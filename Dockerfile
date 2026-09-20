@@ -33,6 +33,9 @@ COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
 COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nodejs:nodejs /app/package*.json ./
 
+# Create data directory with proper permissions
+RUN mkdir -p ./data && chown -R nodejs:nodejs ./data
+
 # Switch to non-root user
 USER nodejs
 
