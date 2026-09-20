@@ -19,4 +19,3 @@ coverage
 __tests__
 .eslintrc*
 .prettierrc*
-tsconfig.json
