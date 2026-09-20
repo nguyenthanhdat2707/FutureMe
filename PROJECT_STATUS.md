@@ -1,21 +1,21 @@
 # Future Me — Project Status
 
 > **Last Updated:** 2026-09-21 — implementation in progress
-> **Current Branch:** `feat/cicdworkflow`
+> **Current Branch:** `feat/core-decision-logic`
 > **Overall Progress:** Foundation complete; core feasibility assessment in progress
 
 ## Live Implementation Status
 
 | Field | Current value |
 |-------|---------------|
-| Current task | Frontend feasibility assessment integration complete |
-| Actual agent | Codex implementation worker; Hermes supervisor verified and pushed coherent units |
-| Working path | `frontend/src/api/client.ts`, `frontend/src/types/domain.ts`, `frontend/src/pages/DecisionsPage.tsx` |
-| Completed | Typed general-purpose impact profile; deterministic capacity, deadline-pressure, energy-fit, feasibility, evidence, assumptions, and clarifications; focused automated tests |
-| In progress | No implementation work in this unit; the frontend form now submits to the real decision API and renders the returned assessment |
-| Next | Add broader route/repository tests to satisfy the repository-wide coverage gate, then add browser-level frontend tests when test infrastructure is selected |
-| Blocked | No product or credentials blocker. Full test command remains blocked by pre-existing project-wide coverage debt; real Calendar/Bedrock remain optional adapters |
-| Current test status | Feasibility tests: 4/4 passed; health tests: 2/2 passed; root build passed; frontend lint and build passed; live decision API returned the expected `not-feasible` result. `npm run test` exits non-zero only because global coverage is 37.43% versus the configured 50% threshold |
+| Current task | Route-level integration coverage and persistence consistency complete |
+| Actual agent | Codex implementation worker; Hermes supervisor verified and will push the tested unit |
+| Working path | `src/__tests__/routes.integration.test.ts`, demo and decision persistence repositories/routes |
+| Completed | Typed general-purpose impact profile; deterministic capacity, deadline-pressure, energy-fit, feasibility, evidence, assumptions, clarifications; route integration coverage; stable demo and decision IDs |
+| In progress | No implementation work in this unit |
+| Next | Add targeted tests for the remaining low-coverage intelligence components, then add browser-level frontend tests when test infrastructure is selected |
+| Blocked | No product or credentials blocker; real Calendar/Bedrock remain optional adapters |
+| Current test status | Full Jest suite: 13/13 passed. Global coverage: 79.41% statements, 60% branches, 80.86% functions, 80.1% lines; all exceed the 50% gate. Root and frontend builds passed; focused lint passed; live decision API returned the expected `not-feasible` result |
 
 ---
 

@@ -23,8 +23,8 @@ export class DecisionRepository extends BaseRepository {
     return rows.map(this.mapToDecision.bind(this));
   }
 
-  create(decision: Omit<Decision, 'id' | 'createdAt'>): Decision {
-    const id = uuidv4();
+  create(decision: Omit<Decision, 'createdAt'>): Decision {
+    const id = decision.id || uuidv4();
     const now = new Date().toISOString();
 
     this.db.run(`

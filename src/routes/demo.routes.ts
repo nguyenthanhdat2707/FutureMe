@@ -20,6 +20,7 @@ demoRouter.post('/reset', async (req: Request, res: Response) => {
     let user = userRepo.findById(userId);
     if (!user) {
       user = userRepo.create({
+        id: userId,
         email: 'demo@future-me.app',
         displayName: 'Demo User'
       });
@@ -72,6 +73,7 @@ demoRouter.post('/seed', async (req: Request, res: Response) => {
       user = userRepo.findByEmail('demo@future-me.app');
       if (!user) {
         user = userRepo.create({
+          id: userId,
           email: 'demo@future-me.app',
           displayName: 'Demo User'
         });
