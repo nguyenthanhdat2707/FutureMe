@@ -140,6 +140,43 @@ export interface Recommendation {
   reasoning: string;
 }
 
+export type DecisionImpactSource = 'user-confirmed' | 'provided' | 'estimated';
+
+export interface DecisionImpactProfile {
+  timeCostHours?: number;
+  target?: string;
+  deadline?: Date | string;
+  availableHoursBeforeDeadline?: number;
+  workloadHoursBeforeDeadline?: number;
+  energyCost?: number;
+  availableEnergy?: number;
+  goalRelevance?: 'low' | 'medium' | 'high';
+  source?: DecisionImpactSource;
+}
+
+export type DecisionFeasibility = 'feasible' | 'at-risk' | 'not-feasible' | 'needs-info';
+export type DeadlinePressure = 'low' | 'moderate' | 'high' | 'unknown';
+export type EnergyFit = 'good' | 'strained' | 'poor' | 'unknown';
+
+export interface FeasibilityEvidence {
+  fact: string;
+  value: string | number;
+  source: DecisionImpactSource | 'calculated';
+  explanation: string;
+}
+
+export interface DecisionFeasibilityAssessment {
+  availableTimeBeforeDeadlineHours: number | null;
+  projectedRemainingCapacityHours: number | null;
+  deadlinePressure: DeadlinePressure;
+  energyFit: EnergyFit;
+  feasibility: DecisionFeasibility;
+  recommendation: Recommendation;
+  assumptions: string[];
+  missingData: string[];
+  evidence: FeasibilityEvidence[];
+}
+
 export interface ContextSnapshot {
   capturedAt: Date;
   goals: Goal[];
@@ -167,10 +204,12 @@ export interface DecisionQuery {
   question: string;
   options?: string[];
   context?: Record<string, unknown>;
+  impactProfile?: DecisionImpactProfile;
 }
 
 export interface DecisionSupport {
   decision: Decision;
+  assessment: DecisionFeasibilityAssessment;
   clarificationNeeded?: string[];
 }
 
