@@ -9,7 +9,8 @@ import type {
   Role,
   TimeBlock,
   DecisionQuery,
-  DecisionResponse,
+  DecisionApiRequest,
+  DecisionApiResponse,
   Intervention,
   ClarificationRequest,
   DemoScenario,
@@ -28,10 +29,7 @@ import {
   InterventionIntensity,
 } from '../types/domain';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
-
-// Silence unused - will be used when connecting real API
-void API_BASE_URL;
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api').replace(/\/$/, '');
 
 // ============================================================================
 // Mock Data Helpers
@@ -235,64 +233,31 @@ export const calendarApi = {
 // ============================================================================
 
 export const decisionsApi = {
-  async query(question: string, context?: Record<string, any>): Promise<DecisionResponse> {
-    await delay(800);
-    // Silence unused params - will be used when connecting real API
-    void question;
-    void context;
-    return {
-      queryId: `query-${Date.now()}`,
-      recommendation: 'Postpone the client meeting to tomorrow afternoon and use this time slot for focused MVP development.',
-      reasoning: {
-        summary: 'Based on your current energy level, looming deadline, and available capacity, prioritizing MVP work now maximizes progress toward your critical goal.',
-        factors: [
-          {
-            factor: 'Hackathon deadline proximity',
-            weight: 0.9,
-            direction: 'POSITIVE',
-            explanation: 'Only 3 days remaining until demo day',
-          },
-          {
-            factor: 'Current energy level',
-            weight: 0.7,
-            direction: 'POSITIVE',
-            explanation: 'Your energy is medium-high, suitable for deep work',
-          },
-          {
-            factor: 'Meeting flexibility',
-            weight: 0.6,
-            direction: 'POSITIVE',
-            explanation: 'Client meeting can be rescheduled with 24h notice',
-          },
-        ],
-        constraintsConsidered: ['Available time capacity', 'Energy levels', 'Goal priorities'],
-        assumptionsMade: ['Client is flexible with meeting time', 'No other urgent deadlines today'],
+  async query(request: DecisionApiRequest): Promise<DecisionApiResponse> {
+    const response = await fetch(`${API_BASE_URL}/decisions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
       },
-      tradeoffs: [
-        {
-          aspect: 'Client relationship',
-          gain: 'Complete critical MVP milestone',
-          cost: 'Need to reschedule meeting (minor inconvenience)',
-          severity: 'LOW',
-        },
-      ],
-      alternatives: [
-        {
-          option: 'Keep meeting, work on MVP in evening',
-          pros: ['Maintain scheduled commitment', 'No rescheduling needed'],
-          cons: ['Evening energy typically lower', 'Risk of incomplete work', 'Potential burnout'],
-          suitability: 0.4,
-        },
-      ],
-      confidence: 0.85,
-      impactAnalysis: {
-        shortTerm: ['MVP progress accelerates', 'Meeting moves to tomorrow'],
-        longTerm: ['Increases likelihood of successful hackathon demo', 'Maintains sustainable work pace'],
-        riskLevel: 'LOW',
-        affectedGoals: ['goal-1'],
-      },
-      timestamp: new Date().toISOString(),
-    };
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      let message = `Decision request failed (${response.status})`;
+
+      try {
+        const body: unknown = await response.json();
+        if (typeof body === 'object' && body !== null && 'error' in body && typeof body.error === 'string') {
+          message = body.error;
+        }
+      } catch {
+        // Keep the status-based message when the server does not return JSON.
+      }
+
+      throw new Error(message);
+    }
+
+    return response.json() as Promise<DecisionApiResponse>;
   },
 
   async getHistory(): Promise<DecisionQuery[]> {

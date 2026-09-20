@@ -4,10 +4,11 @@
  * PROVISIONAL - replaceable with real Bedrock integration
  */
 
-import { DecisionQuery, DecisionSupport, Decision, DecisionStatus } from '../domain/types';
+import { DecisionQuery, DecisionSupport, Decision, DecisionStatus, Tradeoff } from '../domain/types';
 import { IDecisionEngine, IContextEngine } from './interfaces';
 import { ILLMProvider } from '../adapters/llm-provider.interface';
 import { v4 as uuidv4 } from 'uuid';
+import { assessDecisionFeasibility } from './deterministic-feasibility-assessment';
 
 export class MockDecisionEngine implements IDecisionEngine {
   constructor(
@@ -18,6 +19,7 @@ export class MockDecisionEngine implements IDecisionEngine {
   async supportDecision(userId: string, query: DecisionQuery): Promise<DecisionSupport> {
     // Get relevant context
     const relevantContext = await this.contextEngine.getRelevantContext(userId, query);
+    const assessment = assessDecisionFeasibility(query.impactProfile);
     
     // Build LLM prompt
     const systemPrompt = `You are a decision support assistant. Analyze the user's question in context of their goals, commitments, and constraints. Provide a recommendation with clear tradeoffs.
@@ -44,27 +46,24 @@ Context:
 - Goals: ${JSON.stringify(relevantContext.goals)}
 - Commitments: ${JSON.stringify(relevantContext.commitments)}
 - Current State: ${relevantContext.state.state}
+- Candidate Impact: ${JSON.stringify(query.impactProfile ?? null)}
 
-Please analyze this decision.`;
+Please describe meaningful tradeoffs without inventing feasibility facts.`;
 
     const response = await this.llmProvider.generate([
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt }
     ]);
 
-    let parsed: any;
+    let tradeoffs: Tradeoff[] = [];
     try {
-      parsed = JSON.parse(response.content);
-    } catch (e) {
+      const parsed: unknown = JSON.parse(response.content);
+      if (hasTradeoffs(parsed)) {
+        tradeoffs = parsed.tradeoffs;
+      }
+    } catch {
       // Fallback if LLM doesn't return valid JSON
-      parsed = {
-        recommendation: {
-          option: 'uncertain',
-          confidence: 0.5,
-          reasoning: 'Unable to generate recommendation'
-        },
-        tradeoffs: []
-      };
+      tradeoffs = [];
     }
 
     // Create decision object
@@ -80,17 +79,41 @@ Please analyze this decision.`;
         constraints: relevantContext.constraints,
         relevantHistory: relevantContext.recentHistory
       },
-      tradeoffs: parsed.tradeoffs || [],
-      recommendation: parsed.recommendation,
-      reasoning: parsed.recommendation.reasoning,
-      confidence: parsed.recommendation.confidence,
+      tradeoffs,
+      recommendation: assessment.recommendation,
+      reasoning: assessment.recommendation.reasoning,
+      confidence: assessment.recommendation.confidence,
       status: DecisionStatus.PENDING,
       createdAt: new Date()
     };
 
     return {
       decision,
-      clarificationNeeded: []
+      assessment,
+      clarificationNeeded: clarificationQuestions(assessment.missingData)
     };
   }
+}
+
+function hasTradeoffs(value: unknown): value is { tradeoffs: Tradeoff[] } {
+  return typeof value === 'object' && value !== null && Array.isArray((value as { tradeoffs?: unknown }).tradeoffs);
+}
+
+function clarificationQuestions(missingData: string[]): string[] {
+  return missingData.map(field => {
+    switch (field) {
+      case 'timeCostHours':
+        return 'How many hours will this candidate commitment require?';
+      case 'availableHoursBeforeDeadline or deadline':
+        return 'What is the deadline, or how many hours are available before it?';
+      case 'workloadHoursBeforeDeadline':
+        return 'How many hours of existing workload remain before the deadline?';
+      case 'energyCost':
+        return 'How much energy will the candidate commitment require?';
+      case 'availableEnergy':
+        return 'How much energy is currently available?';
+      default:
+        return `Please provide ${field}.`;
+    }
+  });
 }

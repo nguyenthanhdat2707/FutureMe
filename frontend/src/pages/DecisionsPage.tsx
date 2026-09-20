@@ -1,158 +1,440 @@
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
+import { decisionsApi } from '../api/client';
+import type { DecisionApiRequest, DecisionApiResponse } from '../types/domain';
 
-/**
- * DecisionsPage - Ask Future Me
- * Decision query interface with trade-off analysis
- */
+interface DemoForm {
+  userId: string;
+  question: string;
+  target: string;
+  deadline: string;
+  timeCostHours: string;
+  availableHoursBeforeDeadline: string;
+  workloadHoursBeforeDeadline: string;
+  energyCost: string;
+  availableEnergy: string;
+  goalRelevance: 'low' | 'medium' | 'high';
+  source: 'user-confirmed' | 'provided' | 'estimated';
+}
+
+const INITIAL_FORM: DemoForm = {
+  userId: 'demo-user',
+  question: 'Should I accept a 10-hour freelance project due Friday while preparing for the hackathon?',
+  target: 'Freelance project due Friday',
+  deadline: '2026-09-25T18:00',
+  timeCostHours: '10',
+  availableHoursBeforeDeadline: '14',
+  workloadHoursBeforeDeadline: '8',
+  energyCost: '7',
+  availableEnergy: '5',
+  goalRelevance: 'medium',
+  source: 'user-confirmed',
+};
+
+const inputClassName =
+  'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-ai disabled:opacity-60';
+
+function optionalNumber(value: string): number | undefined {
+  if (value.trim() === '') {
+    return undefined;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function titleCase(value: string): string {
+  return value
+    .split('-')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function feasibilityClass(feasibility: string): string {
+  switch (feasibility) {
+    case 'feasible':
+      return 'bg-green-100 text-green-800';
+    case 'at-risk':
+      return 'bg-amber-100 text-amber-800';
+    case 'not-feasible':
+      return 'bg-red-100 text-red-800';
+    default:
+      return 'bg-slate-100 text-slate-700';
+  }
+}
+
+function formatHours(value: number | null): string {
+  return value === null ? 'Not available' : value + ' hours';
+}
+
 function DecisionsPage() {
-  const [query, setQuery] = useState('');
-  const [showResponse, setShowResponse] = useState(false);
+  const [form, setForm] = useState<DemoForm>(INITIAL_FORM);
+  const [result, setResult] = useState<DecisionApiResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleAsk = () => {
-    if (query.trim()) {
-      setShowResponse(true);
+  const updateField = (field: keyof DemoForm, value: string) => {
+    setForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const question = form.question.trim();
+    if (!question) {
+      setError('Enter a decision question before submitting.');
+      return;
+    }
+
+    const request: DecisionApiRequest = {
+      query: {
+        question,
+        impactProfile: {
+          target: form.target.trim() || undefined,
+          deadline: form.deadline || undefined,
+          timeCostHours: optionalNumber(form.timeCostHours),
+          availableHoursBeforeDeadline: optionalNumber(form.availableHoursBeforeDeadline),
+          workloadHoursBeforeDeadline: optionalNumber(form.workloadHoursBeforeDeadline),
+          energyCost: optionalNumber(form.energyCost),
+          availableEnergy: optionalNumber(form.availableEnergy),
+          goalRelevance: form.goalRelevance,
+          source: form.source,
+        },
+      },
+    };
+
+    if (form.userId.trim()) {
+      request.userId = form.userId.trim();
+    }
+
+    setIsLoading(true);
+    setError(null);
+    setResult(null);
+
+    try {
+      setResult(await decisionsApi.query(request));
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : 'Unable to request decision support.');
+    } finally {
+      setIsLoading(false);
     }
   };
+
+  const recommendation = result?.decision.recommendation;
+  const assessment = result?.assessment;
+  const confidencePercent = recommendation
+    ? Math.round(Math.min(1, Math.max(0, recommendation.confidence)) * 100)
+    : 0;
 
   return (
     <div className="p-8 space-y-8">
       <header>
         <h1 className="text-4xl font-serif text-text-primary mb-2">Ask Future Me</h1>
-        <p className="text-text-secondary">Get context-aware decision support</p>
+        <p className="text-text-secondary">
+          Test a decision against your available time, workload, and energy.
+        </p>
       </header>
 
-      {/* Query Input */}
-      <div className="card p-6 space-y-4">
-        <label htmlFor="decision-query" className="block text-sm font-medium text-text-secondary">
-          What decision do you need help with?
-        </label>
-        <textarea
-          id="decision-query"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="e.g., Should I reschedule my client meeting to work on the MVP?"
-          className="w-full p-4 border border-slate-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-accent-ai"
-          rows={4}
-        />
-        <button
-          onClick={handleAsk}
-          className="px-6 py-3 bg-accent-ai text-white rounded-lg font-medium hover:bg-opacity-90"
-        >
-          Ask Future Me
-        </button>
-      </div>
-
-      {/* Response */}
-      {showResponse && (
-        <div className="space-y-6">
-          {/* Recommendation */}
-          <div className="card p-6 space-y-4">
-            <div className="flex items-start gap-3">
-              <div className="flex-shrink-0 w-8 h-8 bg-accent-ai bg-opacity-10 rounded-full flex items-center justify-center">
-                <span className="text-accent-ai font-bold text-sm">AI</span>
-              </div>
-              <div className="flex-1">
-                <h3 className="font-medium text-text-primary mb-2">Recommendation</h3>
-                <p className="text-text-primary">
-                  Postpone the client meeting to tomorrow afternoon and use this time slot for focused MVP development.
-                </p>
-                <div className="mt-4 flex items-center gap-2">
-                  <span className="text-sm text-text-secondary">Confidence:</span>
-                  <div className="flex-1 max-w-xs bg-slate-200 rounded-full h-2">
-                    <div className="bg-accent-ai h-2 rounded-full" style={{ width: '85%' }}></div>
-                  </div>
-                  <span className="font-mono text-sm">85%</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Reasoning */}
-          <div className="card p-6 space-y-4">
-            <h3 className="font-medium text-text-primary">Why this recommendation?</h3>
-            <div className="space-y-3">
-              <div className="flex gap-3">
-                <div className="text-green-600 font-bold">+</div>
-                <div>
-                  <p className="text-sm font-medium text-text-primary">Hackathon deadline proximity</p>
-                  <p className="text-sm text-text-secondary">Only 3 days remaining until demo day</p>
-                </div>
-              </div>
-              <div className="flex gap-3">
-                <div className="text-green-600 font-bold">+</div>
-                <div>
-                  <p className="text-sm font-medium text-text-primary">Current energy level</p>
-                  <p className="text-sm text-text-secondary">Your energy is medium-high, suitable for deep work</p>
-                </div>
-              </div>
-              <div className="flex gap-3">
-                <div className="text-green-600 font-bold">+</div>
-                <div>
-                  <p className="text-sm font-medium text-text-primary">Meeting flexibility</p>
-                  <p className="text-sm text-text-secondary">Client meeting can be rescheduled with 24h notice</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Trade-offs */}
-          <div className="card p-6 space-y-4">
-            <h3 className="font-medium text-text-primary">Trade-offs to consider</h3>
-            <div className="space-y-4">
-              <div className="border-l-4 border-accent-warning pl-4">
-                <p className="font-medium text-sm text-text-primary mb-1">Client relationship</p>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <p className="text-text-secondary mb-1">Gain:</p>
-                    <p className="text-text-primary">Complete critical MVP milestone</p>
-                  </div>
-                  <div>
-                    <p className="text-text-secondary mb-1">Cost:</p>
-                    <p className="text-text-primary">Need to reschedule meeting (minor inconvenience)</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Alternatives */}
-          <div className="card p-6 space-y-4">
-            <h3 className="font-medium text-text-primary">Alternative options</h3>
-            <div className="border border-slate-300 rounded-lg p-4">
-              <div className="flex items-start justify-between mb-2">
-                <p className="font-medium text-text-primary">Keep meeting, work on MVP in evening</p>
-                <span className="font-mono text-sm text-text-secondary">40% fit</span>
-              </div>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="text-text-secondary mb-1">Pros:</p>
-                  <ul className="list-disc list-inside text-text-primary space-y-1">
-                    <li>Maintain scheduled commitment</li>
-                    <li>No rescheduling needed</li>
-                  </ul>
-                </div>
-                <div>
-                  <p className="text-text-secondary mb-1">Cons:</p>
-                  <ul className="list-disc list-inside text-text-primary space-y-1">
-                    <li>Evening energy typically lower</li>
-                    <li>Risk of incomplete work</li>
-                    <li>Potential burnout</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div className="flex gap-3">
-            <button className="px-6 py-3 bg-accent-ai text-white rounded-lg font-medium hover:bg-opacity-90">
-              Accept & Apply
-            </button>
-            <button className="px-6 py-3 border border-slate-300 text-text-primary rounded-lg hover:bg-slate-50">
-              Show me more options
-            </button>
-          </div>
+      <form className="card p-6 space-y-6" onSubmit={handleSubmit}>
+        <div>
+          <label htmlFor="decision-query" className="block text-sm font-medium text-text-secondary mb-2">
+            What decision do you need help with?
+          </label>
+          <textarea
+            id="decision-query"
+            value={form.question}
+            onChange={(event) => updateField('question', event.target.value)}
+            className={inputClassName + ' resize-y'}
+            rows={4}
+            required
+          />
         </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <label className="text-sm text-text-secondary">
+            User ID <span className="text-xs">(optional)</span>
+            <input
+              value={form.userId}
+              onChange={(event) => updateField('userId', event.target.value)}
+              className={inputClassName + ' mt-1'}
+            />
+          </label>
+
+          <label className="text-sm text-text-secondary">
+            Decision target
+            <input
+              value={form.target}
+              onChange={(event) => updateField('target', event.target.value)}
+              className={inputClassName + ' mt-1'}
+            />
+          </label>
+
+          <label className="text-sm text-text-secondary">
+            Deadline
+            <input
+              type="datetime-local"
+              value={form.deadline}
+              onChange={(event) => updateField('deadline', event.target.value)}
+              className={inputClassName + ' mt-1'}
+            />
+          </label>
+
+          <label className="text-sm text-text-secondary">
+            Time cost (hours)
+            <input
+              type="number"
+              min="0"
+              step="0.5"
+              value={form.timeCostHours}
+              onChange={(event) => updateField('timeCostHours', event.target.value)}
+              className={inputClassName + ' mt-1'}
+            />
+          </label>
+
+          <label className="text-sm text-text-secondary">
+            Available time before deadline (hours)
+            <input
+              type="number"
+              min="0"
+              step="0.5"
+              value={form.availableHoursBeforeDeadline}
+              onChange={(event) => updateField('availableHoursBeforeDeadline', event.target.value)}
+              className={inputClassName + ' mt-1'}
+            />
+          </label>
+
+          <label className="text-sm text-text-secondary">
+            Existing workload before deadline (hours)
+            <input
+              type="number"
+              min="0"
+              step="0.5"
+              value={form.workloadHoursBeforeDeadline}
+              onChange={(event) => updateField('workloadHoursBeforeDeadline', event.target.value)}
+              className={inputClassName + ' mt-1'}
+            />
+          </label>
+
+          <label className="text-sm text-text-secondary">
+            Energy cost (0–10)
+            <input
+              type="number"
+              min="0"
+              max="10"
+              step="1"
+              value={form.energyCost}
+              onChange={(event) => updateField('energyCost', event.target.value)}
+              className={inputClassName + ' mt-1'}
+            />
+          </label>
+
+          <label className="text-sm text-text-secondary">
+            Available energy (0–10)
+            <input
+              type="number"
+              min="0"
+              max="10"
+              step="1"
+              value={form.availableEnergy}
+              onChange={(event) => updateField('availableEnergy', event.target.value)}
+              className={inputClassName + ' mt-1'}
+            />
+          </label>
+
+          <label className="text-sm text-text-secondary">
+            Goal relevance
+            <select
+              value={form.goalRelevance}
+              onChange={(event) => updateField('goalRelevance', event.target.value)}
+              className={inputClassName + ' mt-1'}
+            >
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
+          </label>
+
+          <label className="text-sm text-text-secondary">
+            Data source
+            <select
+              value={form.source}
+              onChange={(event) => updateField('source', event.target.value)}
+              className={inputClassName + ' mt-1'}
+            >
+              <option value="user-confirmed">User confirmed</option>
+              <option value="provided">Provided</option>
+              <option value="estimated">Estimated</option>
+            </select>
+          </label>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="inline-flex items-center gap-2 rounded-lg bg-accent-ai px-6 py-3 font-medium text-white hover:bg-opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isLoading && (
+              <span
+                className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"
+                aria-hidden="true"
+              />
+            )}
+            {isLoading ? 'Assessing decision…' : 'Ask Future Me'}
+          </button>
+          <span className="text-xs text-text-secondary">
+            Sends a live request to the configured decisions API.
+          </span>
+        </div>
+
+        {error && (
+          <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+            <p className="font-medium">Decision request failed</p>
+            <p className="mt-1">{error}</p>
+          </div>
+        )}
+      </form>
+
+      {result && recommendation && assessment && (
+        <section className="space-y-6" aria-live="polite">
+          <article className="card p-6">
+            <div className="flex items-start gap-3">
+              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-violet-100">
+                <span className="text-sm font-bold text-accent-ai">AI</span>
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h2 className="text-xl font-medium text-text-primary">Recommendation</h2>
+                  <span className="rounded-full bg-violet-100 px-3 py-1 text-sm font-medium text-accent-ai">
+                    {titleCase(recommendation.option)}
+                  </span>
+                </div>
+                <p className="mt-3 text-text-primary">{recommendation.reasoning}</p>
+                <div className="mt-4 flex items-center gap-3">
+                  <span className="text-sm text-text-secondary">Confidence</span>
+                  <div className="h-2 max-w-xs flex-1 rounded-full bg-slate-200">
+                    <div
+                      className="h-2 rounded-full bg-accent-ai"
+                      style={{ width: confidencePercent + '%' }}
+                    />
+                  </div>
+                  <span className="font-mono text-sm text-text-primary">{confidencePercent}%</span>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article className="card p-6 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-xl font-medium text-text-primary">Feasibility assessment</h2>
+              <span
+                className={
+                  'rounded-full px-3 py-1 text-sm font-medium ' +
+                  feasibilityClass(assessment.feasibility)
+                }
+              >
+                {titleCase(assessment.feasibility)}
+              </span>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="rounded-lg border border-slate-200 p-4">
+                <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">Capacity</p>
+                <p className="mt-2 font-mono text-lg text-text-primary">
+                  {formatHours(assessment.projectedRemainingCapacityHours)}
+                </p>
+                <p className="mt-1 text-xs text-text-secondary">
+                  Remaining from {formatHours(assessment.availableTimeBeforeDeadlineHours)}
+                </p>
+              </div>
+              <div className="rounded-lg border border-slate-200 p-4">
+                <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">Pressure</p>
+                <p className="mt-2 text-lg font-medium text-text-primary">
+                  {titleCase(assessment.deadlinePressure)}
+                </p>
+                <p className="mt-1 text-xs text-text-secondary">Deadline pressure</p>
+              </div>
+              <div className="rounded-lg border border-slate-200 p-4">
+                <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">Energy</p>
+                <p className="mt-2 text-lg font-medium text-text-primary">
+                  {titleCase(assessment.energyFit)}
+                </p>
+                <p className="mt-1 text-xs text-text-secondary">Energy fit</p>
+              </div>
+              <div className="rounded-lg border border-slate-200 p-4">
+                <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">Assessment</p>
+                <p className="mt-2 text-lg font-medium text-text-primary">
+                  {titleCase(assessment.feasibility)}
+                </p>
+                <p className="mt-1 text-xs text-text-secondary">Overall feasibility</p>
+              </div>
+            </div>
+          </article>
+
+          <article className="card p-6 space-y-4">
+            <h2 className="text-xl font-medium text-text-primary">Evidence</h2>
+            {assessment.evidence.length > 0 ? (
+              <div className="space-y-3">
+                {assessment.evidence.map((item, index) => (
+                  <div key={item.fact + index} className="rounded-lg border border-slate-200 p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <p className="font-medium text-text-primary">{item.fact}</p>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-sm text-text-primary">{String(item.value)}</span>
+                        <span className="rounded bg-slate-100 px-2 py-1 text-xs text-text-secondary">
+                          {titleCase(item.source)}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="mt-2 text-sm text-text-secondary">{item.explanation}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-text-secondary">No evidence was returned.</p>
+            )}
+          </article>
+
+          <div className="grid gap-6 lg:grid-cols-2">
+            <article className="card p-6">
+              <h2 className="text-xl font-medium text-text-primary">Assumptions</h2>
+              {assessment.assumptions.length > 0 ? (
+                <ul className="mt-4 list-disc space-y-2 pl-5 text-sm text-text-primary">
+                  {assessment.assumptions.map((assumption) => (
+                    <li key={assumption}>{assumption}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-4 text-sm text-text-secondary">No assumptions were reported.</p>
+              )}
+            </article>
+
+            <article className="card p-6">
+              <h2 className="text-xl font-medium text-text-primary">Missing data</h2>
+              {assessment.missingData.length > 0 ? (
+                <ul className="mt-4 list-disc space-y-2 pl-5 text-sm text-text-primary">
+                  {assessment.missingData.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-4 text-sm text-text-secondary">No required data is missing.</p>
+              )}
+            </article>
+          </div>
+
+          <article className="card border-l-4 border-accent-warning p-6">
+            <h2 className="text-xl font-medium text-text-primary">Clarifications</h2>
+            {result.clarificationNeeded.length > 0 ? (
+              <ul className="mt-4 list-disc space-y-2 pl-5 text-sm text-text-primary">
+                {result.clarificationNeeded.map((clarification) => (
+                  <li key={clarification}>{clarification}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-4 text-sm text-text-secondary">No clarification is needed.</p>
+            )}
+          </article>
+        </section>
       )}
     </div>
   );
