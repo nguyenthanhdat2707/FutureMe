@@ -7,23 +7,22 @@ import { getDatabase } from '../database/connection';
 
 export const healthRouter = Router();
 
-healthRouter.get('/', async (req: Request, res: Response) => {
-  try {
-    // Check database connection
-    const db = getDatabase();
-    const result = db.prepare('SELECT 1 as ok').get() as any;
+healthRouter.get('/', (_req: Request, res: Response) => {
+  let database: 'connected' | 'disconnected' = 'disconnected';
 
-    res.json({
-      status: 'healthy',
-      timestamp: new Date().toISOString(),
-      database: result.ok === 1 ? 'connected' : 'disconnected',
-      version: '0.1.0'
-    });
-  } catch (error: any) {
-    res.status(503).json({
-      status: 'unhealthy',
-      timestamp: new Date().toISOString(),
-      error: error.message
-    });
+  try {
+    const db = getDatabase();
+    const result = db.prepare('SELECT 1 as ok').get() as { ok?: number };
+    database = result.ok === 1 ? 'connected' : 'disconnected';
+  } catch {
+    // The liveness endpoint remains available while the database is starting.
   }
+
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    service: 'future-me-backend',
+    database,
+    version: '0.1.0'
+  });
 });

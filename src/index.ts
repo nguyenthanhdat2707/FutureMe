@@ -17,7 +17,7 @@ async function start() {
     // Initialize database
     console.log('[Server] Initializing database...');
     await initDatabase();
-    
+
     // Create Express app
     const app = createApp();
     
@@ -48,4 +48,4 @@ async function start() {
   }
 }
 
-start();
+void start();
