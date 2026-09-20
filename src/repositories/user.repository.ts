@@ -22,8 +22,8 @@ export class UserRepository extends BaseRepository {
     return row ? this.mapToUser(row) : null;
   }
 
-  create(user: Omit<User, 'id' | 'createdAt' | 'updatedAt'>): User {
-    const id = uuidv4();
+  create(user: Omit<User, 'createdAt' | 'updatedAt'>): User {
+    const id = user.id || uuidv4();
     const now = new Date().toISOString();
 
     this.db.run(
