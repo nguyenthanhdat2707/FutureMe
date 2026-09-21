@@ -13,9 +13,10 @@ import {
   ObservationSource,
   Goal,
   Commitment,
-  Preference
+  Preference,
+  ObservationType
 } from '../domain/types';
-import { IContextEngine } from './interfaces';
+import { IContextEngine, IStateEstimator } from './interfaces';
 import { PersonalContextRepository } from '../repositories/personal-context.repository';
 import { DecisionRepository } from '../repositories/decision.repository';
 import { CalendarEventRepository } from '../repositories/calendar-event.repository';
@@ -26,7 +27,8 @@ export class SimpleContextEngine implements IContextEngine {
     private contextRepo: PersonalContextRepository,
     private decisionRepo: DecisionRepository,
     private calendarRepo: CalendarEventRepository,
-    private observationRepo: ObservationRepository
+    private observationRepo: ObservationRepository,
+    private stateEstimator: IStateEstimator
   ) {}
 
   async getCurrentContext(userId: string): Promise<PersonalContext> {
@@ -96,14 +98,27 @@ export class SimpleContextEngine implements IContextEngine {
   }
 
   async updateContext(userId: string, observation: Observation): Promise<PersonalContext> {
-    // Simple implementation: just return current context
-    // In real implementation, would analyze observation and update context attributes
+    const timestamp = observation.timestamp ? new Date(observation.timestamp) : new Date();
+    const confidence = Number.isFinite(observation.confidence)
+      ? Math.min(1, Math.max(0, observation.confidence))
+      : 1;
+
+    this.observationRepo.create({
+      userId,
+      type: observation.type ?? ObservationType.USER_REPORTED,
+      data: observation.data ?? {},
+      source: observation.source ?? ObservationSource.USER_CONFIRMED,
+      confidence,
+      timestamp: Number.isNaN(timestamp.getTime()) ? new Date() : timestamp
+    });
+
     return this.getCurrentContext(userId);
   }
 
   async getRelevantContext(userId: string, decision: DecisionQuery): Promise<RelevantContext> {
     const context = await this.getCurrentContext(userId);
     const recentObs = this.observationRepo.findRecent(userId, 24);
+    const state = await this.stateEstimator.estimateCurrentState(context, recentObs);
 
     // PROVISIONAL: Return all context as "relevant"
     // Real implementation would filter based on decision query
@@ -112,12 +127,7 @@ export class SimpleContextEngine implements IContextEngine {
       commitments: context.commitments,
       constraints: [],
       recentHistory: recentObs.map(o => `${o.type}: ${JSON.stringify(o.data)}`),
-      state: {
-        state: 'FLOW' as any,
-        confidence: 0.5,
-        evidence: [],
-        timestamp: new Date()
-      }
+      state
     };
   }
 

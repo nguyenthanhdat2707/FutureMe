@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
-import { decisionsApi } from '../api/client';
-import type { DecisionApiRequest, DecisionApiResponse } from '../types/domain';
+import { decisionsApi, contextApi } from '../api/client';
+import type { DecisionApiRequest, DecisionApiResponse, ContextUpdateObservation, ObservationSource } from '../types/domain';
 
 interface DemoForm {
   userId: string;
@@ -16,18 +16,30 @@ interface DemoForm {
   source: 'user-confirmed' | 'provided' | 'estimated';
 }
 
+interface ObservationForm {
+  category: 'workload-increase' | 'energy-decrease' | 'deadline-change' | 'disruption';
+  description: string;
+  severity: 'low' | 'medium' | 'high';
+}
+
 const INITIAL_FORM: DemoForm = {
   userId: 'demo-user',
-  question: 'Should I accept a 10-hour freelance project due Friday while preparing for the hackathon?',
-  target: 'Freelance project due Friday',
-  deadline: '2026-09-25T18:00',
-  timeCostHours: '10',
-  availableHoursBeforeDeadline: '14',
-  workloadHoursBeforeDeadline: '8',
-  energyCost: '7',
-  availableEnergy: '5',
+  question: '',
+  target: '',
+  deadline: '',
+  timeCostHours: '',
+  availableHoursBeforeDeadline: '',
+  workloadHoursBeforeDeadline: '',
+  energyCost: '',
+  availableEnergy: '',
   goalRelevance: 'medium',
   source: 'user-confirmed',
+};
+
+const INITIAL_OBSERVATION: ObservationForm = {
+  category: 'workload-increase',
+  description: '',
+  severity: 'medium',
 };
 
 const inputClassName =
@@ -68,12 +80,20 @@ function formatHours(value: number | null): string {
 
 function DecisionsPage() {
   const [form, setForm] = useState<DemoForm>(INITIAL_FORM);
+  const [observationForm, setObservationForm] = useState<ObservationForm>(INITIAL_OBSERVATION);
   const [result, setResult] = useState<DecisionApiResponse | null>(null);
+  const [beforeResult, setBeforeResult] = useState<DecisionApiResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [clarificationAnswers, setClarificationAnswers] = useState<Record<string, string>>({});
+  const [showObservationForm, setShowObservationForm] = useState(false);
 
   const updateField = (field: keyof DemoForm, value: string) => {
     setForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const updateObservation = (field: keyof ObservationForm, value: string) => {
+    setObservationForm((current) => ({ ...current, [field]: value }));
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -109,11 +129,116 @@ function DecisionsPage() {
     setIsLoading(true);
     setError(null);
     setResult(null);
+    setBeforeResult(null);
+    setClarificationAnswers({});
 
     try {
-      setResult(await decisionsApi.query(request));
+      const response = await decisionsApi.query(request);
+      setResult(response);
+      setBeforeResult(null);
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : 'Unable to request decision support.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleObservationSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!observationForm.description.trim()) {
+      setError('Enter an observation description.');
+      return;
+    }
+
+    const observation: ContextUpdateObservation = {
+      type: observationForm.category,
+      data: {
+        description: observationForm.description,
+        severity: observationForm.severity,
+      },
+      source: 'USER_CONFIRMED' as ObservationSource,
+      confidence: 1.0,
+    };
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      await contextApi.update(observation, form.userId);
+      setShowObservationForm(false);
+      setObservationForm(INITIAL_OBSERVATION);
+      setError(null);
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : 'Unable to submit observation.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleClarificationSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!result) return;
+
+    // Save the current result as "before"
+    setBeforeResult(result);
+
+    // Merge clarification answers into the impact profile
+    const updatedProfile = { ...form };
+
+    Object.entries(clarificationAnswers).forEach(([question, answer]) => {
+      const answerNum = optionalNumber(answer);
+      
+      if (question.toLowerCase().includes('time cost') || question.toLowerCase().includes('how long')) {
+        if (answerNum !== undefined) updatedProfile.timeCostHours = answer;
+      } else if (question.toLowerCase().includes('available time') || question.toLowerCase().includes('hours available')) {
+        if (answerNum !== undefined) updatedProfile.availableHoursBeforeDeadline = answer;
+      } else if (question.toLowerCase().includes('existing workload') || question.toLowerCase().includes('workload hours')) {
+        if (answerNum !== undefined) updatedProfile.workloadHoursBeforeDeadline = answer;
+      } else if (question.toLowerCase().includes('energy cost')) {
+        if (answerNum !== undefined) updatedProfile.energyCost = answer;
+      } else if (question.toLowerCase().includes('available energy') || question.toLowerCase().includes('energy level')) {
+        if (answerNum !== undefined) updatedProfile.availableEnergy = answer;
+      } else if (question.toLowerCase().includes('deadline')) {
+        updatedProfile.deadline = answer;
+      } else if (question.toLowerCase().includes('target')) {
+        updatedProfile.target = answer;
+      }
+    });
+
+    setForm(updatedProfile);
+
+    const request: DecisionApiRequest = {
+      query: {
+        question: form.question,
+        impactProfile: {
+          target: updatedProfile.target.trim() || undefined,
+          deadline: updatedProfile.deadline || undefined,
+          timeCostHours: optionalNumber(updatedProfile.timeCostHours),
+          availableHoursBeforeDeadline: optionalNumber(updatedProfile.availableHoursBeforeDeadline),
+          workloadHoursBeforeDeadline: optionalNumber(updatedProfile.workloadHoursBeforeDeadline),
+          energyCost: optionalNumber(updatedProfile.energyCost),
+          availableEnergy: optionalNumber(updatedProfile.availableEnergy),
+          goalRelevance: updatedProfile.goalRelevance,
+          source: updatedProfile.source,
+        },
+      },
+    };
+
+    if (form.userId.trim()) {
+      request.userId = form.userId.trim();
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await decisionsApi.query(request);
+      setResult(response);
+      setClarificationAnswers({});
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : 'Unable to re-assess decision.');
     } finally {
       setIsLoading(false);
     }
@@ -124,6 +249,19 @@ function DecisionsPage() {
   const confidencePercent = recommendation
     ? Math.round(Math.min(1, Math.max(0, recommendation.confidence)) * 100)
     : 0;
+
+  const beforeRecommendation = beforeResult?.decision.recommendation;
+  const beforeAssessment = beforeResult?.assessment;
+
+  const hasChangedRecommendation = beforeRecommendation && recommendation &&
+    beforeRecommendation.option !== recommendation.option;
+
+  const changedEvidence = beforeAssessment && assessment
+    ? assessment.evidence.filter(e => {
+        const beforeEv = beforeAssessment.evidence.find(be => be.fact === e.fact);
+        return !beforeEv || beforeEv.value !== e.value;
+      })
+    : [];
 
   return (
     <div className="p-8 space-y-8">
@@ -281,6 +419,13 @@ function DecisionsPage() {
             )}
             {isLoading ? 'Assessing decision…' : 'Ask Future Me'}
           </button>
+          <button
+            type="button"
+            onClick={() => setShowObservationForm(!showObservationForm)}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-6 py-3 font-medium text-text-primary hover:bg-slate-50"
+          >
+            {showObservationForm ? 'Hide' : 'Add'} Context Change
+          </button>
           <span className="text-xs text-text-secondary">
             Sends a live request to the configured decisions API.
           </span>
@@ -288,11 +433,138 @@ function DecisionsPage() {
 
         {error && (
           <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-            <p className="font-medium">Decision request failed</p>
+            <p className="font-medium">Request failed</p>
             <p className="mt-1">{error}</p>
           </div>
         )}
       </form>
+
+      {showObservationForm && (
+        <form className="card p-6 space-y-4 border-l-4 border-accent-ai" onSubmit={handleObservationSubmit}>
+          <h2 className="text-xl font-medium text-text-primary">Report Context Change</h2>
+          <p className="text-sm text-text-secondary">
+            Report a change that affects your capacity or state (new task, energy shift, deadline moved, disruption).
+          </p>
+
+          <label className="text-sm text-text-secondary">
+            Change category
+            <select
+              value={observationForm.category}
+              onChange={(event) => updateObservation('category', event.target.value)}
+              className={inputClassName + ' mt-1'}
+            >
+              <option value="workload-increase">Workload increase</option>
+              <option value="energy-decrease">Energy decrease</option>
+              <option value="deadline-change">Deadline change</option>
+              <option value="disruption">Disruption</option>
+            </select>
+          </label>
+
+          <label className="text-sm text-text-secondary">
+            Description
+            <textarea
+              value={observationForm.description}
+              onChange={(event) => updateObservation('description', event.target.value)}
+              className={inputClassName + ' mt-1 resize-y'}
+              rows={3}
+              required
+            />
+          </label>
+
+          <label className="text-sm text-text-secondary">
+            Severity
+            <select
+              value={observationForm.severity}
+              onChange={(event) => updateObservation('severity', event.target.value)}
+              className={inputClassName + ' mt-1'}
+            >
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
+          </label>
+
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="inline-flex items-center gap-2 rounded-lg bg-accent-ai px-6 py-3 font-medium text-white hover:bg-opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Submit Observation
+          </button>
+        </form>
+      )}
+
+      {result && result.clarificationNeeded && result.clarificationNeeded.length > 0 && !beforeResult && (
+        <form className="card border-l-4 border-accent-warning p-6 space-y-4" onSubmit={handleClarificationSubmit}>
+          <h2 className="text-xl font-medium text-text-primary">Clarification Needed</h2>
+          <p className="text-sm text-text-secondary">
+            The following information is needed to improve the assessment:
+          </p>
+
+          {result.clarificationNeeded.map((question) => (
+            <label key={question} className="text-sm text-text-secondary">
+              {question}
+              <input
+                value={clarificationAnswers[question] || ''}
+                onChange={(event) => setClarificationAnswers(prev => ({
+                  ...prev,
+                  [question]: event.target.value
+                }))}
+                className={inputClassName + ' mt-1'}
+                required
+              />
+            </label>
+          ))}
+
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="inline-flex items-center gap-2 rounded-lg bg-accent-warning px-6 py-3 font-medium text-white hover:bg-opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Re-assess with Clarifications
+          </button>
+        </form>
+      )}
+
+      {beforeResult && hasChangedRecommendation && (
+        <article className="card border-l-4 border-green-500 p-6 space-y-4">
+          <h2 className="text-xl font-medium text-text-primary">Assessment Updated</h2>
+          <p className="text-sm text-text-secondary">
+            The recommendation changed after clarification:
+          </p>
+          
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-lg border border-slate-200 p-4 bg-slate-50">
+              <p className="text-xs font-medium uppercase tracking-wide text-text-secondary mb-2">Before</p>
+              <p className="text-lg font-medium text-text-primary">
+                {titleCase(beforeRecommendation?.option || '')}
+              </p>
+              <p className="mt-2 text-sm text-text-secondary">{beforeRecommendation?.reasoning}</p>
+            </div>
+
+            <div className="rounded-lg border border-green-500 p-4 bg-green-50">
+              <p className="text-xs font-medium uppercase tracking-wide text-green-700 mb-2">After</p>
+              <p className="text-lg font-medium text-green-900">
+                {titleCase(recommendation?.option || '')}
+              </p>
+              <p className="mt-2 text-sm text-green-800">{recommendation?.reasoning}</p>
+            </div>
+          </div>
+
+          {changedEvidence.length > 0 && (
+            <div>
+              <p className="text-sm font-medium text-text-primary mb-2">Changed inputs:</p>
+              <ul className="list-disc space-y-1 pl-5 text-sm text-text-secondary">
+                {changedEvidence.map((ev) => (
+                  <li key={ev.fact}>
+                    <span className="font-medium text-text-primary">{ev.fact}:</span> {String(ev.value)}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </article>
+      )}
 
       {result && recommendation && assessment && (
         <section className="space-y-6" aria-live="polite">
@@ -374,20 +646,31 @@ function DecisionsPage() {
             <h2 className="text-xl font-medium text-text-primary">Evidence</h2>
             {assessment.evidence.length > 0 ? (
               <div className="space-y-3">
-                {assessment.evidence.map((item, index) => (
-                  <div key={item.fact + index} className="rounded-lg border border-slate-200 p-4">
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <p className="font-medium text-text-primary">{item.fact}</p>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-sm text-text-primary">{String(item.value)}</span>
-                        <span className="rounded bg-slate-100 px-2 py-1 text-xs text-text-secondary">
-                          {titleCase(item.source)}
-                        </span>
+                {assessment.evidence.map((item, index) => {
+                  const isChanged = changedEvidence.some(ce => ce.fact === item.fact);
+                  return (
+                    <div 
+                      key={item.fact + index} 
+                      className={`rounded-lg border p-4 ${isChanged ? 'border-green-500 bg-green-50' : 'border-slate-200'}`}
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <p className="font-medium text-text-primary">{item.fact}</p>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-sm text-text-primary">{String(item.value)}</span>
+                          <span className="rounded bg-slate-100 px-2 py-1 text-xs text-text-secondary">
+                            {titleCase(item.source)}
+                          </span>
+                          {isChanged && (
+                            <span className="rounded bg-green-200 px-2 py-1 text-xs text-green-800 font-medium">
+                              Updated
+                            </span>
+                          )}
+                        </div>
                       </div>
+                      <p className="mt-2 text-sm text-text-secondary">{item.explanation}</p>
                     </div>
-                    <p className="mt-2 text-sm text-text-secondary">{item.explanation}</p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <p className="text-sm text-text-secondary">No evidence was returned.</p>
@@ -421,19 +704,6 @@ function DecisionsPage() {
               )}
             </article>
           </div>
-
-          <article className="card border-l-4 border-accent-warning p-6">
-            <h2 className="text-xl font-medium text-text-primary">Clarifications</h2>
-            {result.clarificationNeeded.length > 0 ? (
-              <ul className="mt-4 list-disc space-y-2 pl-5 text-sm text-text-primary">
-                {result.clarificationNeeded.map((clarification) => (
-                  <li key={clarification}>{clarification}</li>
-                ))}
-              </ul>
-            ) : (
-              <p className="mt-4 text-sm text-text-secondary">No clarification is needed.</p>
-            )}
-          </article>
         </section>
       )}
     </div>

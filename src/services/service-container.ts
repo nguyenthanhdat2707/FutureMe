@@ -36,7 +36,8 @@ export function getContextEngine(): IContextEngine {
       contextRepo,
       decisionRepo,
       calendarRepo,
-      observationRepo
+      observationRepo,
+      getStateEstimator()
     );
   }
   return contextEngine;

@@ -1,21 +1,21 @@
 # Future Me — Project Status
 
-> **Last Updated:** 2026-09-21 — Context page UI interactions complete
+> **Last Updated:** 2026-09-21 — Context-change → clarification → before/after decision flow complete
 > **Current Branch:** `feat/core-decision-logic`
-> **Overall Progress:** Foundation complete; core decision logic and Context page fully implemented with confirmation/correction UI
+> **Overall Progress:** Foundation complete; core product thesis proven through working clarification flow
 
 ## Live Implementation Status
 
 | Field | Current value |
 |-------|---------------|
-| Current task | Context page UI interactions complete |
+| Current task | Context-change → clarification → before/after assessment flow complete |
 | Actual agent | Hermes (direct implementation) |
-| Working path | `frontend/src/pages/ContextPage.tsx`, `frontend/src/types/domain.ts`, `src/domain/types.ts`, `src/intelligence/simple-context-engine.ts`, `src/__tests__/routes.integration.test.ts` |
-| Completed | Context page now displays provenance/source badges for all attributes (goals, commitments, preferences); added UI for confirming inferred context (POST /api/context/confirm); added inline editing UI for correcting context (POST /api/context/correct); visually distinguishes user-confirmed vs system-inferred vs calculated values with color-coded badges; inferred items show "AI believes:" prefix; confirmation and correction persist after reload; extended Goal/Commitment/Preference types with source, confidence, attributeId fields in both frontend and backend; backend returns provenance data with all context attributes |
+| Working path | `frontend/src/pages/DecisionsPage.tsx`, `src/intelligence/simple-state-estimator.ts`, `src/__tests__/state-estimation.test.ts` |
+| Completed | **Core product thesis proven:** observation creation connects to POST /api/observations; generic observation categories (workload-increase, energy-decrease, deadline-change, disruption) supported; state estimation (FLOW/UNCERTAIN/OVERLOADED/DISRUPTED) displays where implemented; clarificationNeeded prompts appear when assessment lacks data; clarification answers update impact profile inputs; same decision re-runs with updated inputs; before/after assessment displays side-by-side with changed recommendation highlighted; changed evidence items marked with "Updated" badge and green highlight; causal chain visible (which inputs changed → new assessment → different recommendation); deterministic feasibility logic remains authoritative; LLM cannot invent facts; full test coverage for state estimation logic (8 new tests, all passing) |
 | In progress | Ready to commit and push |
-| Next | Further feature work as directed |
+| Next | Calendar integration, outcome/feedback, demo polish |
 | Blocked | No blockers; real Calendar/Bedrock remain optional adapters |
-| Current test status | Full Jest suite: 27/27 passed (5 suites). Backend coverage: 81.03% statements, 63.33% branches, 82.96% functions, 81.54% lines. Frontend build passed (vite build succeeded). Backend lint shows 289 pre-existing issues unrelated to Context page work |
+| Current test status | Full Jest suite: 35/35 passed (6 suites). Backend coverage: 83.1% statements, 64.42% branches, 85.18% functions, 83.66% lines. Frontend build passed (vite build succeeded). Backend build passed (tsc). Lint shows pre-existing issues unrelated to this work |
 
 ---
 
@@ -30,69 +30,72 @@
 
 ---
 
-## Current Milestone: Foundation Setup (Day 0-1)
+## Current Milestone: Core Decision Logic (Day 2-3)
 
-**Goal:** Establish project structure, Docker environment, CI pipeline, and adapter foundations to enable parallel frontend/backend development.
+**Goal:** Prove the core product thesis: context change → uncertainty detection → targeted clarification → updated assessment with inspectable causality.
 
 ---
 
 ## Progress by Track
 
-### TRACK A — Frontend (Antigravity)
+### TRACK A — Frontend (React + TypeScript)
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| Project setup (React + Vite + TypeScript) | ⏳ PLANNED | |
-| TailwindCSS + design tokens | ⏳ PLANNED | Warm palette from REFERENCE_ANALYSIS |
-| App shell (3-column layout) | ⏳ PLANNED | |
-| Basic routing | ⏳ PLANNED | |
-| Mock API client | ⏳ PLANNED | |
-| Context display UI | ⏳ PLANNED | |
-| Calendar timeline component | ⏳ PLANNED | |
-| Decision UI components | ⏳ PLANNED | |
+| Project setup (React + Vite + TypeScript) | ✅ DONE | Vite dev server, TypeScript strict mode |
+| TailwindCSS + design tokens | ✅ DONE | Warm palette, custom surface tokens |
+| App shell (3-column layout) | ✅ DONE | Responsive grid layout |
+| Basic routing | ✅ DONE | React Router with Decisions, Context, Calendar pages |
+| API client | ✅ DONE | context, decisions, calendar endpoints |
+| Context display UI | ✅ DONE | Provenance badges, confirm/correct interactions |
+| Decision UI | ✅ DONE | Form, recommendation, assessment, evidence display |
+| Observation form | ✅ DONE | Generic categories, severity levels |
+| Clarification UI | ✅ DONE | Dynamic question inputs, re-assessment trigger |
+| Before/after comparison | ✅ DONE | Side-by-side cards, changed evidence highlighting |
+| Calendar timeline component | ⏳ PLANNED | Mock data available |
 | Intervention cards | ⏳ PLANNED | |
-| Demo mode UI | ⏳ PLANNED | |
+| Demo mode UI | ⏸️ DEFERRED | |
 
-**Next:** Project setup after backend foundation ready
-
----
-
-### TRACK B — Backend Core (Codex)
-
-| Component | Status | Notes |
-|-----------|--------|-------|
-| Project setup (Node + TypeScript) | 🚧 IN PROGRESS | |
-| Database setup (SQLite) | 🚧 IN PROGRESS | |
-| Domain types | 🚧 IN PROGRESS | |
-| Express server | 🚧 IN PROGRESS | |
-| Health endpoint | 🚧 IN PROGRESS | |
-| API routes skeleton | ⏳ PLANNED | |
-| Authentication (OAuth structure) | ⏳ PLANNED | Mock until creds available |
-| Calendar adapter interface | ⏳ PLANNED | |
-| LLM provider interface | ⏳ PLANNED | |
-| Repository layer | ⏳ PLANNED | |
-| Context service | ⏳ PLANNED | |
-| Decision service | ⏳ PLANNED | |
-
-**Next:** Complete project setup, domain types, basic server
+**Next:** Calendar integration UI
 
 ---
 
-### TRACK C — Intelligence Layer (Codex)
+### TRACK B — Backend Core (Node.js + Express + TypeScript)
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| Interface definitions | 🚧 IN PROGRESS | |
-| IContextEngine | ⏳ PLANNED | Simple implementation |
-| IStateEstimator | ⏳ PLANNED | Deterministic rules |
-| IForecastEngine | ⏳ PLANNED | Optional/null initially |
-| IDecisionEngine | ⏳ PLANNED | Mock until Bedrock ready |
-| IInterventionPolicy | ⏳ PLANNED | Basic thresholds |
-| ILLMContextAnalyst | ⏳ PLANNED | Mock until Bedrock ready |
-| MockLLMProvider | ⏳ PLANNED | For development |
-| MockCalendarAdapter | ⏳ PLANNED | For development |
+| Project setup (Node + TypeScript) | ✅ DONE | Express 4, TypeScript 5, strict mode |
+| Database setup (SQLite) | ✅ DONE | better-sqlite3, migrations in src/database/schema.ts |
+| Domain types | ✅ DONE | Full type coverage in src/domain/types.ts |
+| Express server | ✅ DONE | Logging, error handling, CORS |
+| Health endpoint | ✅ DONE | GET /api/health returns status + db connection |
+| API routes | ✅ DONE | decisions, context, calendar, observations, demo |
+| Authentication (OAuth structure) | ⏸️ DEFERRED | Mock userId until needed |
+| Calendar adapter interface | ✅ DONE | ICalendarAdapter + MockCalendarAdapter |
+| LLM provider interface | ✅ DONE | ILLMProvider + MockLLMProvider |
+| Repository layer | ✅ DONE | All domain repositories implemented |
+| Context service | ✅ DONE | SimpleContextEngine with state estimation |
+| Decision service | ✅ DONE | Deterministic feasibility + bounded LLM harness |
 
-**Next:** Define all interfaces first (contract freeze)
+**Next:** Calendar sync implementation
+
+---
+
+### TRACK C — Intelligence Layer
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Interface definitions | ✅ DONE | src/intelligence/interfaces.ts |
+| IContextEngine | ✅ DONE | SimpleContextEngine with observation support |
+| IStateEstimator | ✅ DONE | SimpleStateEstimator (FLOW/UNCERTAIN/OVERLOADED) |
+| IForecastEngine | ⏸️ DEFERRED | Not needed for MVP thesis proof |
+| IDecisionEngine | ✅ DONE | Deterministic feasibility assessment |
+| IInterventionPolicy | ⏸️ DEFERRED | Basic thresholds present but not integrated |
+| ILLMContextAnalyst | ✅ DONE | Bounded harness, proposal validation |
+| MockLLMProvider | ✅ DONE | For development and testing |
+| MockCalendarAdapter | ✅ DONE | For development and testing |
+
+**Next:** Intervention policy integration if needed
 
 ---
 
@@ -100,195 +103,68 @@
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| Docker setup | ⏳ PLANNED | |
-| Docker Compose | ⏳ PLANNED | |
-| CI pipeline (GitHub Actions) | ⏳ PLANNED | |
-| Linting + type checking | ⏳ PLANNED | |
-| Unit test infrastructure | ⏳ PLANNED | |
-| Security scanning (Trivy) | ⏳ PLANNED | |
-| Secret scanning (gitleaks) | ⏳ PLANNED | |
-| `.env.example` | ⏳ PLANNED | |
-| Demo Mode infrastructure | ⏳ PLANNED | |
+| Docker + Compose | ✅ DONE | Multi-stage build, development + production configs |
+| Jest + coverage | ✅ DONE | 35 tests passing, 83%+ coverage |
+| ESLint + Prettier | ✅ DONE | TypeScript-aware, pre-existing warnings isolated |
+| CI pipeline (GitHub Actions) | ✅ DONE | Lint, test, build on every push |
+| Trivy security scanning | ✅ DONE | Automated vulnerability + secret scans |
+| Environment variable management | ✅ DONE | .env.example, validation in app.ts |
 
-**Next:** Docker + CI after basic app structure exists
+**Next:** No blockers
 
 ---
 
-## Completed Work
+## Acceptance Criteria for Current Unit
 
-**Day 0 (Current):**
-- ✅ Repository inspection
-- ✅ Engineering branch created (`chore/engineering-foundation`)
-- ✅ Product Owner setup documentation (`docs/PRODUCT_OWNER_SETUP.md`)
-- ✅ Architecture documentation (`docs/ARCHITECTURE.md`)
-- ✅ Project status tracking (`PROJECT_STATUS.md`)
-- 🚧 Backend foundation (in progress)
+✅ **Same decision can be evaluated before and after a context change**  
+✅ **Meaningful observation can change the assessment** (workload/energy/deadline/disruption)  
+✅ **Missing information produces clarification rather than fabricated assumptions**  
+✅ **After clarification, assessment updates with new inputs**  
+✅ **UI makes the causal reason for recommendation change visible** (before/after comparison, changed evidence highlighted)  
 
 ---
 
-## Verification Evidence
+## Key Design Decisions Locked In
 
-### Tests Executed
-- ❌ None yet (project just starting)
-
-### Build Status
-- ❌ No build yet
-
-### Security Scans
-- ⏳ Planned after initial code
+1. **Deterministic feasibility is the source of truth** — LLM can only propose context interpretations, never invent impact values
+2. **No demo-specific logic** — generic observation categories, no hardcoded "hackathon" or "freelance" matching
+3. **Clarification over assumption** — missing data triggers questions, not guesses
+4. **Provenance on everything** — every context attribute carries source + confidence
+5. **State estimation before clarification** — system estimates user state (FLOW/UNCERTAIN/OVERLOADED) from observations and calendar load
 
 ---
 
-## External Dependencies
+## Known Issues / Technical Debt
 
-### Credentials Status
-
-| Service | Status | Blocks | Docs |
-|---------|--------|--------|------|
-| Google Calendar OAuth | 🔴 BLOCKED | Live Calendar integration test | `docs/PRODUCT_OWNER_SETUP.md#google-calendar-oauth-setup` |
-| AWS Bedrock Access | 🔴 BLOCKED | Live LLM inference test | `docs/PRODUCT_OWNER_SETUP.md#aws-authentication--bedrock-access` |
-
-**Engineering continues with mocks for both.**
+- Lint warnings (286 issues) are pre-existing; new code follows strict TypeScript conventions
+- State estimator uses simple rules (30-minute observation window, 8-hour workload threshold); production would use more sophisticated logic
+- Frontend clarification mapping is heuristic (keyword matching in questions); production would use structured clarification schema
+- No persistent demo scenarios yet; reset/seed creates fresh data each time
 
 ---
 
-## Product Owner Decisions Required
+## Next Steps
 
-### Immediate (Day 1-2)
-
-1. **Database choice for MVP:**
-   - Option A: SQLite (current default, simplest)
-   - Option B: PostgreSQL (more production-like)
-   - **Recommendation:** SQLite for MVP demo, migrate to PostgreSQL for production
-
-2. **Bedrock model selection:**
-   - Option A: Claude 3.5 Sonnet (higher quality, slower, more expensive)
-   - Option B: Claude 3 Haiku (faster, cheaper, good enough for MVP)
-   - **Recommendation:** Haiku for MVP development speed, can upgrade to Sonnet later
-
-### Later (Day 3-4)
-
-3. **Calendar write-back scope:**
-   - Include in MVP or defer?
-   - **Recommendation:** Defer to post-MVP (read-only is sufficient for core demo)
-
-4. **Deployment approach:**
-   - Deploy to AWS during MVP or keep local-only?
-   - If AWS: ECS, App Runner, Lambda?
-   - **Recommendation:** Focus on local demo for hackathon, deploy post-MVP if needed
+1. **Commit and push** this unit as a separate logical commit
+2. **Calendar integration** — sync events, show timeline, factor into state estimation
+3. **Outcome and feedback** — record what user chose, capture results
+4. **Demo polish** — pre-built scenarios, better onboarding
 
 ---
 
-## Domain Dependencies
+## Deployment Readiness
 
-### Unresolved Domain Semantics (Provisional in MVP)
-
-1. **Evidence quality weighting** — Using simple recency-based ranking
-2. **State classification thresholds** — Using hardcoded deterministic rules
-3. **Forecasting formulas** — Optional/stub implementation initially
-4. **JITAI trigger thresholds** — Basic hardcoded rules
-5. **Recommendation confidence calculation** — Pass-through from LLM confidence
-
-**All marked as PROVISIONAL in code. Interfaces frozen, implementations replaceable.**
-
----
-
-## Known Issues & Blockers
-
-### Current Blockers
-- None (engineering proceeding with mocks)
-
-### Credential-Dependent Work (Blocked but Non-Critical)
-- 🔴 Google Calendar live integration test
-- 🔴 Bedrock live inference test
-- 🔴 End-to-end OAuth flow test
-
-**Workaround:** Mock adapters allow all other work to proceed
+| Aspect | Status | Notes |
+|--------|--------|-------|
+| Local development | ✅ Ready | `docker-compose up` works |
+| Production Docker image | ✅ Ready | Multi-stage build, non-root user |
+| Environment variables | ✅ Ready | All required vars documented |
+| Database migrations | ✅ Ready | Schema in code, auto-init |
+| CI/CD pipeline | ✅ Ready | Lint, test, build, security scan |
+| Secrets management | 🔴 Blocked | AWS Bedrock key needed for production LLM |
+| Calendar OAuth | 🔴 Blocked | Google OAuth credentials needed |
+| Monitoring | ⏳ Planned | CloudWatch or similar |
 
 ---
 
-## Risks & Mitigation
-
-| Risk | Severity | Mitigation | Status |
-|------|----------|------------|--------|
-| Credentials delayed | MEDIUM | Mock adapters + Demo Mode | ✅ Mitigated |
-| LLM prompt quality | MEDIUM | Start simple, iterate based on testing | ⏳ Planned |
-| Calendar API rate limits | LOW | Read-only, reasonable polling interval | ⏳ Planned |
-| Integration complexity | MEDIUM | Contract-first, early integration checkpoint Day 3 | ⏳ Planned |
-| Scope creep | HIGH | Strict MUST/SHOULD/DEFERRED adherence | ✅ Documented |
-
----
-
-## Safe Next Tasks (Can Proceed Without Product Owner Input)
-
-1. ✅ Complete backend project setup
-2. ✅ Define domain types (TypeScript interfaces)
-3. ✅ Create database schema
-4. ✅ Implement repository layer
-5. ✅ Create adapter interfaces (Calendar, LLM)
-6. ✅ Implement mock adapters
-7. ✅ Frontend project setup
-8. ✅ Design system tokens
-9. ✅ Docker configuration
-10. ✅ CI pipeline setup
-
----
-
-## Upcoming Checkpoints
-
-### End of Day 1 (Target: 2024-09-20 EOD)
-- ✅ Backend and frontend projects running
-- ✅ Basic API health check working
-- ✅ Domain types defined
-- ✅ Database initialized
-- ✅ Mock adapters functional
-- ✅ Docker Compose working
-
-### End of Day 2
-- ✅ Context CRUD working (backend + frontend)
-- ✅ Decision query flow (stub reasoning)
-- ✅ Calendar display (mock data)
-- ✅ Demo Mode infrastructure
-
-### End of Day 3
-- ✅ First end-to-end integration
-- ✅ LLM integration (real or mock based on credential availability)
-- ✅ Calendar integration (real or mock based on credential availability)
-
-### End of Day 4
-- ✅ Hero demo flow working
-- ✅ Decision reasoning visibly changes with context
-
-### Day 5
-- ✅ Polish, testing, demo rehearsal
-
----
-
-## Current Focus
-
-**Active work:** Establishing backend foundation with Codex  
-**Next:** Frontend setup with Antigravity (parallel after backend structure ready)  
-**Parallel:** Product Owner sets up Google OAuth and AWS Bedrock access
-
----
-
-## Team Status
-
-- **Supervisor (Hermes):** Orchestrating foundation setup
-- **Codex (Luna High):** Backend foundation (in progress)
-- **Antigravity (3.8 High):** Standby for frontend (planned after backend structure)
-- **Product Owner:** Parallel credential setup (see `docs/PRODUCT_OWNER_SETUP.md`)
-
----
-
-## Notes
-
-- Engineering proceeding with adapter pattern — all external services behind interfaces
-- Mock implementations allow development without credentials
-- Demo Mode will be first-class feature, not afterthought
-- All provisional intelligence logic clearly marked in code
-- Repository inspection shows clean slate — no legacy code to migrate
-
----
-
-**Next Status Update:** After backend foundation complete or every 4 hours of active work
+**Bottom Line:** Core product thesis is proven. A user can report a context change, answer clarifying questions, and see exactly why the recommendation changed. Ready for next feature increment.
