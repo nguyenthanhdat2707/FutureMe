@@ -1,180 +1,153 @@
-# Future Me — Project Status
+# Project Status & Roadmap: Future Me
 
-> **Last Updated:** 2026-09-21 — Phase 2 (Live Intelligence Loop) COMPLETE
-> **Current Branch:** `feat/phase2-live-intelligence-loop`
-> **Overall Progress:** ~50% — Phase 1 foundation + Phase 2 live intelligence loop complete
+This document tracks the verified completion of the Future Me MVP roadmap. It separates structural scaffolding from verified behavioral capabilities. Completion criteria require passing automated tests or explicit visual proof, not just code existence.
 
-## Phase Summary
+## Status Summary
+- **Last Updated:** 2026-09-22
+- **Overall MVP estimate after Phase 2:** ~50%
+- **Current product position:** BETWEEN Phase 2 and Phase 3 — AWS Deployment / Platform Enablement track IN PROGRESS, Phase 3 product implementation NOT STARTED.
 
-| Phase | Status | Notes |
-|-------|--------|-------|
-| Phase 1 — Core Decision Logic & Foundation | ✅ COMPLETE | Verified; audit verdict READY |
-| Phase 2 — Live Intelligence Loop | ✅ COMPLETE | Full loop verified: context → analyst → clarify → persist → decision |
+| Phase / Track | Status |
+|---|---|
+| Phase 1 — Core Decision Logic & Foundation | COMPLETE |
+| Phase 2 — Live Intelligence Loop | COMPLETE |
+| AWS Deployment / Platform Enablement | IN PROGRESS |
+| Phase 3 | NOT STARTED |
+| Phase 4 | NOT STARTED |
+| Phase 5 | NOT STARTED |
+| Phase 6 | NOT STARTED |
+| Phase 7 | NOT STARTED |
+| Phase 8 | NOT STARTED |
 
-## Live Implementation Status
+## Roadmap Authority / Cross-Cutting Invariants
+This roadmap is governed by the following contract files:
+- `docs/PRODUCT.md`
+- `docs/MVP_SCOPE_UPDATED.md`
+- `docs/DOMAIN_CONTRACT.md`
+- `docs/USER_FLOWS.md`
+- *Gap identified: `docs/DECISION_POLICY.md` must be restored/frozen.*
 
-| Field | Current value |
-|-------|---------------|
-| Current task | Phase 2 complete; ready for Phase 3 |
-| Actual agents | Antigravity (implementation); Hermes (supervision + verification) |
-| Working path | `src/adapters/bedrock-llm-provider.ts`, `src/routes/context.routes.ts`, `src/services/service-container.ts`, `src/__tests__/phase2-loop.integration.test.ts` |
-| Completed | BedrockLLMProvider (real LLM behind ILLMProvider); /api/context/analyze (detect uncertainty, call BoundedLLMContextAnalyst, return proposals without persisting); /api/context/clarify (validate, persist as USER_CONFIRMED with provenance); end-to-end integration test (full loop exercised in real runtime with fake-injected provider); Bedrock fallback to MockLLMProvider when credentials absent |
-| In progress | None |
-| Blocked | Backend lint has legacy debt (pre-existing, not Phase 2 debt). AWS Bedrock credentials not yet configured in production environment (non-blocking: MockLLMProvider handles the fallback). |
-| Current test status | Full Jest suite: 40/40 passed (7 suites). Backend build (tsc) passed. All Phase 1 tests remain green. |
+The following cross-cutting invariants apply to all phases:
+- Calendar is plan evidence, never proof of actual behavior.
+- Absence of calendar data is not free capacity or low workload.
+- Clarification (ASK) or abstention is required over making unsupported assumptions.
+- Corrections must preserve old evidence and history.
+- Confirmed, decision-relevant context must retain its source, provenance, confidence, and freshness.
+- Deterministic, structured logic owns authoritative outcomes where evidence is sufficient.
+- LLM output remains unpersisted proposal/hypothesis until explicitly validated by the user.
+- Recommendation, user choice, outcome, and feedback remain completely distinct concepts.
+- Silence / NO-OP is a valid system behavior.
 
----
+## Global Deferred / Non-Goals
+The following are explicitly deferred or non-goals for this MVP:
+- RAG, semantic, or vector retrieval.
+- Multi-agent product architecture.
+- Custom ML, model training, fine-tuning, or RL.
+- Advanced forecasting models.
+- Continuous surveillance or screen monitoring.
+- Autonomous calendar optimization, write-back, or autonomous actions.
+- Cross-device or universal memory.
+- Unrelated scope expansion.
 
-## Status Legend
+## Phase 1 — Core Decision Logic & Foundation
+- **Status:** COMPLETE
+- **Historical evidence:** Frontend foundation under `frontend/`; root backend/SQLite/domain/repository/adapter/interface foundation; deterministic feasibility and decision support; observation/context/decision flow and user-visible before/after/provenance foundation.
+- **Explicit completion criteria satisfied:** The core deterministic decision logic and foundation are implemented and serve as the product baseline, describing actual decision foundation rather than merely scaffolding for future capabilities.
 
-- ✅ **DONE** — Implemented and verified
-- 🚧 **IN PROGRESS** — Currently being implemented
-- ⏳ **PLANNED** — Next in queue
-- 🔴 **BLOCKED — PRODUCT OWNER SETUP** — Waiting for credentials/config
-- 🟡 **BLOCKED — DOMAIN DECISION** — Waiting for product clarification
-- ⏸️ **DEFERRED** — Post-MVP
-
----
-
-## Current Milestone: Core Decision Logic (Day 2-3)
-
-**Goal:** Prove the core product thesis: context change → uncertainty detection → targeted clarification → updated assessment with inspectable causality.
-
----
-
-## Progress by Track
-
-### TRACK A — Frontend (React + TypeScript)
-
-| Component | Status | Notes |
-|-----------|--------|-------|
-| Project setup (React + Vite + TypeScript) | ✅ DONE | Vite dev server, TypeScript strict mode |
-| TailwindCSS + design tokens | ✅ DONE | Warm palette, custom surface tokens |
-| App shell (3-column layout) | ✅ DONE | Responsive grid layout |
-| Basic routing | ✅ DONE | React Router with Decisions, Context, Calendar pages |
-| API client | ✅ DONE | context, decisions, calendar endpoints |
-| Context display UI | ✅ DONE | Provenance badges, confirm/correct interactions |
-| Decision UI | ✅ DONE | Form, recommendation, assessment, evidence display |
-| Observation form | ✅ DONE | Generic categories, severity levels |
-| Clarification UI | ✅ DONE | Dynamic question inputs, re-assessment trigger |
-| Before/after comparison | ✅ DONE | Side-by-side cards, changed evidence highlighting |
-| Calendar timeline component | ⏳ PLANNED | Mock data available |
-| Intervention cards | ⏳ PLANNED | |
-| Demo mode UI | ⏸️ DEFERRED | |
-
-**Next:** Calendar integration UI
+## Phase 2 — Live Intelligence Loop
+- **Status:** COMPLETE
+- **Historical evidence:** `BedrockLLMProvider` implementation with `MockLLMProvider` fallback, bounded LLM context analyst, `/api/context/analyze` returning non-persisted proposals, and `/api/context/clarify` validating and persisting user-confirmed answers with provenance.
+- **Explicit completion criteria satisfied:** Full loop exercised: observation → analyze → clarify → persist (USER_CONFIRMED) → decision. A meaningful observation can change the assessment, and missing information produces clarification rather than unsupported assumptions. The same decision can be evaluated before and after a context change. LLM output operates strictly as a proposal/hypothesis until validated by the user.
 
 ---
 
-### TRACK B — Backend Core (Node.js + Express + TypeScript)
-
-| Component | Status | Notes |
-|-----------|--------|-------|
-| Project setup (Node + TypeScript) | ✅ DONE | Express 4, TypeScript 5, strict mode |
-| Database setup (SQLite) | ✅ DONE | better-sqlite3, migrations in src/database/schema.ts |
-| Domain types | ✅ DONE | Full type coverage in src/domain/types.ts |
-| Express server | ✅ DONE | Logging, error handling, CORS |
-| Health endpoint | ✅ DONE | GET /api/health returns status + db connection |
-| API routes | ✅ DONE | decisions, context, calendar, observations, demo |
-| Authentication (OAuth structure) | ⏸️ DEFERRED | Mock userId until needed |
-| Calendar adapter interface | ✅ DONE | ICalendarAdapter + MockCalendarAdapter |
-| LLM provider interface | ✅ DONE | ILLMProvider + MockLLMProvider |
-| Repository layer | ✅ DONE | All domain repositories implemented |
-| Context service | ✅ DONE | SimpleContextEngine with state estimation |
-| Decision service | ✅ DONE | Deterministic feasibility + bounded LLM harness |
-
-**Next:** Calendar sync implementation
+## AWS Deployment / Platform Enablement
+- **Status:** IN PROGRESS
+- **Description:** Deployment and Platform Enablement. Positioned between Phase 2 and Phase 3.
+- **Goal:** Provide the approved hackathon deployment target and necessary configuration.
+- **Boundary:** It is explicitly not a product phase and does not add new product capability. It never changes the product phase count or the overall ~50% completion estimate.
+- **Exit Evidence:** Verified deployment target configuration and handoff to Phase 8.
 
 ---
 
-### TRACK C — Intelligence Layer
+## Remaining Phases
 
-| Component | Status | Notes |
-|-----------|--------|-------|
-| Interface definitions | ✅ DONE | src/intelligence/interfaces.ts |
-| IContextEngine | ✅ DONE | SimpleContextEngine with observation support |
-| IStateEstimator | ✅ DONE | SimpleStateEstimator (FLOW/UNCERTAIN/OVERLOADED) |
-| IForecastEngine | ⏸️ DEFERRED | Not needed for MVP thesis proof |
-| IDecisionEngine | ✅ DONE | Deterministic feasibility assessment |
-| IInterventionPolicy | ⏸️ DEFERRED | Basic thresholds present but not integrated |
-| ILLMContextAnalyst | ✅ DONE | Bounded harness, proposal validation |
-| MockLLMProvider | ✅ DONE | For development and testing |
-| MockCalendarAdapter | ✅ DONE | For development and testing |
-| BedrockLLMProvider | ✅ DONE | Real AWS Bedrock, falls back to Mock when credentials absent |
-| /api/context/analyze | ✅ DONE | Builds ContextAnalystRequest, calls BoundedLLMContextAnalyst, returns proposals only — never persists |
-| /api/context/clarify | ✅ DONE | Validates + persists clarification answer as USER_CONFIRMED with provenance |
-| Phase 2 end-to-end test | ✅ DONE | Full loop exercised: observation → analyze → clarify → USER_CONFIRMED → decision |
+### Phase 3: Trustworthy context acquisition/population and adaptive setup
+- **Status:** NOT STARTED
+- **Goal:** Establish reliable initial context through explicit onboarding, calendar data, and manual updates.
+- **Capability boundary:** Context extraction from calendar plans, short adaptive onboarding mini-interview, and manual user correction. Read-only calendar sync-in may be real or seeded per MVP contract. Where live calendar is used, it must include normalization, status, and connect/disconnect/failure-safe behavior. Sparse-context path for users with no calendar data.
+- **Main deliverables:** Calendar integration (real or seeded), deterministic extraction, sparse-context path, short adaptive onboarding, manual correction, dashboard context surfaces.
+- **Completion criteria:** System successfully extracts calendar evidence (real or seeded), allows short onboarding, supports manual correction. For decision-relevant and confirmed context evidence, it preserves source/provenance/confidence/freshness and correction history. Sparse or empty calendar must not be interpreted as free/low workload.
+- **Dependencies:** Phase 2 completion.
+- **Explicitly not part of this phase:** Autonomous calendar optimization, surveillance, or continuous screen monitoring.
 
-**Next:** Calendar integration, outcome/feedback loop
+### Phase 4: Complete the user-invoked decision journey and planning/explainability experience
+- **Status:** NOT STARTED
+- **Goal:** Deliver a complete, explainable decision support experience based on current user context.
+- **Capability boundary:** Decision-scoped relevant context retrieval, minimum material clarification, transparent options/trade-offs, and separation of system recommendation from final user choice.
+- **Main deliverables:** Decision-scoped relevant context assembly, minimum material clarification, options/trade-offs generation, clear boundary between recommendation vs choice separation, separation of facts/inferences/assumptions/uncertainty/confidence, and same-decision before/after explanation UI.
+- **Completion criteria:** System provides relevant context, options, and trade-offs for a decision. It explicitly requires ASK/ABSTAIN when material evidence is missing. It uses deterministic authority for structured evidence and ensures LLM proposals are validated before use. It maintains a complete user-visible separation of facts, inference, assumptions, trade-offs, uncertainty/confidence, and recommendation. Record choice remains Phase 6.
+- **Dependencies:** Phase 3 context acquisition, restored/frozen `DECISION_POLICY.md` for exact recommendation/abstention rules.
+- **Explicitly not part of this phase:** Autonomous planning, autonomous action execution, RAG, or semantic/vector retrieval.
 
----
+### Phase 5: Bounded proactive context maintenance and consequential disruption
+- **Status:** NOT STARTED
+- **Goal:** Proactively maintain context validity without unnecessary interruption.
+- **Capability boundary:** Approved deterministic/basic intervention policy, returning refresh, bounded in-app Needs Your Input/disruption cards.
+- **Main deliverables:** Basic intervention rules, returning refresh logic, in-app disruption cards, explicit silence/NO-OP behavior.
+- **Completion criteria:** Approved deterministic/basic rules trigger bounded in-app clarification/disruption or NO-OP. Explicit silence is valid and remains the behavior when no consequential change occurs.
+- **Dependencies:** Phase 4 decision journey, restored/frozen `DECISION_POLICY.md` for intervention thresholds/rules.
+- **Explicitly not part of this phase:** Native notifications, advanced JITAI, autonomous action, or custom ML/model training.
 
-### TRACK D — DevOps & Infrastructure
+### Phase 6: User choice, outcomes, feedback, and reusable history
+- **Status:** NOT STARTED
+- **Goal:** Capture actual user decisions and real-world outcomes to provide relevant history for future decisions.
+- **Capability boundary:** Choice is separate from recommendation; outcome is separate from feedback. Future decision retrieval uses relevant stored history.
+- **Main deliverables:** Recent decision/history surfaces, choice persistence flow, outcome and feedback capture flows, historical context retrieval.
+- **Completion criteria:** MVP learning is exactly defined as storing outcome/feedback plus retrieving relevant history later; history must not silently change weights/policy. User can persist a final choice separate from recommendation, and an outcome separate from feedback. The system reuses this relevant history in future related decisions.
+- **Dependencies:** Phase 4 and 5.
+- **Explicitly not part of this phase:** Automatic policy learning, model training, or fine-tuning.
 
-| Component | Status | Notes |
-|-----------|--------|-------|
-| Docker + Compose | ✅ DONE | Multi-stage build, development + production configs |
-| Jest + coverage | ✅ DONE | 39 tests passing, 82%+ coverage |
-| ESLint + Prettier | ✅ DONE | TypeScript-aware, pre-existing warnings isolated |
-| CI pipeline (GitHub Actions) | ✅ DONE | Lint, test, build on every push |
-| Trivy security scanning | ✅ DONE | Automated vulnerability + secret scans |
-| Environment variable management | ✅ DONE | .env.example, validation in app.ts |
+### Phase 7: Deterministic Demo Mode, reset/replay, and recoverable fallbacks
+- **Status:** NOT STARTED
+- **Goal:** Ensure reliable product demonstration and graceful degradation.
+- **Capability boundary:** Seeded hero scenario, reliable state reset, fallback paths for external services (calendar/OAuth/LLM), insufficient-context abstention.
+- **Main deliverables:** Seeded hero scenario covering the whole loop, reliable reset mechanism, continue without calendar/try demo paths, insufficient-context abstention ("I don't know enough yet").
+- **Completion criteria:** A deterministic seeded hero scenario must cover the initial decision, reality change, material clarification, changed reasoning, independent choice, outcome/feedback, later history reuse, and exact reset/replay. Calendar/OAuth/LLM failures must offer recoverable continue-without-calendar / Try Demo / validated mock or abstain paths.
+- **Dependencies:** Phase 6.
+- **Explicitly not part of this phase:** Hardcoded demo rules leaking into core product logic.
 
-**Next:** No blockers
-
----
-
-## Acceptance Criteria for Current Unit
-
-✅ **Same decision can be evaluated before and after a context change**  
-✅ **Meaningful observation can change the assessment** (workload/energy/deadline/disruption)  
-✅ **Missing information produces clarification rather than fabricated assumptions**  
-✅ **After clarification, assessment updates with new inputs**  
-✅ **UI makes the causal reason for recommendation change visible** (before/after comparison, changed evidence highlighted)  
-
----
-
-## Key Design Decisions Locked In
-
-1. **Deterministic feasibility is the source of truth** — LLM can only propose context interpretations, never invent impact values
-2. **No demo-specific logic** — generic observation categories, no hardcoded "hackathon" or "freelance" matching
-3. **Clarification over assumption** — missing data triggers questions, not guesses
-4. **Provenance on everything** — every context attribute carries source + confidence
-5. **State estimation before clarification** — system estimates user state (FLOW/UNCERTAIN/OVERLOADED) from observations and calendar load
-
----
-
-## Known Issues / Technical Debt
-
-- Lint problems (280 issues) are pre-existing; new code follows strict TypeScript conventions
-- State estimator uses simple rules (30-minute observation window, 8-hour workload threshold); production would use more sophisticated logic
-- Frontend clarification mapping is heuristic (keyword matching in questions); production would use structured clarification schema
-- No persistent demo scenarios yet; reset/seed creates fresh data each time
+### Phase 8: Final integration, contract verification, approved hackathon deployment readiness, and demo polish
+- **Status:** NOT STARTED
+- **Goal:** Verify end-to-end correctness, resolve open debt, and prepare for approved hackathon deployment target.
+- **Capability boundary:** Verification against requirements, resolution of verification debt, and final deployment handoff. It adds no new capability.
+- **Main deliverables:** End-to-end browser/runtime proof, D1-D9 and Definition of Done verification, builds/tests/lints resolution, docs/demo checklist, and deployment/config handoff from infra track.
+- **Completion criteria:** D1-D9 and the MVP Definition of Done loop are evidenced end-to-end; backend tests/build/lint, frontend build/lint and appropriate frontend/end-to-end checks pass; browser/runtime hero-flow verification and demo checklist pass; no MVP-blocking defects remain; approved hackathon deployment target is verified.
+- **Dependencies:** Phase 7, Infra Track.
+- **Explicitly not part of this phase:** Multi-agent product architecture, unrelated expansion, or any new product capability.
 
 ---
 
-## Next Steps
+## Verification State & Open Debt
 
-1. **Commit and push** this unit as a separate logical commit
-2. **Calendar integration** — sync events, show timeline, factor into state estimation
-3. **Outcome and feedback** — record what user chose, capture results
-4. **Demo polish** — pre-built scenarios, better onboarding
+**Verified Results (2026-09-22):**
+- **Backend tests:** 40/40 across 7 suites PASS
+- **Backend build:** TypeScript build PASS
+- **Frontend build:** Production build PASS
+- **Frontend lint:** Exits 0 with one warning: `react(set-state-in-effect)` in `frontend/src/pages/ContextPage.tsx:30`
+- **Frontend tests:** No frontend test suite is currently configured.
 
----
-
-## Deployment Readiness
-
-| Aspect | Status | Notes |
-|--------|--------|-------|
-| Local development | ✅ Ready | `docker-compose up` works |
-| Production Docker image | ✅ Ready | Multi-stage build, non-root user |
-| Environment variables | ✅ Ready | All required vars documented |
-| Database migrations | ✅ Ready | Schema in code, auto-init |
-| CI/CD pipeline | ✅ Ready | Lint, test, build, security scan |
-| Secrets management | 🔴 Blocked | AWS Bedrock key needed for production LLM |
-| Calendar OAuth | 🔴 Blocked | Google OAuth credentials needed |
-| Monitoring | ⏳ Planned | CloudWatch or similar |
+**Open Verification Debt:**
+- **Backend lint:** FAILS with 34 errors in Phase 2 files (`phase2-loop.integration.test.ts`, `Bedrock provider`, `context routes`).
+  *Note: This is open verification debt that must be resolved before Phase 8 can complete. It is not legacy/pre-existing debt.*
 
 ---
 
-**Bottom Line:** Core product thesis is proven. A user can report a context change, answer clarifying questions, and see exactly why the recommendation changed. Ready for next feature increment.
+## MVP COMPLETE Gate
+The Future Me MVP will be considered complete when:
+- All Phase 1-8 completion criteria are satisfied.
+- One repeatable end-to-end hero flow demonstrates: load context, observation/change, clarification when material, provenance-preserving update, relevant decision support/trade-offs/recommendation/uncertainty, independent user choice, outcome and feedback, and relevant history reused later.
+- D1-D9 pass.
+- Demo Mode reset/replay and external-service fallbacks work.
+- Required tests/builds/lints and end-to-end browser/runtime checks pass with no MVP-blocking defects.
+- The approved hackathon deployment target is verified.
