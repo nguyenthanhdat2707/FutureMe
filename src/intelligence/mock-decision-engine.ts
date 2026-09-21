@@ -8,7 +8,18 @@ import { DecisionQuery, DecisionSupport, Decision, DecisionStatus, Tradeoff } fr
 import { IDecisionEngine, IContextEngine } from './interfaces';
 import { ILLMProvider } from '../adapters/llm-provider.interface';
 import { v4 as uuidv4 } from 'uuid';
+import { z } from 'zod';
 import { assessDecisionFeasibility } from './deterministic-feasibility-assessment';
+
+const tradeoffSchema: z.ZodType<Tradeoff> = z.object({
+  option: z.string().trim().min(1).max(200),
+  gains: z.array(z.string().trim().min(1).max(500)).min(1).max(10),
+  costs: z.array(z.string().trim().min(1).max(500)).min(1).max(10)
+}).strict();
+
+const tradeoffEnvelopeSchema = z.object({
+  tradeoffs: z.array(z.unknown()).max(20)
+}).strict();
 
 export class MockDecisionEngine implements IDecisionEngine {
   constructor(
@@ -19,18 +30,13 @@ export class MockDecisionEngine implements IDecisionEngine {
   async supportDecision(userId: string, query: DecisionQuery): Promise<DecisionSupport> {
     // Get relevant context
     const relevantContext = await this.contextEngine.getRelevantContext(userId, query);
-    const assessment = assessDecisionFeasibility(query.impactProfile);
+    const assessment = assessDecisionFeasibility(query.impactProfile, new Date(), relevantContext);
     
     // Build LLM prompt
-    const systemPrompt = `You are a decision support assistant. Analyze the user's question in context of their goals, commitments, and constraints. Provide a recommendation with clear tradeoffs.
+    const systemPrompt = `You are a decision support assistant. Analyze the user's question in context of their goals, commitments, and constraints. Describe clear tradeoffs.
 
 Return your response as JSON with this structure:
 {
-  "recommendation": {
-    "option": "string",
-    "confidence": 0.0-1.0,
-    "reasoning": "string"
-  },
   "tradeoffs": [
     {
       "option": "string",
@@ -55,16 +61,7 @@ Please describe meaningful tradeoffs without inventing feasibility facts.`;
       { role: 'user', content: userPrompt }
     ]);
 
-    let tradeoffs: Tradeoff[] = [];
-    try {
-      const parsed: unknown = JSON.parse(response.content);
-      if (hasTradeoffs(parsed)) {
-        tradeoffs = parsed.tradeoffs;
-      }
-    } catch {
-      // Fallback if LLM doesn't return valid JSON
-      tradeoffs = [];
-    }
+    const tradeoffs = parseTradeoffs(response.content);
 
     // Create decision object
     const decision: Decision = {
@@ -90,13 +87,26 @@ Please describe meaningful tradeoffs without inventing feasibility facts.`;
     return {
       decision,
       assessment,
-      clarificationNeeded: clarificationQuestions(assessment.missingData)
+      clarificationNeeded: clarificationQuestions(assessment.missingData),
+      state: relevantContext.state
     };
   }
 }
 
-function hasTradeoffs(value: unknown): value is { tradeoffs: Tradeoff[] } {
-  return typeof value === 'object' && value !== null && Array.isArray((value as { tradeoffs?: unknown }).tradeoffs);
+function parseTradeoffs(content: string): Tradeoff[] {
+  try {
+    const envelope = tradeoffEnvelopeSchema.safeParse(JSON.parse(content));
+    if (!envelope.success) {
+      return [];
+    }
+
+    return envelope.data.tradeoffs.flatMap(candidate => {
+      const tradeoff = tradeoffSchema.safeParse(candidate);
+      return tradeoff.success ? [tradeoff.data] : [];
+    });
+  } catch {
+    return [];
+  }
 }
 
 function clarificationQuestions(missingData: string[]): string[] {

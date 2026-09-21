@@ -4,12 +4,14 @@
  */
 
 import { ILLMProvider, LLMMessage, LLMResponse } from './llm-provider.interface';
+import { ContextAnalystRequest } from '../domain/types';
 
 export class MockLLMProvider implements ILLMProvider {
-  async generate(messages: LLMMessage[], options?: {
+  async generate(messages: LLMMessage[], _options?: {
     temperature?: number;
     maxTokens?: number;
   }): Promise<LLMResponse> {
+    await Promise.resolve();
     console.log('[MockLLMProvider] Generating response for', messages.length, 'messages');
     
     // Extract the last user message
@@ -19,7 +21,13 @@ export class MockLLMProvider implements ILLMProvider {
     // Simple mock responses based on query patterns
     let response = '';
 
-    if (query.toLowerCase().includes('should i')) {
+    const isContextAnalystRequest = messages.some(message =>
+      message.role === 'system' && message.content.includes('[FUTURE_ME_CONTEXT_ANALYST_V1]')
+    );
+
+    if (isContextAnalystRequest) {
+      response = mockContextAnalystResponse(query);
+    } else if (query.toLowerCase().includes('should i')) {
       response = JSON.stringify({
         recommendation: {
           option: 'skip',
@@ -65,4 +73,46 @@ export class MockLLMProvider implements ILLMProvider {
       }
     };
   }
+}
+
+function mockContextAnalystResponse(query: string): string {
+  try {
+    const request = JSON.parse(query) as ContextAnalystRequest;
+    const signal = request.signals[0];
+    const evidence = request.evidence[0];
+    const contextAttribute = request.contextAttributes[0];
+
+    if (!signal || !evidence || !contextAttribute) {
+      return emptyContextAnalystResponse();
+    }
+
+    return JSON.stringify({
+      proposedHypotheses: [
+        {
+          statement: `The supplied signal may relate to ${contextAttribute.id}.`,
+          signalIds: [signal.id],
+          evidenceIds: [evidence.id],
+          contextAttributeIds: [contextAttribute.id]
+        }
+      ],
+      candidateClarificationQuestions: [
+        {
+          question: `What should Future Me know about ${contextAttribute.id}?`,
+          resolvesContextAttributeIds: [contextAttribute.id],
+          signalIds: [signal.id],
+          evidenceIds: [evidence.id],
+          responseFormat: { type: 'free-text' }
+        }
+      ]
+    });
+  } catch {
+    return emptyContextAnalystResponse();
+  }
+}
+
+function emptyContextAnalystResponse(): string {
+  return JSON.stringify({
+    proposedHypotheses: [],
+    candidateClarificationQuestions: []
+  });
 }

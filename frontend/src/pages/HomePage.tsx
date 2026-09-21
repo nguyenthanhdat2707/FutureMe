@@ -17,24 +17,27 @@ function HomePage() {
         <div className="intervention-suggestion space-y-3">
           <div className="flex items-start justify-between">
             <div className="flex-1">
-              <h3 className="font-medium text-text-primary mb-1">Schedule Capacity Alert</h3>
+              <h3 className="font-medium text-text-primary mb-1">Phát hiện lời mời họp mới: 'Project Review' (14:00 - 15:30)</h3>
               <p className="text-sm text-text-secondary mb-2">
-                You have 8 hours of planned work but only 5 hours of available time today.
+                Tác động: Lịch làm việc hôm nay sẽ vượt ngưỡng 8h (chuyển sang trạng thái OVERLOADED). Thời gian dự phòng cho deadline giảm về âm.
               </p>
               <details className="text-sm">
-                <summary className="cursor-pointer text-accent-ai font-medium">Why is this happening?</summary>
+                <summary className="cursor-pointer text-accent-ai font-medium">Khuyến nghị</summary>
                 <p className="mt-2 text-text-secondary">
-                  Your fixed commitments leave limited capacity. Consider moving lower-priority tasks to tomorrow.
+                  Từ chối hoặc đề xuất dời sang ngày mai.
                 </p>
               </details>
             </div>
           </div>
           <div className="flex gap-2">
             <button className="px-4 py-2 bg-accent-ai text-white rounded-lg text-sm font-medium hover:bg-opacity-90">
-              Review schedule
+              Chấp nhận
             </button>
-            <button className="px-4 py-2 text-text-secondary text-sm hover:bg-slate-100 rounded-lg">
-              Dismiss for today
+            <button className="px-4 py-2 text-text-secondary text-sm hover:bg-slate-100 border border-slate-200 rounded-lg">
+              Từ chối
+            </button>
+            <button className="px-4 py-2 text-text-secondary text-sm hover:bg-slate-100 border border-slate-200 rounded-lg">
+              Đề xuất dời lịch
             </button>
           </div>
         </div>

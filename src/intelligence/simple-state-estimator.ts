@@ -8,7 +8,7 @@ import { PersonalContext, PersonalState, StateEstimate, Observation } from '../d
 import { IStateEstimator } from './interfaces';
 
 export class SimpleStateEstimator implements IStateEstimator {
-  async estimateCurrentState(
+  estimateCurrentState(
     context: PersonalContext,
     observations: Observation[]
   ): Promise<StateEstimate> {
@@ -22,33 +22,33 @@ export class SimpleStateEstimator implements IStateEstimator {
     });
 
     if (recentObs.length === 0) {
-      return {
+      return Promise.resolve({
         state: PersonalState.UNCERTAIN,
         confidence: 0.7,
         evidence: ['No recent observations in last 30 minutes'],
         timestamp: now
-      };
+      });
     }
 
     // Rule 2: Check calendar overload
     const busyHours = context.calendar.busyHoursToday;
     if (busyHours > 8) {
       evidence.push(`Busy hours today: ${busyHours.toFixed(1)}`);
-      return {
+      return Promise.resolve({
         state: PersonalState.OVERLOADED,
         confidence: 0.65,
         evidence,
         timestamp: now
-      };
+      });
     }
 
     // Default: FLOW
     evidence.push('Normal activity level detected');
-    return {
+    return Promise.resolve({
       state: PersonalState.FLOW,
       confidence: 0.6,
       evidence,
       timestamp: now
-    };
+    });
   }
 }

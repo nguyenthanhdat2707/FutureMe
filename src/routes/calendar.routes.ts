@@ -6,18 +6,20 @@ import { Router, Request, Response } from 'express';
 import { getCalendarAdapter } from '../services/service-container';
 import { CalendarEventRepository } from '../repositories/calendar-event.repository';
 
+import { getErrorMessage } from '../utils/error';
+
 export const calendarRouter = Router();
 
 // List calendar events
-calendarRouter.get('/events', async (req: Request, res: Response) => {
+calendarRouter.get('/events', (req: Request, res: Response) => {
   try {
     const calendarRepo = new CalendarEventRepository();
-    const userId = req.query.userId as string || 'demo-user';
+    const userId = typeof req.query.userId === 'string' ? req.query.userId : 'demo-user';
     const events = calendarRepo.findUpcoming(userId);
     
     res.json({ events });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
   }
 });
 
@@ -25,7 +27,8 @@ calendarRouter.get('/events', async (req: Request, res: Response) => {
 calendarRouter.post('/sync', async (req: Request, res: Response) => {
   try {
     const calendarRepo = new CalendarEventRepository();
-    const userId = req.body.userId || 'demo-user';
+    const body = req.body as { userId?: string };
+    const userId = typeof body.userId === 'string' ? body.userId : 'demo-user';
     
     const adapter = getCalendarAdapter();
     const events = await adapter.syncEvents(userId);
@@ -40,16 +43,16 @@ calendarRouter.post('/sync', async (req: Request, res: Response) => {
       synced: events.length,
       timestamp: new Date().toISOString()
     });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
   }
 });
 
 // Get sync status
-calendarRouter.get('/status', async (req: Request, res: Response) => {
+calendarRouter.get('/status', (req: Request, res: Response) => {
   try {
     const calendarRepo = new CalendarEventRepository();
-    const userId = req.query.userId as string || 'demo-user';
+    const userId = typeof req.query.userId === 'string' ? req.query.userId : 'demo-user';
     const events = calendarRepo.findByUserId(userId, 1);
     
     const lastSync = events.length > 0 ? events[0].syncedAt : null;
@@ -58,7 +61,7 @@ calendarRouter.get('/status', async (req: Request, res: Response) => {
       lastSync,
       status: lastSync ? 'synced' : 'never'
     });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
   }
 });

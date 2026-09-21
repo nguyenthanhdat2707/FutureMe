@@ -20,6 +20,77 @@ export interface UserContext {
   updatedAt: string;
 }
 
+export enum ObservationSource {
+  USER_CONFIRMED = 'USER_CONFIRMED',
+  CALENDAR = 'CALENDAR',
+  SYSTEM_OBSERVED = 'SYSTEM_OBSERVED',
+  SYSTEM_INFERRED = 'SYSTEM_INFERRED',
+  HISTORICAL_PATTERN = 'HISTORICAL_PATTERN',
+  EXTERNAL_SOURCE = 'EXTERNAL_SOURCE',
+}
+
+export interface ContextAttribute {
+  id: string;
+  userId: string;
+  attribute: string;
+  value: string; // JSON serialized
+  source: ObservationSource;
+  confidence: number;
+  observedAt: string;
+  validUntil?: string;
+  createdAt: string;
+}
+
+export interface PersonalContext {
+  userId: string;
+  goals: Goal[];
+  commitments: Commitment[];
+  preferences: Preference[];
+  calendar: CalendarSummary;
+  recentDecisions: DecisionQuery[];
+  lastUpdated: string;
+}
+
+export interface Commitment {
+  id: string;
+  description: string;
+  startTime: string;
+  endTime: string;
+  recurring?: boolean;
+  source?: ObservationSource;
+  confidence?: number;
+  attributeId?: string;
+}
+
+export interface Preference {
+  id: string;
+  category: string;
+  description: string;
+  value: string;
+  source?: ObservationSource;
+  confidence?: number;
+  attributeId?: string;
+}
+
+export interface CalendarSummary {
+  upcomingEvents: number;
+  busyHoursToday: number;
+  busyHoursThisWeek: number;
+}
+
+export interface ContextUpdateObservation {
+  type: string;
+  data: Record<string, unknown>;
+  source: ObservationSource;
+  confidence: number;
+}
+
+export interface ContextCorrection {
+  attributeId: string;
+  correctedValue: string;
+  reason?: string;
+}
+
 export enum EnergyLevel {
   VERY_LOW = 'VERY_LOW',
   LOW = 'LOW',
@@ -48,16 +119,12 @@ export enum CognitiveLoad {
 
 export interface Goal {
   id: string;
-  userId: string;
-  title: string;
-  description?: string;
-  category: GoalCategory;
-  priority: Priority;
-  deadline?: string;
-  status: GoalStatus;
-  progress: number; // 0-100
-  createdAt: string;
-  updatedAt: string;
+  description: string;
+  deadline?: Date | string;
+  priority: 'low' | 'medium' | 'high';
+  source?: ObservationSource;
+  confidence?: number;
+  attributeId?: string; // Link to ContextAttribute for confirm/correct
 }
 
 export enum GoalCategory {
@@ -196,7 +263,7 @@ export interface ImpactAnalysis {
   affectedGoals: string[]; // Goal IDs
 }
 
-export type DecisionImpactSource = 'user-confirmed' | 'provided' | 'estimated';
+export type DecisionImpactSource = 'user-confirmed' | 'provided' | 'estimated' | 'context';
 
 export interface DecisionImpactProfile {
   timeCostHours?: number;
@@ -244,7 +311,23 @@ export interface DecisionFeasibilityAssessment {
   recommendation: DecisionRecommendation;
   assumptions: string[];
   missingData: string[];
+  invalidInputs: string[];
   evidence: FeasibilityEvidence[];
+}
+
+export enum PersonalState {
+  FLOW = 'FLOW',
+  UNCERTAIN = 'UNCERTAIN',
+  DRIFTING = 'DRIFTING',
+  DISRUPTED = 'DISRUPTED',
+  OVERLOADED = 'OVERLOADED'
+}
+
+export interface StateEstimate {
+  state: PersonalState;
+  confidence: number;
+  evidence: string[];
+  timestamp: string;
 }
 
 export interface DecisionApiResponse {
@@ -253,6 +336,7 @@ export interface DecisionApiResponse {
   };
   assessment: DecisionFeasibilityAssessment;
   clarificationNeeded: string[];
+  state?: StateEstimate;
 }
 
 // ============================================================================

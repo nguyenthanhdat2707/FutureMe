@@ -6,13 +6,19 @@ import {
   DecisionImpactSource,
   EnergyFit,
   FeasibilityEvidence,
-  Recommendation
+  Recommendation,
+  PersonalState,
+  RelevantContext
 } from '../domain/types';
 
 const HOURS_TO_MILLISECONDS = 60 * 60 * 1000;
 
 function isNonNegativeNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0;
+}
+
+function isNegativeNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value < 0;
 }
 
 function roundHours(value: number): number {
@@ -91,22 +97,58 @@ function confidenceFor(
 
 export function assessDecisionFeasibility(
   profile: DecisionImpactProfile | undefined,
-  now: Date = new Date()
+  now: Date = new Date(),
+  context?: RelevantContext
 ): DecisionFeasibilityAssessment {
   const assumptions: string[] = [];
   const missingData: string[] = [];
+  const invalidInputs: string[] = [];
   const evidence: FeasibilityEvidence[] = [];
   const source = profile?.source ?? 'provided';
 
+  let additionalWorkload = 0;
+  let energyReduction = 0;
+  let hasDisruption = false;
+  let isOverloaded = false;
+
+  if (context?.recentHistory) {
+    for (const hist of context.recentHistory) {
+      if (hist.includes('workload-increase')) {
+        let severity = 'low';
+        if (hist.includes('"severity":"high"')) { additionalWorkload += 4; severity = 'high'; }
+        else if (hist.includes('"severity":"medium"')) { additionalWorkload += 2; severity = 'medium'; }
+        else { additionalWorkload += 1; }
+        evidence.push({ fact: 'Context effect', value: `+${additionalWorkload}h workload`, source: 'context', explanation: `Applied ${severity} workload increase from recent observations.` });
+      }
+      if (hist.includes('energy-decrease')) {
+        energyReduction += 1;
+        evidence.push({ fact: 'Context effect', value: '-1 energy', source: 'context', explanation: `Applied energy decrease from recent observations.` });
+      }
+      if (hist.includes('disruption')) {
+        hasDisruption = true;
+        evidence.push({ fact: 'Context effect', value: 'Disrupted', source: 'context', explanation: `Recent disruption observed.` });
+      }
+    }
+  }
+
+  if (context?.state?.state === PersonalState.OVERLOADED) {
+    isOverloaded = true;
+    evidence.push({ fact: 'Context state', value: 'Overloaded', source: 'context', explanation: `Current state is OVERLOADED.` });
+  }
+
   const timeCostHours = profile?.timeCostHours;
-  if (!isNonNegativeNumber(timeCostHours)) {
+  if (isNegativeNumber(timeCostHours)) {
+    invalidInputs.push('timeCostHours');
+  } else if (!isNonNegativeNumber(timeCostHours)) {
     missingData.push('timeCostHours');
   } else {
     evidence.push(inputEvidence('Candidate time cost', timeCostHours, source));
   }
 
   let availableTimeBeforeDeadlineHours: number | null = null;
-  if (isNonNegativeNumber(profile?.availableHoursBeforeDeadline)) {
+  if (isNegativeNumber(profile?.availableHoursBeforeDeadline)) {
+    invalidInputs.push('availableHoursBeforeDeadline');
+  } else if (isNonNegativeNumber(profile?.availableHoursBeforeDeadline)) {
     availableTimeBeforeDeadlineHours = roundHours(profile.availableHoursBeforeDeadline);
     evidence.push(inputEvidence(
       'Available time before deadline',
@@ -136,9 +178,11 @@ export function assessDecisionFeasibility(
 
   const suppliedWorkloadHours = profile?.workloadHoursBeforeDeadline;
   const usedWorkloadAssumption = !isNonNegativeNumber(suppliedWorkloadHours);
-  const workloadHours = usedWorkloadAssumption ? 0 : suppliedWorkloadHours;
-  if (usedWorkloadAssumption) {
-    assumptions.push('No workload hours were supplied; projected capacity accounts only for the candidate commitment.');
+  const workloadHours = (usedWorkloadAssumption ? 0 : suppliedWorkloadHours) + additionalWorkload;
+  if (isNegativeNumber(suppliedWorkloadHours)) {
+    invalidInputs.push('workloadHoursBeforeDeadline');
+  } else if (usedWorkloadAssumption) {
+    assumptions.push('No workload hours were supplied; projected capacity accounts only for the candidate commitment and context adjustments.');
     missingData.push('workloadHoursBeforeDeadline');
   } else {
     evidence.push(inputEvidence('Existing workload before deadline', workloadHours, source));
@@ -153,7 +197,7 @@ export function assessDecisionFeasibility(
       fact: 'Projected remaining capacity',
       value: projectedRemainingCapacityHours,
       source: 'calculated',
-      explanation: 'Available time minus supplied workload and candidate time cost.'
+      explanation: 'Available time minus supplied workload, context workload, and candidate time cost.'
     });
   }
 
@@ -172,7 +216,8 @@ export function assessDecisionFeasibility(
   }
 
   const energyCost = profile?.energyCost;
-  const availableEnergy = profile?.availableEnergy;
+  const suppliedAvailableEnergy = profile?.availableEnergy;
+  const availableEnergy = isNonNegativeNumber(suppliedAvailableEnergy) ? Math.max(0, suppliedAvailableEnergy - energyReduction) : undefined;
   const hasEnergyInputs = isNonNegativeNumber(energyCost) && isNonNegativeNumber(availableEnergy);
   let energyFit: EnergyFit = 'unknown';
   if (hasEnergyInputs) {
@@ -187,8 +232,10 @@ export function assessDecisionFeasibility(
       energyFit = 'good';
     }
   } else {
-    if (!isNonNegativeNumber(energyCost)) missingData.push('energyCost');
-    if (!isNonNegativeNumber(availableEnergy)) missingData.push('availableEnergy');
+    if (isNegativeNumber(energyCost)) invalidInputs.push('energyCost');
+    else if (!isNonNegativeNumber(energyCost)) missingData.push('energyCost');
+    if (isNegativeNumber(suppliedAvailableEnergy)) invalidInputs.push('availableEnergy');
+    else if (!isNonNegativeNumber(availableEnergy)) missingData.push('availableEnergy');
   }
 
   if (profile?.target) evidence.push(inputEvidence('Decision target', profile.target, source));
@@ -202,10 +249,10 @@ export function assessDecisionFeasibility(
     feasibility = 'needs-info';
   } else if (
     projectedRemainingCapacityHours !== null && projectedRemainingCapacityHours < 0 ||
-    energyFit === 'poor'
+    energyFit === 'poor' || (isOverloaded && hasDisruption)
   ) {
     feasibility = 'not-feasible';
-  } else if (deadlinePressure === 'moderate' || energyFit === 'strained') {
+  } else if (deadlinePressure === 'moderate' || energyFit === 'strained' || isOverloaded || hasDisruption) {
     feasibility = 'at-risk';
   } else {
     feasibility = 'feasible';
@@ -228,6 +275,7 @@ export function assessDecisionFeasibility(
     recommendation: recommendationFor(feasibility, deadlinePressure, energyFit, confidence),
     assumptions,
     missingData,
+    invalidInputs,
     evidence
   };
 }

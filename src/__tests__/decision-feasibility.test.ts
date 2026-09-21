@@ -155,6 +155,19 @@ describe('deterministic decision feasibility assessment', () => {
     expect(support.decision.recommendation.option).toBe('clarify');
   });
 
+  it('reports negative values as invalid inputs instead of missing data', async () => {
+    const support = await assess(queryWithImpact('Should I do this?', {
+      timeCostHours: -5,
+      availableHoursBeforeDeadline: 8,
+      workloadHoursBeforeDeadline: 0,
+      energyCost: 1,
+      availableEnergy: 5
+    }));
+
+    expect(support.assessment.invalidInputs).toContain('timeCostHours');
+    expect(support.assessment.missingData).not.toContain('timeCostHours');
+  });
+
   it('uses supplied impact values for a generic question rather than workshop-specific matching', async () => {
     const feasible = await assess(queryWithImpact('Is this the right choice?', {
       timeCostHours: 2,
@@ -175,5 +188,103 @@ describe('deterministic decision feasibility assessment', () => {
     expect(infeasible.assessment.feasibility).toBe('not-feasible');
     expect(feasible.assessment.projectedRemainingCapacityHours).toBe(10);
     expect(infeasible.assessment.projectedRemainingCapacityHours).toBe(-7);
+  });
+
+  it('applies context workload increases and energy decreases', async () => {
+    class ContextEngineWithHistory extends FakeContextEngine {
+      async getRelevantContext(): Promise<RelevantContext> {
+        await Promise.resolve();
+        return {
+          goals: [],
+          commitments: [],
+          constraints: [],
+          recentHistory: [
+            'CONTEXT_CHANGE: {"type":"workload-increase","severity":"high"}', // +4h
+            'CONTEXT_CHANGE: {"type":"energy-decrease"}' // -1 energy
+          ],
+          state: {
+            state: PersonalState.FLOW,
+            confidence: 0.8,
+            evidence: [],
+            timestamp: new Date()
+          }
+        };
+      }
+    }
+    const engine = new MockDecisionEngine(llmProvider, new ContextEngineWithHistory());
+    const support = await engine.supportDecision('user-1', queryWithImpact('Test', {
+      timeCostHours: 4,
+      availableHoursBeforeDeadline: 10,
+      workloadHoursBeforeDeadline: 2,
+      energyCost: 3,
+      availableEnergy: 4,
+    }));
+
+    expect(support.assessment.projectedRemainingCapacityHours).toBe(0); // 10 - (2+4) - 4 = 0
+    expect(support.assessment.energyFit).toBe('strained'); // available = 4 - 1 = 3, cost 3 -> remaining 0 -> strained
+    expect(support.assessment.deadlinePressure).toBe('moderate'); // 0 hours remaining
+  });
+
+  it('reports missing workload data even if context provides workload adjustments', async () => {
+    class ContextEngineWithHistory extends FakeContextEngine {
+      async getRelevantContext(): Promise<RelevantContext> {
+        await Promise.resolve();
+        return {
+          goals: [],
+          commitments: [],
+          constraints: [],
+          recentHistory: [
+            'CONTEXT_CHANGE: {"type":"workload-increase","severity":"high"}' // +4h
+          ],
+          state: {
+            state: PersonalState.FLOW,
+            confidence: 0.8,
+            evidence: [],
+            timestamp: new Date()
+          }
+        };
+      }
+    }
+    const engine = new MockDecisionEngine(llmProvider, new ContextEngineWithHistory());
+    const support = await engine.supportDecision('user-1', queryWithImpact('Test', {
+      timeCostHours: 2,
+      availableHoursBeforeDeadline: 10
+      // workloadHoursBeforeDeadline intentionally omitted
+    }));
+
+    expect(support.assessment.missingData).toContain('workloadHoursBeforeDeadline');
+    expect(support.assessment.projectedRemainingCapacityHours).toBe(4); // 10 - (0 + 4) - 2 = 4
+  });
+
+  it('rejects overloaded state plus disruption context as not-feasible', async () => {
+    class ContextEngineWithHistory extends FakeContextEngine {
+      async getRelevantContext(): Promise<RelevantContext> {
+        await Promise.resolve();
+        return {
+          goals: [],
+          commitments: [],
+          constraints: [],
+          recentHistory: [
+            'CONTEXT_CHANGE: {"type":"disruption"}'
+          ],
+          state: {
+            state: PersonalState.OVERLOADED,
+            confidence: 1,
+            evidence: [],
+            timestamp: new Date()
+          }
+        };
+      }
+    }
+    const engine = new MockDecisionEngine(llmProvider, new ContextEngineWithHistory());
+    const support = await engine.supportDecision('user-1', queryWithImpact('Test', {
+      timeCostHours: 1,
+      availableHoursBeforeDeadline: 10,
+      workloadHoursBeforeDeadline: 2,
+      energyCost: 1,
+      availableEnergy: 4,
+    }));
+
+    expect(support.assessment.feasibility).toBe('not-feasible');
   });
 });

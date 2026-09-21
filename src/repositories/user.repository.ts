@@ -40,7 +40,7 @@ export class UserRepository extends BaseRepository {
 
     const now = new Date().toISOString();
     const fields: string[] = [];
-    const values: any[] = [];
+    const values: unknown[] = [];
 
     if (updates.email !== undefined) {
       fields.push('email = ?');
@@ -68,15 +68,18 @@ export class UserRepository extends BaseRepository {
     return this.findById(id);
   }
 
-  private mapToUser(row: any): User {
+  private mapToUser(row: unknown): User {
+    if (!row || typeof row !== 'object') throw new Error('Invalid row');
+    const r = row as Record<string, unknown>;
+
     return {
-      id: row.id as string,
-      email: row.email as string,
-      googleId: row.google_id ? (row.google_id as string) : undefined,
-      displayName: row.display_name ? (row.display_name as string) : undefined,
-      tokens: row.tokens ? (row.tokens as string) : undefined,
-      createdAt: new Date(row.created_at as string),
-      updatedAt: new Date(row.updated_at as string)
+      id: typeof r.id === 'string' ? r.id : '',
+      email: typeof r.email === 'string' ? r.email : '',
+      googleId: typeof r.google_id === 'string' ? r.google_id : undefined,
+      displayName: typeof r.display_name === 'string' ? r.display_name : undefined,
+      tokens: typeof r.tokens === 'string' ? r.tokens : undefined,
+      createdAt: new Date(typeof r.created_at === 'string' ? r.created_at : 0),
+      updatedAt: new Date(typeof r.updated_at === 'string' ? r.updated_at : 0)
     };
   }
 }

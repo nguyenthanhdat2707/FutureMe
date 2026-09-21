@@ -4,7 +4,9 @@
  */
 
 import type {
-  UserContext,
+  PersonalContext,
+  ContextUpdateObservation,
+  ContextCorrection,
   Goal,
   Role,
   TimeBlock,
@@ -19,9 +21,7 @@ import type {
 import {
   EnergyLevel,
   CognitiveLoad,
-  GoalCategory,
   Priority,
-  GoalStatus,
   TimeBlockType,
   TimeBlockStatus,
   FlexibilityLevel,
@@ -42,32 +42,69 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 // ============================================================================
 
 export const contextApi = {
-  async getCurrent(): Promise<UserContext> {
-    await delay(300);
-    return {
-      id: 'ctx-1',
-      userId: 'user-1',
-      timestamp: new Date().toISOString(),
-      energyLevel: EnergyLevel.MEDIUM,
-      mood: 'focused',
-      cognitiveLoad: CognitiveLoad.MEDIUM,
-      stressLevel: 5,
-      updatedAt: new Date().toISOString(),
-    };
+  async getCurrent(userId: string = 'demo-user'): Promise<PersonalContext> {
+    const response = await fetch(`${API_BASE_URL}/context?userId=${encodeURIComponent(userId)}`);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch context: ${response.status}`);
+    }
+    
+    return response.json();
   },
 
-  async update(context: Partial<UserContext>): Promise<UserContext> {
-    await delay(200);
-    return {
-      id: 'ctx-1',
-      userId: 'user-1',
-      timestamp: new Date().toISOString(),
-      energyLevel: context.energyLevel || EnergyLevel.MEDIUM,
-      mood: context.mood,
-      cognitiveLoad: context.cognitiveLoad,
-      stressLevel: context.stressLevel,
-      updatedAt: new Date().toISOString(),
-    };
+  async update(observation: ContextUpdateObservation, userId: string = 'demo-user'): Promise<PersonalContext> {
+    const response = await fetch(`${API_BASE_URL}/context/update`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        userId,
+        observation,
+      }),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to update context: ${response.status}`);
+    }
+    
+    return response.json();
+  },
+
+  async confirm(attributeId: string, userId: string = 'demo-user'): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/context/confirm`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        userId,
+        attributeId,
+      }),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to confirm attribute: ${response.status}`);
+    }
+  },
+
+  async correct(correction: ContextCorrection, userId: string = 'demo-user'): Promise<PersonalContext> {
+    const response = await fetch(`${API_BASE_URL}/context/correct`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        userId,
+        correction,
+      }),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to correct context: ${response.status}`);
+    }
+    
+    return response.json();
   },
 };
 
@@ -81,27 +118,14 @@ export const goalsApi = {
     return [
       {
         id: 'goal-1',
-        userId: 'user-1',
-        title: 'Launch MVP at Hackathon',
         description: 'Complete Future Me MVP within 5-day hackathon timeline',
-        category: GoalCategory.CAREER,
-        priority: Priority.CRITICAL,
+        priority: 'high',
         deadline: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-        status: GoalStatus.ACTIVE,
-        progress: 35,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
       },
       {
         id: 'goal-2',
-        userId: 'user-1',
-        title: 'Daily Exercise Routine',
-        category: GoalCategory.HEALTH,
-        priority: Priority.MEDIUM,
-        status: GoalStatus.ACTIVE,
-        progress: 60,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        description: 'Maintain daily exercise routine',
+        priority: 'medium',
       },
     ];
   },
@@ -110,14 +134,9 @@ export const goalsApi = {
     await delay(200);
     return {
       id: `goal-${Date.now()}`,
-      userId: 'user-1',
-      title: goal.title || 'New Goal',
-      category: goal.category || GoalCategory.PERSONAL,
-      priority: goal.priority || Priority.MEDIUM,
-      status: GoalStatus.ACTIVE,
-      progress: 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      description: goal.description || 'New Goal',
+      priority: goal.priority || 'medium',
+      deadline: goal.deadline,
     };
   },
 };
@@ -345,7 +364,7 @@ export const demoApi = {
     await delay(300);
     return [
       {
-        id: 'demo-1',
+        id: 'hackathon-deadline',
         name: 'Overcommitted Developer',
         description: 'A developer juggling too many commitments with an approaching deadline',
         preloadedContext: {
@@ -361,8 +380,24 @@ export const demoApi = {
   },
 
   async loadScenario(scenarioId: string): Promise<void> {
-    await delay(400);
-    void scenarioId; // Will be used when scenarios are implemented
+    const response = await fetch(`${API_BASE_URL}/demo/seed`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scenario: scenarioId }),
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to load scenario: ${response.statusText}`);
+    }
+  },
+
+  async reset(): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/demo/reset`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to reset demo: ${response.statusText}`);
+    }
   },
 };
 

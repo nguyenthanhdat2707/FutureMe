@@ -52,14 +52,16 @@ export class FeedbackRepository extends BaseRepository {
     return this.findById(id)!;
   }
 
-  private mapToFeedback(row: any): Feedback {
+  private mapToFeedback(row: unknown): Feedback {
+    if (!row || typeof row !== 'object') throw new Error('Invalid row');
+    const r = row as Record<string, unknown>;
     return {
-      id: row.id,
-      userId: row.user_id,
-      targetType: row.target_type as FeedbackTargetType,
-      targetId: row.target_id,
-      feedbackText: row.feedback_text,
-      createdAt: new Date(row.created_at)
+      id: typeof r.id === 'string' ? r.id : '',
+      userId: typeof r.user_id === 'string' ? r.user_id : '',
+      targetType: (typeof r.target_type === 'string' ? r.target_type : 'decision') as FeedbackTargetType,
+      targetId: typeof r.target_id === 'string' ? r.target_id : '',
+      feedbackText: typeof r.feedback_text === 'string' ? r.feedback_text : '',
+      createdAt: new Date(typeof r.created_at === 'string' ? r.created_at : 0)
     };
   }
 }

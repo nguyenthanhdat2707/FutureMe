@@ -52,14 +52,16 @@ export class OutcomeRepository extends BaseRepository {
     return this.findById(id)!;
   }
 
-  private mapToOutcome(row: any): Outcome {
+  private mapToOutcome(row: unknown): Outcome {
+    if (!row || typeof row !== 'object') throw new Error('Invalid row');
+    const r = row as Record<string, unknown>;
     return {
-      id: row.id,
-      decisionId: row.decision_id,
-      userId: row.user_id,
-      description: row.description,
-      observedAt: new Date(row.observed_at),
-      createdAt: new Date(row.created_at)
+      id: typeof r.id === 'string' ? r.id : '',
+      decisionId: typeof r.decision_id === 'string' ? r.decision_id : '',
+      userId: typeof r.user_id === 'string' ? r.user_id : '',
+      description: typeof r.description === 'string' ? r.description : '',
+      observedAt: new Date(typeof r.observed_at === 'string' ? r.observed_at : 0),
+      createdAt: new Date(typeof r.created_at === 'string' ? r.created_at : 0)
     };
   }
 }
