@@ -30,7 +30,7 @@ export class MockDecisionEngine implements IDecisionEngine {
   async supportDecision(userId: string, query: DecisionQuery): Promise<DecisionSupport> {
     // Get relevant context
     const relevantContext = await this.contextEngine.getRelevantContext(userId, query);
-    const assessment = assessDecisionFeasibility(query.impactProfile);
+    const assessment = assessDecisionFeasibility(query.impactProfile, new Date(), relevantContext);
     
     // Build LLM prompt
     const systemPrompt = `You are a decision support assistant. Analyze the user's question in context of their goals, commitments, and constraints. Describe clear tradeoffs.
@@ -87,7 +87,8 @@ Please describe meaningful tradeoffs without inventing feasibility facts.`;
     return {
       decision,
       assessment,
-      clarificationNeeded: clarificationQuestions(assessment.missingData)
+      clarificationNeeded: clarificationQuestions(assessment.missingData),
+      state: relevantContext.state
     };
   }
 }

@@ -16,7 +16,7 @@ describe('Context API Integration', () => {
     await initDatabase();
   });
 
-  afterAll(async () => {
+  afterAll(() => {
     closeDatabase();
   });
 
@@ -45,9 +45,10 @@ describe('Context API Integration', () => {
         .get('/api/context?userId=brand-new-user')
         .expect(200);
 
-      expect(response.body.goals).toEqual([]);
-      expect(response.body.commitments).toEqual([]);
-      expect(response.body.preferences).toEqual([]);
+      const body = response.body as { goals: unknown[]; commitments: unknown[]; preferences: unknown[] };
+      expect(body.goals).toEqual([]);
+      expect(body.commitments).toEqual([]);
+      expect(body.preferences).toEqual([]);
     });
   });
 
