@@ -138,115 +138,115 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  deploy-staging:
-    name: Deploy to Staging
-    runs-on: ubuntu-latest
-    needs: build
-    if: github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/heads/feat/')
-    environment:
-      name: staging
-      url: https://staging.future-me.example.com
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Deploy to staging
-        run: |
-          echo "Deploying to staging environment..."
-          echo "Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
-          # Add your deployment commands here:
-          # Example for Kubernetes:
-          # kubectl set image deployment/future-me-backend future-me-backend=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
-          # Example for Docker Compose on remote server:
-          # ssh user@staging-server "cd /app && docker-compose pull && docker-compose up -d"
-          # Example for AWS ECS:
-          # aws ecs update-service --cluster staging --service future-me --force-new-deployment
-
-      - name: Wait for deployment
-        run: sleep 30
-
-  smoke-test:
-    name: Smoke Tests
-    runs-on: ubuntu-latest
-    needs: deploy-staging
-    if: github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/heads/feat/')
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Health check
-        run: |
-          # Replace with your actual staging URL
-          STAGING_URL="${STAGING_URL:-https://staging.future-me.example.com}"
-          
-          echo "Running smoke tests against: $STAGING_URL"
-          
-          # Health check
-          response=$(curl -s -o /dev/null -w "%{http_code}" "$STAGING_URL/api/health" || echo "000")
-          
-          if [ "$response" = "200" ]; then
-            echo "✓ Health check passed"
-          else
-            echo "✗ Health check failed (HTTP $response)"
-            exit 1
-          fi
-
-      - name: API endpoint tests
-        run: |
-          STAGING_URL="${STAGING_URL:-https://staging.future-me.example.com}"
-          
-          # Test context endpoint
-          response=$(curl -s -o /dev/null -w "%{http_code}" "$STAGING_URL/api/context" || echo "000")
-          if [ "$response" = "200" ]; then
-            echo "✓ Context API responding"
-          else
-            echo "✗ Context API failed (HTTP $response)"
-            exit 1
-          fi
-
-      - name: Notify deployment success
-        if: success()
-        run: |
-          echo "🚀 Deployment to staging successful!"
-          echo "Environment: staging"
-          echo "Commit: ${{ github.sha }}"
-          echo "Branch: ${{ github.ref_name }}"
-
-  deploy-production:
-    name: Deploy to Production
-    runs-on: ubuntu-latest
-    needs: build
-    if: github.ref == 'refs/heads/main'
-    environment:
-      name: production
-      url: https://future-me.example.com
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Deploy to production
-        run: |
-          echo "Deploying to production environment..."
-          echo "Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
-          # Add your production deployment commands here
-
-      - name: Wait for deployment
-        run: sleep 30
-
-      - name: Production smoke test
-        run: |
-          PROD_URL="${PROD_URL:-https://future-me.example.com}"
-          response=$(curl -s -o /dev/null -w "%{http_code}" "$PROD_URL/api/health" || echo "000")
-          
-          if [ "$response" = "200" ]; then
-            echo "✓ Production health check passed"
-          else
-            echo "✗ Production health check failed"
-            exit 1
-          fi
-
-      - name: Notify production deployment
-        if: success()
-        run: |
-          echo "🎉 Production deployment successful!"
-          echo "Commit: ${{ github.sha }}"
+#   deploy-staging:
+#     name: Deploy to Staging
+#     runs-on: ubuntu-latest
+#     needs: build
+#     if: github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/heads/feat/')
+#     environment:
+#       name: staging
+#       url: https://staging.future-me.example.com
+#     steps:
+#       - name: Checkout code
+#         uses: actions/checkout@v4
+# 
+#       - name: Deploy to staging
+#         run: |
+#           echo "Deploying to staging environment..."
+#           echo "Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
+#           # Add your deployment commands here:
+#           # Example for Kubernetes:
+#           # kubectl set image deployment/future-me-backend future-me-backend=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+#           # Example for Docker Compose on remote server:
+#           # ssh user@staging-server "cd /app && docker-compose pull && docker-compose up -d"
+#           # Example for AWS ECS:
+#           # aws ecs update-service --cluster staging --service future-me --force-new-deployment
+# 
+#       - name: Wait for deployment
+#         run: sleep 30
+# 
+#   smoke-test:
+#     name: Smoke Tests
+#     runs-on: ubuntu-latest
+#     needs: deploy-staging
+#     if: github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/heads/feat/')
+#     steps:
+#       - name: Checkout code
+#         uses: actions/checkout@v4
+# 
+#       - name: Health check
+#         run: |
+#           # Replace with your actual staging URL
+#           STAGING_URL="${STAGING_URL:-https://staging.future-me.example.com}"
+#           
+#           echo "Running smoke tests against: $STAGING_URL"
+#           
+#           # Health check
+#           response=$(curl -s -o /dev/null -w "%{http_code}" "$STAGING_URL/api/health" || echo "000")
+#           
+#           if [ "$response" = "200" ]; then
+#             echo "✓ Health check passed"
+#           else
+#             echo "✗ Health check failed (HTTP $response)"
+#             exit 1
+#           fi
+# 
+#       - name: API endpoint tests
+#         run: |
+#           STAGING_URL="${STAGING_URL:-https://staging.future-me.example.com}"
+#           
+#           # Test context endpoint
+#           response=$(curl -s -o /dev/null -w "%{http_code}" "$STAGING_URL/api/context" || echo "000")
+#           if [ "$response" = "200" ]; then
+#             echo "✓ Context API responding"
+#           else
+#             echo "✗ Context API failed (HTTP $response)"
+#             exit 1
+#           fi
+# 
+#       - name: Notify deployment success
+#         if: success()
+#         run: |
+#           echo "🚀 Deployment to staging successful!"
+#           echo "Environment: staging"
+#           echo "Commit: ${{ github.sha }}"
+#           echo "Branch: ${{ github.ref_name }}"
+# 
+#   deploy-production:
+#     name: Deploy to Production
+#     runs-on: ubuntu-latest
+#     needs: build
+#     if: github.ref == 'refs/heads/main'
+#     environment:
+#       name: production
+#       url: https://future-me.example.com
+#     steps:
+#       - name: Checkout code
+#         uses: actions/checkout@v4
+# 
+#       - name: Deploy to production
+#         run: |
+#           echo "Deploying to production environment..."
+#           echo "Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
+#           # Add your production deployment commands here
+# 
+#       - name: Wait for deployment
+#         run: sleep 30
+# 
+#       - name: Production smoke test
+#         run: |
+#           PROD_URL="${PROD_URL:-https://future-me.example.com}"
+#           response=$(curl -s -o /dev/null -w "%{http_code}" "$PROD_URL/api/health" || echo "000")
+#           
+#           if [ "$response" = "200" ]; then
+#             echo "✓ Production health check passed"
+#           else
+#             echo "✗ Production health check failed"
+#             exit 1
+#           fi
+# 
+#       - name: Notify production deployment
+#         if: success()
+#         run: |
+#           echo "🎉 Production deployment successful!"
+#           echo "Commit: ${{ github.sha }}"
