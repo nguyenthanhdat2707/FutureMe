@@ -3,7 +3,7 @@
  * Wrapper around sql.js for easier querying
  */
 
-import { Database as SqlJsDatabase } from 'sql.js';
+import { Database as SqlJsDatabase, SqlValue } from 'sql.js';
 import { getDatabase, saveDatabaseToDisk } from './connection';
 
 export class DB {
@@ -16,9 +16,9 @@ export class DB {
   /**
    * Execute a query that returns a single row
    */
-  get(sql: string, params: any[] = []): any | null {
+  get(sql: string, params: unknown[] = []): unknown {
     const stmt = this.db.prepare(sql);
-    stmt.bind(params);
+    stmt.bind(params as SqlValue[]);
     
     if (stmt.step()) {
       const row = stmt.getAsObject();
@@ -33,11 +33,11 @@ export class DB {
   /**
    * Execute a query that returns multiple rows
    */
-  all(sql: string, params: any[] = []): any[] {
+  all(sql: string, params: unknown[] = []): unknown[] {
     const stmt = this.db.prepare(sql);
-    stmt.bind(params);
+    stmt.bind(params as SqlValue[]);
     
-    const results: any[] = [];
+    const results: unknown[] = [];
     while (stmt.step()) {
       results.push(stmt.getAsObject());
     }
@@ -49,8 +49,8 @@ export class DB {
   /**
    * Execute a query that modifies data (INSERT, UPDATE, DELETE)
    */
-  run(sql: string, params: any[] = []): void {
-    this.db.run(sql, params);
+  run(sql: string, params: unknown[] = []): void {
+    this.db.run(sql, params as SqlValue[]);
     saveDatabaseToDisk();
   }
 

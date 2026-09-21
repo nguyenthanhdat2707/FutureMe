@@ -7,7 +7,7 @@ import { ICalendarAdapter } from './calendar-adapter.interface';
 import { CalendarEvent } from '../domain/types';
 
 export class MockCalendarAdapter implements ICalendarAdapter {
-  async syncEvents(userId: string): Promise<CalendarEvent[]> {
+  syncEvents(userId: string): Promise<CalendarEvent[]> {
     console.log('[MockCalendarAdapter] Syncing events for user:', userId);
     
     // Return mock events for demo
@@ -48,7 +48,7 @@ export class MockCalendarAdapter implements ICalendarAdapter {
       }
     ];
 
-    return mockEvents as CalendarEvent[];
+    return Promise.resolve(mockEvents as CalendarEvent[]);
   }
 
   async getUpcomingEvents(userId: string, daysAhead: number): Promise<CalendarEvent[]> {

@@ -15,7 +15,7 @@ export class PersonalContextRepository extends BaseRepository {
       LIMIT ?
     `, [userId, limit]);
 
-    return rows.map(this.mapToContextAttribute);
+    return rows.map(this.mapToContextAttribute.bind(this));
   }
 
   findByUserIdAndAttribute(userId: string, attribute: string): ContextAttribute[] {
@@ -25,7 +25,7 @@ export class PersonalContextRepository extends BaseRepository {
       ORDER BY observed_at DESC
     `, [userId, attribute]);
 
-    return rows.map(this.mapToContextAttribute);
+    return rows.map(this.mapToContextAttribute.bind(this));
   }
 
   findById(id: string): ContextAttribute | null {
@@ -60,7 +60,7 @@ export class PersonalContextRepository extends BaseRepository {
     if (!attr) return null;
 
     const fields: string[] = [];
-    const values: any[] = [];
+    const values: unknown[] = [];
 
     if (updates.attribute !== undefined) {
       fields.push('attribute = ?');
@@ -96,17 +96,19 @@ export class PersonalContextRepository extends BaseRepository {
     return this.findById(id);
   }
 
-  private mapToContextAttribute(row: any): ContextAttribute {
+  private mapToContextAttribute(row: unknown): ContextAttribute {
+    if (!row || typeof row !== 'object') throw new Error('Invalid row');
+    const r = row as Record<string, unknown>;
     return {
-      id: row.id,
-      userId: row.user_id,
-      attribute: row.attribute,
-      value: row.value,
-      source: row.source as ObservationSource,
-      confidence: row.confidence,
-      observedAt: new Date(row.observed_at),
-      validUntil: row.valid_until ? new Date(row.valid_until) : undefined,
-      createdAt: new Date(row.created_at)
+      id: typeof r.id === 'string' ? r.id : '',
+      userId: typeof r.user_id === 'string' ? r.user_id : '',
+      attribute: typeof r.attribute === 'string' ? r.attribute : '',
+      value: typeof r.value === 'string' ? r.value : '',
+      source: (typeof r.source === 'string' ? r.source : 'USER_CONFIRMED') as ObservationSource,
+      confidence: typeof r.confidence === 'number' ? r.confidence : 0,
+      observedAt: new Date(typeof r.observed_at === 'string' ? r.observed_at : 0),
+      validUntil: typeof r.valid_until === 'string' ? new Date(r.valid_until) : undefined,
+      createdAt: new Date(typeof r.created_at === 'string' ? r.created_at : 0)
     };
   }
 }

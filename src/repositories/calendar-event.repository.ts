@@ -91,18 +91,20 @@ export class CalendarEventRepository extends BaseRepository {
     return this.create(event);
   }
 
-  private mapToCalendarEvent(row: any): CalendarEvent {
+  private mapToCalendarEvent(row: unknown): CalendarEvent {
+    if (!row || typeof row !== 'object') throw new Error('Invalid row');
+    const r = row as Record<string, unknown>;
     return {
-      id: row.id,
-      userId: row.user_id,
-      externalId: row.external_id,
-      title: row.title,
-      startTime: new Date(row.start_time),
-      endTime: new Date(row.end_time),
-      status: row.status || undefined,
-      rawData: row.raw_data || undefined,
-      syncedAt: new Date(row.synced_at),
-      createdAt: new Date(row.created_at)
+      id: typeof r.id === 'string' ? r.id : '',
+      userId: typeof r.user_id === 'string' ? r.user_id : '',
+      externalId: typeof r.external_id === 'string' ? r.external_id : '',
+      title: typeof r.title === 'string' ? r.title : '',
+      startTime: new Date(typeof r.start_time === 'string' ? r.start_time : 0),
+      endTime: new Date(typeof r.end_time === 'string' ? r.end_time : 0),
+      status: typeof r.status === 'string' ? r.status : undefined,
+      rawData: typeof r.raw_data === 'string' ? r.raw_data : undefined,
+      syncedAt: new Date(typeof r.synced_at === 'string' ? r.synced_at : 0),
+      createdAt: new Date(typeof r.created_at === 'string' ? r.created_at : 0)
     };
   }
 }

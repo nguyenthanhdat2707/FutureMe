@@ -5,6 +5,7 @@
 import { BaseRepository } from './base.repository';
 import { Observation, ObservationType, ObservationSource } from '../domain/types';
 import { v4 as uuidv4 } from 'uuid';
+import { safeJsonParse } from '../utils/json';
 
 export class ObservationRepository extends BaseRepository {
   findById(id: string): Observation | null {
@@ -56,16 +57,21 @@ export class ObservationRepository extends BaseRepository {
     return this.findById(id)!;
   }
 
-  private mapToObservation(row: any): Observation {
+  private mapToObservation(row: unknown): Observation {
+    if (!row || typeof row !== 'object') throw new Error('Invalid row');
+    const r = row as Record<string, unknown>;
+
+    const dataStr = typeof r.data === 'string' ? r.data : '{}';
+
     return {
-      id: row.id,
-      userId: row.user_id,
-      type: row.type as ObservationType,
-      data: JSON.parse(row.data),
-      source: row.source as ObservationSource,
-      confidence: row.confidence,
-      timestamp: new Date(row.timestamp),
-      createdAt: new Date(row.created_at)
+      id: typeof r.id === 'string' ? r.id : '',
+      userId: typeof r.user_id === 'string' ? r.user_id : '',
+      type: (typeof r.type === 'string' ? r.type : 'USER_REPORTED') as ObservationType,
+      data: safeJsonParse(dataStr) as Record<string, unknown>,
+      source: (typeof r.source === 'string' ? r.source : 'USER_CONFIRMED') as ObservationSource,
+      confidence: typeof r.confidence === 'number' ? r.confidence : 0,
+      timestamp: new Date(typeof r.timestamp === 'string' ? r.timestamp : 0),
+      createdAt: new Date(typeof r.created_at === 'string' ? r.created_at : 0)
     };
   }
 }

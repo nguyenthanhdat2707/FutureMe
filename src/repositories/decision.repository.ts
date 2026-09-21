@@ -3,8 +3,9 @@
  */
 
 import { BaseRepository } from './base.repository';
-import { Decision, DecisionStatus } from '../domain/types';
+import { Decision, DecisionStatus, ContextSnapshot } from '../domain/types';
 import { v4 as uuidv4 } from 'uuid';
+import { safeJsonParse } from '../utils/json';
 
 export class DecisionRepository extends BaseRepository {
   findById(id: string): Decision | null {
@@ -66,20 +67,32 @@ export class DecisionRepository extends BaseRepository {
     return this.findById(id);
   }
 
-  private mapToDecision(row: any): Decision {
+  private mapToDecision(row: unknown): Decision {
+    if (!row || typeof row !== 'object') throw new Error('Invalid row');
+    const r = row as Record<string, unknown>;
+
+    const contextSnapshot = typeof r.context_snapshot === 'string' ? r.context_snapshot : '{}';
+    const recommendationStr = typeof r.recommendation === 'string' ? r.recommendation : '{}';
+    const recommendation = safeJsonParse(recommendationStr) as Record<string, unknown>;
+
+    const parsedContext = safeJsonParse(contextSnapshot) as ContextSnapshot;
     return {
-      id: row.id,
-      userId: row.user_id,
-      question: row.question,
-      options: [], // Stored in context_snapshot
-      relevantContext: JSON.parse(row.context_snapshot),
-      tradeoffs: [], // Stored in context_snapshot
-      recommendation: JSON.parse(row.recommendation),
-      reasoning: JSON.parse(row.recommendation).reasoning || '',
-      confidence: JSON.parse(row.recommendation).confidence || 0,
-      userChoice: row.user_choice ? JSON.parse(row.user_choice) : undefined,
-      status: row.status as DecisionStatus,
-      createdAt: new Date(row.created_at)
+      id: typeof r.id === 'string' ? r.id : '',
+      userId: typeof r.user_id === 'string' ? r.user_id : '',
+      question: typeof r.question === 'string' ? r.question : '',
+      options: [],
+      relevantContext: parsedContext,
+      tradeoffs: [],
+      recommendation: {
+        option: typeof recommendation.option === 'string' ? recommendation.option : '',
+        confidence: typeof recommendation.confidence === 'number' ? recommendation.confidence : 0,
+        reasoning: typeof recommendation.reasoning === 'string' ? recommendation.reasoning : ''
+      },
+      reasoning: typeof recommendation.reasoning === 'string' ? recommendation.reasoning : '',
+      confidence: typeof recommendation.confidence === 'number' ? recommendation.confidence : 0,
+      userChoice: typeof r.user_choice === 'string' && r.user_choice ? safeJsonParse(r.user_choice) as string : undefined,
+      status: (typeof r.status === 'string' ? r.status : DecisionStatus.PENDING) as DecisionStatus,
+      createdAt: new Date(typeof r.created_at === 'string' ? r.created_at : 0)
     };
   }
 }

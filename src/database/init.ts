@@ -17,7 +17,7 @@ async function init() {
     const result = stmt.getAsObject();
     stmt.free();
     
-    console.log(`[Database Init] Current user count: ${result.count}`);
+    console.log(`[Database Init] Current user count: ${String(result.count)}`);
     
     db.close();
     console.log('[Database Init] Complete');

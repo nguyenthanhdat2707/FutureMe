@@ -21,6 +21,7 @@ import { PersonalContextRepository } from '../repositories/personal-context.repo
 import { DecisionRepository } from '../repositories/decision.repository';
 import { CalendarEventRepository } from '../repositories/calendar-event.repository';
 import { ObservationRepository } from '../repositories/observation.repository';
+import { safeJsonParse } from '../utils/json';
 
 export class SimpleContextEngine implements IContextEngine {
   constructor(
@@ -31,7 +32,7 @@ export class SimpleContextEngine implements IContextEngine {
     private stateEstimator: IStateEstimator
   ) {}
 
-  async getCurrentContext(userId: string): Promise<PersonalContext> {
+  getCurrentContext(userId: string): Promise<PersonalContext> {
     const attributes = this.contextRepo.findByUserId(userId, 100);
     const recentDecisions = this.decisionRepo.findByUserId(userId, 10);
     const upcomingEvents = this.calendarRepo.findUpcoming(userId);
@@ -43,28 +44,30 @@ export class SimpleContextEngine implements IContextEngine {
 
     for (const attr of attributes) {
       try {
-        const parsed = JSON.parse(attr.value);
-        if (attr.attribute === 'goal') {
-          goals.push({
-            ...parsed,
-            source: attr.source,
-            confidence: attr.confidence,
-            attributeId: attr.id
-          });
-        } else if (attr.attribute === 'commitment') {
-          commitments.push({
-            ...parsed,
-            source: attr.source,
-            confidence: attr.confidence,
-            attributeId: attr.id
-          });
-        } else if (attr.attribute === 'preference') {
-          preferences.push({
-            ...parsed,
-            source: attr.source,
-            confidence: attr.confidence,
-            attributeId: attr.id
-          });
+        const parsed = safeJsonParse(attr.value);
+        if (typeof parsed === 'object' && parsed !== null) {
+          if (attr.attribute === 'goal') {
+            goals.push({
+              ...(parsed as unknown as Goal),
+              source: attr.source,
+              confidence: attr.confidence,
+              attributeId: attr.id
+            });
+          } else if (attr.attribute === 'commitment') {
+            commitments.push({
+              ...(parsed as unknown as Commitment),
+              source: attr.source,
+              confidence: attr.confidence,
+              attributeId: attr.id
+            });
+          } else if (attr.attribute === 'preference') {
+            preferences.push({
+              ...(parsed as unknown as Preference),
+              source: attr.source,
+              confidence: attr.confidence,
+              attributeId: attr.id
+            });
+          }
         }
       } catch (e) {
         // Skip invalid JSON
@@ -82,7 +85,7 @@ export class SimpleContextEngine implements IContextEngine {
         return sum + duration;
       }, 0);
 
-    return {
+    return Promise.resolve({
       userId,
       goals,
       commitments,
@@ -94,10 +97,10 @@ export class SimpleContextEngine implements IContextEngine {
       },
       recentDecisions,
       lastUpdated: new Date()
-    };
+    });
   }
 
-  async updateContext(userId: string, observation: Observation): Promise<PersonalContext> {
+  updateContext(userId: string, observation: Observation): Promise<PersonalContext> {
     const timestamp = observation.timestamp ? new Date(observation.timestamp) : new Date();
     const confidence = Number.isFinite(observation.confidence)
       ? Math.min(1, Math.max(0, observation.confidence))
@@ -115,7 +118,7 @@ export class SimpleContextEngine implements IContextEngine {
     return this.getCurrentContext(userId);
   }
 
-  async getRelevantContext(userId: string, decision: DecisionQuery): Promise<RelevantContext> {
+  async getRelevantContext(userId: string, _decision: DecisionQuery): Promise<RelevantContext> {
     const context = await this.getCurrentContext(userId);
     const recentObs = this.observationRepo.findRecent(userId, 24);
     const state = await this.stateEstimator.estimateCurrentState(context, recentObs);
@@ -131,20 +134,21 @@ export class SimpleContextEngine implements IContextEngine {
     };
   }
 
-  async confirmContextAttribute(userId: string, attributeId: string): Promise<void> {
+  confirmContextAttribute(userId: string, attributeId: string): Promise<void> {
     const attr = this.contextRepo.findById(attributeId);
     if (attr && attr.userId === userId) {
-      await this.contextRepo.update(attributeId, {
+      this.contextRepo.update(attributeId, {
         source: ObservationSource.USER_CONFIRMED,
         confidence: 1.0
       });
     }
+    return Promise.resolve();
   }
 
-  async correctContext(userId: string, correction: ContextCorrection): Promise<PersonalContext> {
+  correctContext(userId: string, correction: ContextCorrection): Promise<PersonalContext> {
     const attr = this.contextRepo.findById(correction.attributeId);
     if (attr && attr.userId === userId) {
-      await this.contextRepo.update(correction.attributeId, {
+      this.contextRepo.update(correction.attributeId, {
         value: correction.correctedValue,
         source: ObservationSource.USER_CONFIRMED,
         confidence: 1.0

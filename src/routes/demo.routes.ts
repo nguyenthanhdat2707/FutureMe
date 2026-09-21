@@ -8,10 +8,12 @@ import { PersonalContextRepository } from '../repositories/personal-context.repo
 import { CalendarEventRepository } from '../repositories/calendar-event.repository';
 import { ObservationSource } from '../domain/types';
 
+import { getErrorMessage } from '../utils/error';
+
 export const demoRouter = Router();
 
 // Reset to initial demo state
-demoRouter.post('/reset', async (req: Request, res: Response) => {
+demoRouter.post('/reset', (req: Request, res: Response) => {
   try {
     const userRepo = new UserRepository();
     const userId = 'demo-user';
@@ -31,13 +33,13 @@ demoRouter.post('/reset', async (req: Request, res: Response) => {
       message: 'Demo state reset',
       userId: user.id
     });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
   }
 });
 
 // Get current demo scenario
-demoRouter.get('/state', async (req: Request, res: Response) => {
+demoRouter.get('/state', (req: Request, res: Response) => {
   try {
     const userRepo = new UserRepository();
     const contextRepo = new PersonalContextRepository();
@@ -54,17 +56,18 @@ demoRouter.get('/state', async (req: Request, res: Response) => {
       upcomingEvents: upcomingEvents.length,
       scenario: 'hackathon-deadline'
     });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
   }
 });
 
 // Seed specific scenario
-demoRouter.post('/seed', async (req: Request, res: Response) => {
+demoRouter.post('/seed', (req: Request, res: Response) => {
   try {
     const userRepo = new UserRepository();
     const contextRepo = new PersonalContextRepository();
-    const scenario = req.body.scenario || 'hackathon-deadline';
+    const body = req.body as { scenario?: string };
+    const scenario = typeof body.scenario === 'string' ? body.scenario : 'hackathon-deadline';
     const userId = 'demo-user';
     
     // Ensure demo user exists - check by ID first, then by email
@@ -118,7 +121,7 @@ demoRouter.post('/seed', async (req: Request, res: Response) => {
       scenario,
       message: `Demo scenario '${scenario}' seeded`
     });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
   }
 });
