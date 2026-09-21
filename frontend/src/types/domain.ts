@@ -263,7 +263,7 @@ export interface ImpactAnalysis {
   affectedGoals: string[]; // Goal IDs
 }
 
-export type DecisionImpactSource = 'user-confirmed' | 'provided' | 'estimated';
+export type DecisionImpactSource = 'user-confirmed' | 'provided' | 'estimated' | 'context';
 
 export interface DecisionImpactProfile {
   timeCostHours?: number;
@@ -311,7 +311,23 @@ export interface DecisionFeasibilityAssessment {
   recommendation: DecisionRecommendation;
   assumptions: string[];
   missingData: string[];
+  invalidInputs: string[];
   evidence: FeasibilityEvidence[];
+}
+
+export enum PersonalState {
+  FLOW = 'FLOW',
+  UNCERTAIN = 'UNCERTAIN',
+  DRIFTING = 'DRIFTING',
+  DISRUPTED = 'DISRUPTED',
+  OVERLOADED = 'OVERLOADED'
+}
+
+export interface StateEstimate {
+  state: PersonalState;
+  confidence: number;
+  evidence: string[];
+  timestamp: string;
 }
 
 export interface DecisionApiResponse {
@@ -320,6 +336,7 @@ export interface DecisionApiResponse {
   };
   assessment: DecisionFeasibilityAssessment;
   clarificationNeeded: string[];
+  state?: StateEstimate;
 }
 
 // ============================================================================

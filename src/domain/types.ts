@@ -149,7 +149,7 @@ export interface Recommendation {
   reasoning: string;
 }
 
-export type DecisionImpactSource = 'user-confirmed' | 'provided' | 'estimated';
+export type DecisionImpactSource = 'user-confirmed' | 'provided' | 'estimated' | 'context';
 
 export interface DecisionImpactProfile {
   timeCostHours?: number;
@@ -183,6 +183,7 @@ export interface DecisionFeasibilityAssessment {
   recommendation: Recommendation;
   assumptions: string[];
   missingData: string[];
+  invalidInputs: string[];
   evidence: FeasibilityEvidence[];
 }
 
@@ -220,6 +221,7 @@ export interface DecisionSupport {
   decision: Decision;
   assessment: DecisionFeasibilityAssessment;
   clarificationNeeded?: string[];
+  state?: StateEstimate;
 }
 
 // ========================================

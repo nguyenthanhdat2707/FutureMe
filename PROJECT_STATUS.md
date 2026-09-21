@@ -1,6 +1,6 @@
 # Future Me — Project Status
 
-> **Last Updated:** 2026-09-21 — Context-change → clarification → before/after decision flow complete
+> **Last Updated:** 2026-09-21 — Decisions reliability and UX remediation under verification
 > **Current Branch:** `feat/core-decision-logic`
 > **Overall Progress:** Foundation complete; core product thesis proven through working clarification flow
 
@@ -8,14 +8,14 @@
 
 | Field | Current value |
 |-------|---------------|
-| Current task | Context-change → clarification → before/after assessment flow complete |
-| Actual agent | Hermes (direct implementation) |
-| Working path | `frontend/src/pages/DecisionsPage.tsx`, `src/intelligence/simple-state-estimator.ts`, `src/__tests__/state-estimation.test.ts` |
-| Completed | **Core product thesis proven:** observation creation connects to POST /api/observations; generic observation categories (workload-increase, energy-decrease, deadline-change, disruption) supported; state estimation (FLOW/UNCERTAIN/OVERLOADED/DISRUPTED) displays where implemented; clarificationNeeded prompts appear when assessment lacks data; clarification answers update impact profile inputs; same decision re-runs with updated inputs; before/after assessment displays side-by-side with changed recommendation highlighted; changed evidence items marked with "Updated" badge and green highlight; causal chain visible (which inputs changed → new assessment → different recommendation); deterministic feasibility logic remains authoritative; LLM cannot invent facts; full test coverage for state estimation logic (8 new tests, all passing) |
-| In progress | Ready to commit and push |
-| Next | Calendar integration, outcome/feedback, demo polish |
-| Blocked | No blockers; real Calendar/Bedrock remain optional adapters |
-| Current test status | Full Jest suite: 35/35 passed (6 suites). Backend coverage: 83.1% statements, 64.42% branches, 85.18% functions, 83.66% lines. Frontend build passed (vite build succeeded). Backend build passed (tsc). Lint shows pre-existing issues unrelated to this work |
+| Current task | Verify remediation of CORS, demo controls, context-aware assessment, clarification mapping, persistence, and state display |
+| Actual agent | Antigravity implementation; Hermes verification and repair; Codex independent review |
+| Working path | `frontend/src/pages/DecisionsPage.tsx`, `frontend/src/pages/DemoPage.tsx`, `src/intelligence/deterministic-feasibility-assessment.ts`, `src/routes/decision.routes.ts` |
+| Completed | CORS preflight; demo load/reset actions; deterministic context workload/energy/disruption effects; negative-input validation; persisted Decisions state; user-state API/UI badge; advanced-input accordion; clarification retry visibility. |
+| In progress | Final verification; no commit or push requested. |
+| Target Phase | Decisions reliability and UX remediation |
+| Blocked | Backend lint has legacy debt. |
+| Current test status | Full Jest suite: 39/39 passed (6 suites). Backend and frontend builds passed. Frontend lint passed with one pre-existing warning. Backend lint remains failing due to legacy debt; no successful clean lint run is claimed. |
 
 ---
 
@@ -104,7 +104,7 @@
 | Component | Status | Notes |
 |-----------|--------|-------|
 | Docker + Compose | ✅ DONE | Multi-stage build, development + production configs |
-| Jest + coverage | ✅ DONE | 35 tests passing, 83%+ coverage |
+| Jest + coverage | ✅ DONE | 39 tests passing, 82%+ coverage |
 | ESLint + Prettier | ✅ DONE | TypeScript-aware, pre-existing warnings isolated |
 | CI pipeline (GitHub Actions) | ✅ DONE | Lint, test, build on every push |
 | Trivy security scanning | ✅ DONE | Automated vulnerability + secret scans |
@@ -136,7 +136,7 @@
 
 ## Known Issues / Technical Debt
 
-- Lint warnings (286 issues) are pre-existing; new code follows strict TypeScript conventions
+- Lint problems (280 issues) are pre-existing; new code follows strict TypeScript conventions
 - State estimator uses simple rules (30-minute observation window, 8-hour workload threshold); production would use more sophisticated logic
 - Frontend clarification mapping is heuristic (keyword matching in questions); production would use structured clarification schema
 - No persistent demo scenarios yet; reset/seed creates fresh data each time
