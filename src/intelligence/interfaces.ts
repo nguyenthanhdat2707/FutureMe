@@ -7,16 +7,14 @@
 
 import {
   PersonalContext,
-  PersonalState,
   StateEstimate,
   Observation,
   Forecast,
   DecisionQuery,
   DecisionSupport,
   InterventionDecision,
-  CalendarEvent,
-  ContextHypotheses,
-  ClarificationQuestion,
+  ContextAnalystRequest,
+  ContextAnalystResult,
   RelevantContext,
   ContextCorrection
 } from '../domain/types';
@@ -82,9 +80,5 @@ export interface IInterventionPolicy {
 // ========================================
 
 export interface ILLMContextAnalyst {
-  analyzeCalendarEvents(events: CalendarEvent[]): Promise<ContextHypotheses>;
-  generateClarificationQuestions(
-    context: PersonalContext,
-    decision?: DecisionQuery
-  ): Promise<ClarificationQuestion[]>;
+  analyze(request: ContextAnalystRequest): Promise<ContextAnalystResult>;
 }

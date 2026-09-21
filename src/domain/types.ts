@@ -318,21 +318,66 @@ export interface User {
 }
 
 // ========================================
-// Context Analysis
+// LLM Context Analysis
 // ========================================
 
-export interface ContextHypotheses {
-  goals: Goal[];
-  commitments: Commitment[];
-  preferences: Preference[];
-  confidence: number;
+export interface ContextAnalystSignal {
+  id: string;
+  description: string;
+  evidenceIds: string[];
 }
 
-export interface ClarificationQuestion {
+export interface ContextAnalystEvidence {
   id: string;
+  description: string;
+}
+
+export interface ContextAnalystAttribute {
+  id: string;
+  value: string | number | boolean | null;
+}
+
+export interface ContextAnalystRequest {
+  signals: ContextAnalystSignal[];
+  evidence: ContextAnalystEvidence[];
+  contextAttributes: ContextAnalystAttribute[];
+}
+
+export interface ProposedContextHypothesis {
+  status: 'proposed';
+  statement: string;
+  signalIds: string[];
+  evidenceIds: string[];
+  contextAttributeIds: string[];
+}
+
+export type ClarificationResponseFormat =
+  | {
+    type: 'quick-choice';
+    options: string[];
+  }
+  | {
+    type: 'free-text';
+  };
+
+export interface CandidateClarificationQuestion {
+  status: 'proposed';
   question: string;
-  context: string;
-  importance: 'low' | 'medium' | 'high';
+  resolvesContextAttributeIds: string[];
+  signalIds: string[];
+  evidenceIds: string[];
+  responseFormat: ClarificationResponseFormat;
+}
+
+export interface ContextAnalystValidationTrace {
+  status: 'accepted' | 'rejected';
+  reason?: 'invalid-request' | 'invalid-json' | 'invalid-schema' | 'unknown-reference';
+}
+
+export interface ContextAnalystResult {
+  proposedHypotheses: ProposedContextHypothesis[];
+  candidateClarificationQuestions: CandidateClarificationQuestion[];
+  validation: ContextAnalystValidationTrace;
 }
 
 export interface RelevantContext {

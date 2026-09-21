@@ -8,14 +8,14 @@
 
 | Field | Current value |
 |-------|---------------|
-| Current task | Route-level integration coverage and persistence consistency complete |
-| Actual agent | Codex implementation worker; Hermes supervisor verified and will push the tested unit |
-| Working path | `src/__tests__/routes.integration.test.ts`, demo and decision persistence repositories/routes |
-| Completed | Typed general-purpose impact profile; deterministic capacity, deadline-pressure, energy-fit, feasibility, evidence, assumptions, clarifications; route integration coverage; stable demo and decision IDs |
+| Current task | Bounded LLM context analyst and trade-off validation complete |
+| Actual agent | Prior implementation worker; Hermes supervisor verified and will push the reviewed unit |
+| Working path | `src/intelligence/bounded-llm-context-analyst.ts`, `src/__tests__/llm-harness.test.ts`, LLM types/interfaces, mock provider, decision trade-off parser |
+| Completed | Typed bounded LLM analyst; strict request/output/reference validation; proposal-only hypotheses and clarifications; deterministic feasibility authority preserved; Zod trade-off validation |
 | In progress | No implementation work in this unit |
-| Next | Add targeted tests for the remaining low-coverage intelligence components, then add browser-level frontend tests when test infrastructure is selected |
+| Next | Context page API integration in a new session |
 | Blocked | No product or credentials blocker; real Calendar/Bedrock remain optional adapters |
-| Current test status | Full Jest suite: 13/13 passed. Global coverage: 79.41% statements, 60% branches, 80.86% functions, 80.1% lines; all exceed the 50% gate. Root and frontend builds passed; focused lint passed; live decision API returned the expected `not-feasible` result |
+| Current test status | Full Jest suite: 21/21 passed. Global coverage: 80.66% statements, 62.33% branches, 82.96% functions, 81.16% lines; all exceed the 50% gate. Root and frontend builds passed; changed-file lint passed. Independent reviewer sandbox failed before a verdict; source-level contract review and executable checks found no issue |
 
 ---
 
