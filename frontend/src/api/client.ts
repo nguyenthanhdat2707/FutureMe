@@ -364,7 +364,7 @@ export const demoApi = {
     await delay(300);
     return [
       {
-        id: 'demo-1',
+        id: 'hackathon-deadline',
         name: 'Overcommitted Developer',
         description: 'A developer juggling too many commitments with an approaching deadline',
         preloadedContext: {
@@ -380,8 +380,24 @@ export const demoApi = {
   },
 
   async loadScenario(scenarioId: string): Promise<void> {
-    await delay(400);
-    void scenarioId; // Will be used when scenarios are implemented
+    const response = await fetch(`${API_BASE_URL}/demo/seed`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scenario: scenarioId }),
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to load scenario: ${response.statusText}`);
+    }
+  },
+
+  async reset(): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/demo/reset`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to reset demo: ${response.statusText}`);
+    }
   },
 };
 
