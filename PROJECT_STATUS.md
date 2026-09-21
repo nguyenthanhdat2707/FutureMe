@@ -1,21 +1,27 @@
 # Future Me — Project Status
 
-> **Last Updated:** 2026-09-21 — Decisions reliability and UX remediation under verification
-> **Current Branch:** `feat/core-decision-logic`
-> **Overall Progress:** Foundation complete; core product thesis proven through working clarification flow
+> **Last Updated:** 2026-09-21 — Phase 2 (Live Intelligence Loop) COMPLETE
+> **Current Branch:** `feat/phase2-live-intelligence-loop`
+> **Overall Progress:** ~50% — Phase 1 foundation + Phase 2 live intelligence loop complete
+
+## Phase Summary
+
+| Phase | Status | Notes |
+|-------|--------|-------|
+| Phase 1 — Core Decision Logic & Foundation | ✅ COMPLETE | Verified; audit verdict READY |
+| Phase 2 — Live Intelligence Loop | ✅ COMPLETE | Full loop verified: context → analyst → clarify → persist → decision |
 
 ## Live Implementation Status
 
 | Field | Current value |
 |-------|---------------|
-| Current task | Verify remediation of CORS, demo controls, context-aware assessment, clarification mapping, persistence, and state display |
-| Actual agent | Antigravity implementation; Hermes verification and repair; Codex independent review |
-| Working path | `frontend/src/pages/DecisionsPage.tsx`, `frontend/src/pages/DemoPage.tsx`, `src/intelligence/deterministic-feasibility-assessment.ts`, `src/routes/decision.routes.ts` |
-| Completed | CORS preflight; demo load/reset actions; deterministic context workload/energy/disruption effects; negative-input validation; persisted Decisions state; user-state API/UI badge; advanced-input accordion; clarification retry visibility. |
-| In progress | Final verification; no commit or push requested. |
-| Target Phase | Decisions reliability and UX remediation |
-| Blocked | Backend lint has legacy debt. |
-| Current test status | Full Jest suite: 39/39 passed (6 suites). Backend and frontend builds passed. Frontend lint passed with one pre-existing warning. Backend lint remains failing due to legacy debt; no successful clean lint run is claimed. |
+| Current task | Phase 2 complete; ready for Phase 3 |
+| Actual agents | Antigravity (implementation); Hermes (supervision + verification) |
+| Working path | `src/adapters/bedrock-llm-provider.ts`, `src/routes/context.routes.ts`, `src/services/service-container.ts`, `src/__tests__/phase2-loop.integration.test.ts` |
+| Completed | BedrockLLMProvider (real LLM behind ILLMProvider); /api/context/analyze (detect uncertainty, call BoundedLLMContextAnalyst, return proposals without persisting); /api/context/clarify (validate, persist as USER_CONFIRMED with provenance); end-to-end integration test (full loop exercised in real runtime with fake-injected provider); Bedrock fallback to MockLLMProvider when credentials absent |
+| In progress | None |
+| Blocked | Backend lint has legacy debt (pre-existing, not Phase 2 debt). AWS Bedrock credentials not yet configured in production environment (non-blocking: MockLLMProvider handles the fallback). |
+| Current test status | Full Jest suite: 40/40 passed (7 suites). Backend build (tsc) passed. All Phase 1 tests remain green. |
 
 ---
 
@@ -94,8 +100,12 @@
 | ILLMContextAnalyst | ✅ DONE | Bounded harness, proposal validation |
 | MockLLMProvider | ✅ DONE | For development and testing |
 | MockCalendarAdapter | ✅ DONE | For development and testing |
+| BedrockLLMProvider | ✅ DONE | Real AWS Bedrock, falls back to Mock when credentials absent |
+| /api/context/analyze | ✅ DONE | Builds ContextAnalystRequest, calls BoundedLLMContextAnalyst, returns proposals only — never persists |
+| /api/context/clarify | ✅ DONE | Validates + persists clarification answer as USER_CONFIRMED with provenance |
+| Phase 2 end-to-end test | ✅ DONE | Full loop exercised: observation → analyze → clarify → USER_CONFIRMED → decision |
 
-**Next:** Intervention policy integration if needed
+**Next:** Calendar integration, outcome/feedback loop
 
 ---
 

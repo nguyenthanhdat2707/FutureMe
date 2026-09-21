@@ -3,7 +3,7 @@
  * Dependency injection for replaceable components
  */
 
-import { IContextEngine, IDecisionEngine, IStateEstimator, IInterventionPolicy } from '../intelligence/interfaces';
+import { IContextEngine, IDecisionEngine, IStateEstimator, IInterventionPolicy, ILLMContextAnalyst } from '../intelligence/interfaces';
 import { ICalendarAdapter } from '../adapters/calendar-adapter.interface';
 import { ILLMProvider } from '../adapters/llm-provider.interface';
 import { SimpleContextEngine } from '../intelligence/simple-context-engine';
@@ -12,6 +12,8 @@ import { SimpleInterventionPolicy } from '../intelligence/simple-intervention-po
 import { MockDecisionEngine } from '../intelligence/mock-decision-engine';
 import { MockCalendarAdapter } from '../adapters/mock-calendar-adapter';
 import { MockLLMProvider } from '../adapters/mock-llm-provider';
+import { BedrockLLMProvider } from '../adapters/bedrock-llm-provider';
+import { BoundedLLMContextAnalyst } from '../intelligence/bounded-llm-context-analyst';
 import { PersonalContextRepository } from '../repositories/personal-context.repository';
 import { DecisionRepository } from '../repositories/decision.repository';
 import { CalendarEventRepository } from '../repositories/calendar-event.repository';
@@ -24,19 +26,40 @@ let decisionEngine: IDecisionEngine | null = null;
 let interventionPolicy: IInterventionPolicy | null = null;
 let calendarAdapter: ICalendarAdapter | null = null;
 let llmProvider: ILLMProvider | null = null;
+let llmContextAnalyst: ILLMContextAnalyst | null = null;
+
+let contextRepo: PersonalContextRepository | null = null;
+let observationRepo: ObservationRepository | null = null;
+let decisionRepo: DecisionRepository | null = null;
+let calendarRepo: CalendarEventRepository | null = null;
+
+export function getContextRepository(): PersonalContextRepository {
+  if (!contextRepo) contextRepo = new PersonalContextRepository();
+  return contextRepo;
+}
+
+export function getObservationRepository(): ObservationRepository {
+  if (!observationRepo) observationRepo = new ObservationRepository();
+  return observationRepo;
+}
+
+export function getDecisionRepository(): DecisionRepository {
+  if (!decisionRepo) decisionRepo = new DecisionRepository();
+  return decisionRepo;
+}
+
+export function getCalendarEventRepository(): CalendarEventRepository {
+  if (!calendarRepo) calendarRepo = new CalendarEventRepository();
+  return calendarRepo;
+}
 
 export function getContextEngine(): IContextEngine {
   if (!contextEngine) {
-    const contextRepo = new PersonalContextRepository();
-    const decisionRepo = new DecisionRepository();
-    const calendarRepo = new CalendarEventRepository();
-    const observationRepo = new ObservationRepository();
-    
     contextEngine = new SimpleContextEngine(
-      contextRepo,
-      decisionRepo,
-      calendarRepo,
-      observationRepo,
+      getContextRepository(),
+      getDecisionRepository(),
+      getCalendarEventRepository(),
+      getObservationRepository(),
       getStateEstimator()
     );
   }
@@ -78,9 +101,20 @@ export function getCalendarAdapter(): ICalendarAdapter {
 
 export function getLLMProvider(): ILLMProvider {
   if (!llmProvider) {
-    // TODO: Check for real AWS Bedrock credentials
-    // For MVP, always use mock
-    llmProvider = new MockLLMProvider();
+    if (process.env.AWS_REGION && process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
+      console.log('Using BedrockLLMProvider for LLM capabilities');
+      llmProvider = new BedrockLLMProvider();
+    } else {
+      console.log('Using MockLLMProvider for LLM capabilities');
+      llmProvider = new MockLLMProvider();
+    }
   }
   return llmProvider;
+}
+
+export function getLLMContextAnalyst(): ILLMContextAnalyst {
+  if (!llmContextAnalyst) {
+    llmContextAnalyst = new BoundedLLMContextAnalyst(getLLMProvider());
+  }
+  return llmContextAnalyst;
 }
