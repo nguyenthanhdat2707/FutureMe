@@ -354,7 +354,7 @@ describe('API route integration', () => {
     expect(correctResponse.status).toBe(200);
     expect(correctResponse.body.preferences).toEqual(
       expect.arrayContaining([
-        { description: 'Corrected generic preference' },
+        expect.objectContaining({ description: 'Corrected generic preference' }),
       ])
     );
     expect(contextRepo.findById(inferredAttribute.id)).toEqual(

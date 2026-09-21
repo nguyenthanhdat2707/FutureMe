@@ -22,6 +22,9 @@ export interface Goal {
   description: string;
   deadline?: Date;
   priority: 'low' | 'medium' | 'high';
+  source?: ObservationSource;
+  confidence?: number;
+  attributeId?: string;
 }
 
 export interface Commitment {
@@ -30,6 +33,9 @@ export interface Commitment {
   startTime: Date;
   endTime: Date;
   recurring?: boolean;
+  source?: ObservationSource;
+  confidence?: number;
+  attributeId?: string;
 }
 
 export interface Preference {
@@ -37,6 +43,9 @@ export interface Preference {
   category: string;
   description: string;
   value: string;
+  source?: ObservationSource;
+  confidence?: number;
+  attributeId?: string;
 }
 
 export interface CalendarSummary {

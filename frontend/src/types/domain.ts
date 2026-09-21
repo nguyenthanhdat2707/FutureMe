@@ -57,6 +57,9 @@ export interface Commitment {
   startTime: string;
   endTime: string;
   recurring?: boolean;
+  source?: ObservationSource;
+  confidence?: number;
+  attributeId?: string;
 }
 
 export interface Preference {
@@ -64,6 +67,9 @@ export interface Preference {
   category: string;
   description: string;
   value: string;
+  source?: ObservationSource;
+  confidence?: number;
+  attributeId?: string;
 }
 
 export interface CalendarSummary {
@@ -116,6 +122,9 @@ export interface Goal {
   description: string;
   deadline?: Date | string;
   priority: 'low' | 'medium' | 'high';
+  source?: ObservationSource;
+  confidence?: number;
+  attributeId?: string; // Link to ContextAttribute for confirm/correct
 }
 
 export enum GoalCategory {

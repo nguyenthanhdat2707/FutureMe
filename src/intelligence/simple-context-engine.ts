@@ -43,11 +43,26 @@ export class SimpleContextEngine implements IContextEngine {
       try {
         const parsed = JSON.parse(attr.value);
         if (attr.attribute === 'goal') {
-          goals.push(parsed);
+          goals.push({
+            ...parsed,
+            source: attr.source,
+            confidence: attr.confidence,
+            attributeId: attr.id
+          });
         } else if (attr.attribute === 'commitment') {
-          commitments.push(parsed);
+          commitments.push({
+            ...parsed,
+            source: attr.source,
+            confidence: attr.confidence,
+            attributeId: attr.id
+          });
         } else if (attr.attribute === 'preference') {
-          preferences.push(parsed);
+          preferences.push({
+            ...parsed,
+            source: attr.source,
+            confidence: attr.confidence,
+            attributeId: attr.id
+          });
         }
       } catch (e) {
         // Skip invalid JSON

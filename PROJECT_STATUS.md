@@ -1,21 +1,21 @@
 # Future Me — Project Status
 
-> **Last Updated:** 2026-09-21 — Context API integration complete
+> **Last Updated:** 2026-09-21 — Context page UI interactions complete
 > **Current Branch:** `feat/core-decision-logic`
-> **Overall Progress:** Foundation complete; core decision logic and Context page integration delivered
+> **Overall Progress:** Foundation complete; core decision logic and Context page fully implemented with confirmation/correction UI
 
 ## Live Implementation Status
 
 | Field | Current value |
 |-------|---------------|
-| Current task | Context page API integration complete |
+| Current task | Context page UI interactions complete |
 | Actual agent | Hermes (direct implementation) |
-| Working path | `frontend/src/api/client.ts`, `frontend/src/pages/ContextPage.tsx`, `frontend/src/types/domain.ts`, `src/__tests__/context-api.integration.test.ts` |
-| Completed | Real backend API integration for Context page (GET /api/context, POST /api/context/update, POST /api/context/confirm, POST /api/context/correct); TypeScript types aligned with backend schema; mock data replaced with live API calls; context attributes display goals, commitments, preferences, calendar summary; frontend build and backend tests verified |
+| Working path | `frontend/src/pages/ContextPage.tsx`, `frontend/src/types/domain.ts`, `src/domain/types.ts`, `src/intelligence/simple-context-engine.ts`, `src/__tests__/routes.integration.test.ts` |
+| Completed | Context page now displays provenance/source badges for all attributes (goals, commitments, preferences); added UI for confirming inferred context (POST /api/context/confirm); added inline editing UI for correcting context (POST /api/context/correct); visually distinguishes user-confirmed vs system-inferred vs calculated values with color-coded badges; inferred items show "AI believes:" prefix; confirmation and correction persist after reload; extended Goal/Commitment/Preference types with source, confidence, attributeId fields in both frontend and backend; backend returns provenance data with all context attributes |
 | In progress | Ready to commit and push |
-| Next | Further feature work or UI enhancements as directed |
+| Next | Further feature work as directed |
 | Blocked | No blockers; real Calendar/Bedrock remain optional adapters |
-| Current test status | Full Jest suite: 27/27 passed (5 suites). Backend coverage: 81.03% statements, 63.33% branches, 82.96% functions, 81.54% lines. Frontend build passed. Backend lint shows 289 pre-existing issues unrelated to this work; frontend lint passed with one non-blocking warning |
+| Current test status | Full Jest suite: 27/27 passed (5 suites). Backend coverage: 81.03% statements, 63.33% branches, 82.96% functions, 81.54% lines. Frontend build passed (vite build succeeded). Backend lint shows 289 pre-existing issues unrelated to Context page work |
 
 ---
 
