@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { decisionsApi, contextApi } from '../api/client';
 import type { DecisionApiRequest, DecisionApiResponse, ContextUpdateObservation, ObservationSource } from '../types/domain';
 
@@ -54,6 +54,16 @@ function optionalNumber(value: string): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
+function readSessionValue<T>(key: string, fallback: T): T {
+  try {
+    const saved = sessionStorage.getItem(key);
+    return saved ? JSON.parse(saved) as T : fallback;
+  } catch {
+    sessionStorage.removeItem(key);
+    return fallback;
+  }
+}
+
 function titleCase(value: string): string {
   return value
     .split('-')
@@ -74,19 +84,51 @@ function feasibilityClass(feasibility: string): string {
   }
 }
 
+
+function personalStateClass(state: string): { bg: string, text: string, border: string } {
+  switch (state.toUpperCase()) {
+    case 'FLOW': return { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-200' };
+    case 'UNCERTAIN': return { bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-200' };
+    case 'DRIFTING': return { bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-200' };
+    case 'DISRUPTED': return { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-200' };
+    case 'OVERLOADED': return { bg: 'bg-purple-100', text: 'text-purple-800', border: 'border-purple-200' };
+    default: return { bg: 'bg-slate-100', text: 'text-slate-800', border: 'border-slate-200' };
+  }
+}
+
 function formatHours(value: number | null): string {
   return value === null ? 'Not available' : value + ' hours';
 }
 
 function DecisionsPage() {
-  const [form, setForm] = useState<DemoForm>(INITIAL_FORM);
-  const [observationForm, setObservationForm] = useState<ObservationForm>(INITIAL_OBSERVATION);
-  const [result, setResult] = useState<DecisionApiResponse | null>(null);
-  const [beforeResult, setBeforeResult] = useState<DecisionApiResponse | null>(null);
+  const [form, setForm] = useState<DemoForm>(() => readSessionValue('decisions_form', INITIAL_FORM));
+  const [observationForm, setObservationForm] = useState<ObservationForm>(() => readSessionValue('decisions_observationForm', INITIAL_OBSERVATION));
+  const [result, setResult] = useState<DecisionApiResponse | null>(() => readSessionValue('decisions_result', null));
+  const [beforeResult, setBeforeResult] = useState<DecisionApiResponse | null>(() => readSessionValue('decisions_beforeResult', null));
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [clarificationAnswers, setClarificationAnswers] = useState<Record<string, string>>({});
+  const [clarificationAnswers, setClarificationAnswers] = useState<Record<string, string>>(() => readSessionValue('decisions_clarificationAnswers', {}));
   const [showObservationForm, setShowObservationForm] = useState(false);
+
+  useEffect(() => sessionStorage.setItem('decisions_form', JSON.stringify(form)), [form]);
+  useEffect(() => sessionStorage.setItem('decisions_observationForm', JSON.stringify(observationForm)), [observationForm]);
+  useEffect(() => sessionStorage.setItem('decisions_result', JSON.stringify(result)), [result]);
+  useEffect(() => sessionStorage.setItem('decisions_beforeResult', JSON.stringify(beforeResult)), [beforeResult]);
+  useEffect(() => sessionStorage.setItem('decisions_clarificationAnswers', JSON.stringify(clarificationAnswers)), [clarificationAnswers]);
+
+  const handleReset = () => {
+    sessionStorage.removeItem('decisions_form');
+    sessionStorage.removeItem('decisions_observationForm');
+    sessionStorage.removeItem('decisions_result');
+    sessionStorage.removeItem('decisions_beforeResult');
+    sessionStorage.removeItem('decisions_clarificationAnswers');
+    setForm(INITIAL_FORM);
+    setObservationForm(INITIAL_OBSERVATION);
+    setResult(null);
+    setBeforeResult(null);
+    setClarificationAnswers({});
+    setError(null);
+  };
 
   const updateField = (field: keyof DemoForm, value: string) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -96,12 +138,23 @@ function DecisionsPage() {
     setObservationForm((current) => ({ ...current, [field]: value }));
   };
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     const question = form.question.trim();
     if (!question) {
       setError('Enter a decision question before submitting.');
+      return;
+    }
+
+    const timeCost = optionalNumber(form.timeCostHours);
+    const availableHours = optionalNumber(form.availableHoursBeforeDeadline);
+    const workloadHours = optionalNumber(form.workloadHoursBeforeDeadline);
+    const energyCost = optionalNumber(form.energyCost);
+    const availableEnergy = optionalNumber(form.availableEnergy);
+
+    if ([timeCost, availableHours, workloadHours, energyCost, availableEnergy].some(v => v !== undefined && v < 0)) {
+      setError('Numeric values cannot be negative.');
       return;
     }
 
@@ -111,11 +164,11 @@ function DecisionsPage() {
         impactProfile: {
           target: form.target.trim() || undefined,
           deadline: form.deadline || undefined,
-          timeCostHours: optionalNumber(form.timeCostHours),
-          availableHoursBeforeDeadline: optionalNumber(form.availableHoursBeforeDeadline),
-          workloadHoursBeforeDeadline: optionalNumber(form.workloadHoursBeforeDeadline),
-          energyCost: optionalNumber(form.energyCost),
-          availableEnergy: optionalNumber(form.availableEnergy),
+          timeCostHours: timeCost,
+          availableHoursBeforeDeadline: availableHours,
+          workloadHoursBeforeDeadline: workloadHours,
+          energyCost: energyCost,
+          availableEnergy: availableEnergy,
           goalRelevance: form.goalRelevance,
           source: form.source,
         },
@@ -126,16 +179,18 @@ function DecisionsPage() {
       request.userId = form.userId.trim();
     }
 
+    if (result) {
+      setBeforeResult(result);
+    }
+
     setIsLoading(true);
     setError(null);
     setResult(null);
-    setBeforeResult(null);
     setClarificationAnswers({});
 
     try {
       const response = await decisionsApi.query(request);
       setResult(response);
-      setBeforeResult(null);
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : 'Unable to request decision support.');
     } finally {
@@ -176,10 +231,19 @@ function DecisionsPage() {
     }
   };
 
-  const handleClarificationSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    const handleClarificationSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (!result) return;
+
+    const hasNegative = Object.values(clarificationAnswers).some(answer => {
+      const num = optionalNumber(answer);
+      return num !== undefined && num < 0;
+    });
+    if (hasNegative) {
+      setError('Numeric values cannot be negative.');
+      return;
+    }
 
     // Save the current result as "before"
     setBeforeResult(result);
@@ -188,21 +252,38 @@ function DecisionsPage() {
     const updatedProfile = { ...form };
 
     Object.entries(clarificationAnswers).forEach(([question, answer]) => {
+      const normalizedQuestion = question.toLowerCase();
       const answerNum = optionalNumber(answer);
-      
-      if (question.toLowerCase().includes('time cost') || question.toLowerCase().includes('how long')) {
-        if (answerNum !== undefined) updatedProfile.timeCostHours = answer;
-      } else if (question.toLowerCase().includes('available time') || question.toLowerCase().includes('hours available')) {
-        if (answerNum !== undefined) updatedProfile.availableHoursBeforeDeadline = answer;
-      } else if (question.toLowerCase().includes('existing workload') || question.toLowerCase().includes('workload hours')) {
-        if (answerNum !== undefined) updatedProfile.workloadHoursBeforeDeadline = answer;
-      } else if (question.toLowerCase().includes('energy cost')) {
-        if (answerNum !== undefined) updatedProfile.energyCost = answer;
-      } else if (question.toLowerCase().includes('available energy') || question.toLowerCase().includes('energy level')) {
-        if (answerNum !== undefined) updatedProfile.availableEnergy = answer;
-      } else if (question.toLowerCase().includes('deadline')) {
-        updatedProfile.deadline = answer;
-      } else if (question.toLowerCase().includes('target')) {
+
+      if (answerNum !== undefined) {
+        if (normalizedQuestion.includes('existing workload') || normalizedQuestion.includes('workload hours')) {
+          updatedProfile.workloadHoursBeforeDeadline = answer;
+        } else if (
+          normalizedQuestion.includes('available before it') ||
+          normalizedQuestion.includes('available time') ||
+          normalizedQuestion.includes('hours are available') ||
+          normalizedQuestion.includes('hours available')
+        ) {
+          updatedProfile.availableHoursBeforeDeadline = answer;
+        } else if (
+          normalizedQuestion.includes('time cost') ||
+          normalizedQuestion.includes('how long') ||
+          normalizedQuestion.includes('how many hours')
+        ) {
+          updatedProfile.timeCostHours = answer;
+        } else if (
+          normalizedQuestion.includes('available energy') ||
+          normalizedQuestion.includes('energy is currently available') ||
+          normalizedQuestion.includes('energy level')
+        ) {
+          updatedProfile.availableEnergy = answer;
+        } else if (normalizedQuestion.includes('energy')) {
+          updatedProfile.energyCost = answer;
+        }
+      } else if (normalizedQuestion.includes('deadline')) {
+        const date = new Date(answer);
+        if (!Number.isNaN(date.getTime())) updatedProfile.deadline = answer;
+      } else if (normalizedQuestion.includes('target')) {
         updatedProfile.target = answer;
       }
     });
@@ -287,125 +368,130 @@ function DecisionsPage() {
           />
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <label className="text-sm text-text-secondary">
-            User ID <span className="text-xs">(optional)</span>
-            <input
-              value={form.userId}
-              onChange={(event) => updateField('userId', event.target.value)}
-              className={inputClassName + ' mt-1'}
-            />
-          </label>
+                <details className="mt-4">
+          <summary className="text-sm font-medium text-accent-ai cursor-pointer select-none mb-4">
+            Advanced Inputs
+          </summary>
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="text-sm text-text-secondary">
+              User ID <span className="text-xs">(optional)</span>
+              <input
+                value={form.userId}
+                onChange={(event) => updateField('userId', event.target.value)}
+                className={inputClassName + ' mt-1'}
+              />
+            </label>
 
-          <label className="text-sm text-text-secondary">
-            Decision target
-            <input
-              value={form.target}
-              onChange={(event) => updateField('target', event.target.value)}
-              className={inputClassName + ' mt-1'}
-            />
-          </label>
+            <label className="text-sm text-text-secondary">
+              Decision target
+              <input
+                value={form.target}
+                onChange={(event) => updateField('target', event.target.value)}
+                className={inputClassName + ' mt-1'}
+              />
+            </label>
 
-          <label className="text-sm text-text-secondary">
-            Deadline
-            <input
-              type="datetime-local"
-              value={form.deadline}
-              onChange={(event) => updateField('deadline', event.target.value)}
-              className={inputClassName + ' mt-1'}
-            />
-          </label>
+            <label className="text-sm text-text-secondary">
+              Deadline
+              <input
+                type="datetime-local"
+                value={form.deadline}
+                onChange={(event) => updateField('deadline', event.target.value)}
+                className={inputClassName + ' mt-1'}
+              />
+            </label>
 
-          <label className="text-sm text-text-secondary">
-            Time cost (hours)
-            <input
-              type="number"
-              min="0"
-              step="0.5"
-              value={form.timeCostHours}
-              onChange={(event) => updateField('timeCostHours', event.target.value)}
-              className={inputClassName + ' mt-1'}
-            />
-          </label>
+            <label className="text-sm text-text-secondary">
+              Time cost (hours)
+              <input
+                type="number"
+                min="0"
+                step="0.5"
+                value={form.timeCostHours}
+                onChange={(event) => updateField('timeCostHours', event.target.value)}
+                className={inputClassName + ' mt-1'}
+              />
+            </label>
 
-          <label className="text-sm text-text-secondary">
-            Available time before deadline (hours)
-            <input
-              type="number"
-              min="0"
-              step="0.5"
-              value={form.availableHoursBeforeDeadline}
-              onChange={(event) => updateField('availableHoursBeforeDeadline', event.target.value)}
-              className={inputClassName + ' mt-1'}
-            />
-          </label>
+            <label className="text-sm text-text-secondary">
+              Available time before deadline (hours)
+              <input
+                type="number"
+                min="0"
+                step="0.5"
+                value={form.availableHoursBeforeDeadline}
+                onChange={(event) => updateField('availableHoursBeforeDeadline', event.target.value)}
+                className={inputClassName + ' mt-1'}
+              />
+            </label>
 
-          <label className="text-sm text-text-secondary">
-            Existing workload before deadline (hours)
-            <input
-              type="number"
-              min="0"
-              step="0.5"
-              value={form.workloadHoursBeforeDeadline}
-              onChange={(event) => updateField('workloadHoursBeforeDeadline', event.target.value)}
-              className={inputClassName + ' mt-1'}
-            />
-          </label>
+            <label className="text-sm text-text-secondary">
+              Existing workload before deadline (hours)
+              <input
+                type="number"
+                min="0"
+                step="0.5"
+                value={form.workloadHoursBeforeDeadline}
+                onChange={(event) => updateField('workloadHoursBeforeDeadline', event.target.value)}
+                className={inputClassName + ' mt-1'}
+              />
+            </label>
 
-          <label className="text-sm text-text-secondary">
-            Energy cost (0–10)
-            <input
-              type="number"
-              min="0"
-              max="10"
-              step="1"
-              value={form.energyCost}
-              onChange={(event) => updateField('energyCost', event.target.value)}
-              className={inputClassName + ' mt-1'}
-            />
-          </label>
+            <label className="text-sm text-text-secondary">
+              Energy cost (0–10)
+              <input
+                type="number"
+                min="0"
+                max="10"
+                step="1"
+                value={form.energyCost}
+                onChange={(event) => updateField('energyCost', event.target.value)}
+                className={inputClassName + ' mt-1'}
+              />
+            </label>
 
-          <label className="text-sm text-text-secondary">
-            Available energy (0–10)
-            <input
-              type="number"
-              min="0"
-              max="10"
-              step="1"
-              value={form.availableEnergy}
-              onChange={(event) => updateField('availableEnergy', event.target.value)}
-              className={inputClassName + ' mt-1'}
-            />
-          </label>
+            <label className="text-sm text-text-secondary">
+              Available energy (0–10)
+              <input
+                type="number"
+                min="0"
+                max="10"
+                step="1"
+                value={form.availableEnergy}
+                onChange={(event) => updateField('availableEnergy', event.target.value)}
+                className={inputClassName + ' mt-1'}
+              />
+            </label>
 
-          <label className="text-sm text-text-secondary">
-            Goal relevance
-            <select
-              value={form.goalRelevance}
-              onChange={(event) => updateField('goalRelevance', event.target.value)}
-              className={inputClassName + ' mt-1'}
-            >
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-            </select>
-          </label>
+            <label className="text-sm text-text-secondary">
+              Goal relevance
+              <select
+                value={form.goalRelevance}
+                onChange={(event) => updateField('goalRelevance', event.target.value)}
+                className={inputClassName + ' mt-1'}
+              >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+            </label>
 
-          <label className="text-sm text-text-secondary">
-            Data source
-            <select
-              value={form.source}
-              onChange={(event) => updateField('source', event.target.value)}
-              className={inputClassName + ' mt-1'}
-            >
-              <option value="user-confirmed">User confirmed</option>
-              <option value="provided">Provided</option>
-              <option value="estimated">Estimated</option>
-            </select>
-          </label>
-        </div>
+            <label className="text-sm text-text-secondary">
+              Data source
+              <select
+                value={form.source}
+                onChange={(event) => updateField('source', event.target.value)}
+                className={inputClassName + ' mt-1'}
+              >
+                <option value="user-confirmed">User confirmed</option>
+                <option value="provided">Provided</option>
+                <option value="estimated">Estimated</option>
+              </select>
+            </label>
+          </div>
+        </details>
 
-        <div className="flex flex-wrap items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
           <button
             type="submit"
             disabled={isLoading}
@@ -418,6 +504,13 @@ function DecisionsPage() {
               />
             )}
             {isLoading ? 'Assessing decision…' : 'Ask Future Me'}
+          </button>
+          <button
+            type="button"
+            onClick={handleReset}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-6 py-3 font-medium text-text-primary hover:bg-slate-50"
+          >
+            Reset
           </button>
           <button
             type="button"
@@ -494,17 +587,22 @@ function DecisionsPage() {
         </form>
       )}
 
-      {result && result.clarificationNeeded && result.clarificationNeeded.length > 0 && !beforeResult && (
+      {result && result.clarificationNeeded && result.clarificationNeeded.length > 0 && (
         <form className="card border-l-4 border-accent-warning p-6 space-y-4" onSubmit={handleClarificationSubmit}>
           <h2 className="text-xl font-medium text-text-primary">Clarification Needed</h2>
           <p className="text-sm text-text-secondary">
             The following information is needed to improve the assessment:
           </p>
 
-          {result.clarificationNeeded.map((question) => (
+          {result.clarificationNeeded.map((question) => {
+            const isNumeric = !question.toLowerCase().includes('deadline');
+            return (
             <label key={question} className="text-sm text-text-secondary">
               {question}
               <input
+                type={isNumeric ? "number" : "text"}
+                min={isNumeric ? "0" : undefined}
+                step={isNumeric ? "0.5" : undefined}
                 value={clarificationAnswers[question] || ''}
                 onChange={(event) => setClarificationAnswers(prev => ({
                   ...prev,
@@ -514,7 +612,8 @@ function DecisionsPage() {
                 required
               />
             </label>
-          ))}
+            );
+          })}
 
           <button
             type="submit"
@@ -596,16 +695,26 @@ function DecisionsPage() {
           </article>
 
           <article className="card p-6 space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-xl font-medium text-text-primary">Feasibility assessment</h2>
-              <span
-                className={
-                  'rounded-full px-3 py-1 text-sm font-medium ' +
-                  feasibilityClass(assessment.feasibility)
-                }
-              >
-                {titleCase(assessment.feasibility)}
-              </span>
+              <div className="flex gap-2">
+                {result.state && (
+                  <span
+                    className={`rounded-full px-3 py-1 text-sm font-medium border cursor-help ${personalStateClass(result.state.state).bg} ${personalStateClass(result.state.state).text} ${personalStateClass(result.state.state).border}`}
+                    title={result.state.evidence.join('; ')}
+                  >
+                    State: {titleCase(result.state.state)}
+                  </span>
+                )}
+                <span
+                  className={
+                    'rounded-full px-3 py-1 text-sm font-medium ' +
+                    feasibilityClass(assessment.feasibility)
+                  }
+                >
+                  {titleCase(assessment.feasibility)}
+                </span>
+              </div>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
