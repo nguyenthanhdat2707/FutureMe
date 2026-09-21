@@ -1,8 +1,36 @@
+import api from '../api/client';
+
 /**
  * DemoPage - Demo Mode Controls
  * Load pre-configured scenarios for demonstration
  */
 function DemoPage() {
+  const handleLoadScenario = async () => {
+    try {
+      await api.demo.loadScenario('hackathon-deadline');
+      window.location.href = '/'; // Navigate to home to show updated data
+    } catch (e) {
+      console.error(e);
+      alert('Failed to load scenario');
+    }
+  };
+
+  const handleReset = async () => {
+    try {
+      sessionStorage.removeItem('decisions_form');
+      sessionStorage.removeItem('decisions_observationForm');
+      sessionStorage.removeItem('decisions_result');
+      sessionStorage.removeItem('decisions_beforeResult');
+      sessionStorage.removeItem('decisions_clarificationAnswers');
+
+      await api.demo.reset();
+      window.location.href = '/'; // Navigate to home to show updated data
+    } catch (e) {
+      console.error(e);
+      alert('Failed to reset scenario');
+    }
+  };
+
   return (
     <div className="p-8 space-y-8">
       <header>
@@ -13,12 +41,12 @@ function DemoPage() {
       {/* Demo Scenarios */}
       <div className="space-y-4">
         <h2 className="text-xl font-serif text-text-primary">Available Scenarios</h2>
-        
+
         <div className="grid gap-4">
           <div className="card p-6 hover:shadow-md transition-shadow cursor-pointer">
             <h3 className="font-medium text-text-primary mb-2">Overcommitted Developer</h3>
             <p className="text-sm text-text-secondary mb-4">
-              A developer juggling too many commitments with an approaching deadline. 
+              A developer juggling too many commitments with an approaching deadline.
               Demonstrates capacity alerts and schedule optimization.
             </p>
             <div className="flex gap-4 text-xs text-text-secondary">
@@ -26,7 +54,10 @@ function DemoPage() {
               <span>Cognitive Load: High</span>
               <span>Stress: 7/10</span>
             </div>
-            <button className="mt-4 px-4 py-2 bg-accent-ai text-white rounded-lg text-sm font-medium hover:bg-opacity-90">
+            <button
+              onClick={handleLoadScenario}
+              className="mt-4 px-4 py-2 bg-accent-ai text-white rounded-lg text-sm font-medium hover:bg-opacity-90"
+            >
               Load Scenario
             </button>
           </div>
@@ -57,7 +88,10 @@ function DemoPage() {
       <div className="card p-6 space-y-4">
         <h3 className="font-medium text-text-primary">Demo Controls</h3>
         <div className="flex gap-3">
-          <button className="px-4 py-2 border border-slate-300 text-text-primary rounded-lg text-sm hover:bg-slate-50">
+          <button
+            onClick={handleReset}
+            className="px-4 py-2 border border-slate-300 text-text-primary rounded-lg text-sm hover:bg-slate-50"
+          >
             Reset to Default
           </button>
           <button className="px-4 py-2 border border-slate-300 text-text-primary rounded-lg text-sm hover:bg-slate-50">
