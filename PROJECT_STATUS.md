@@ -139,8 +139,13 @@ The following are explicitly deferred or non-goals for this MVP:
 
 ## Verification State & Open Debt
 
+<<<<<<< HEAD
 **Verified Results (2026-09-23):**
 - **Production auth hotfix:** PR [#18](https://github.com/nguyenthanhdat2707/FutureMe/pull/18), main merge 26aa96e161eb35ac4531461e39b085d07880ba25, CI run 35795580526 all checks pass, Amplify job 14 BUILD/DEPLOY/VERIFY SUCCEED, live Cognito Sign Up/email/Confirm/CONFIRMED/SRP Sign In pass, cleanup pass with zero residual users, production browser asset index-_CiXeMqD.js and verified password/recovery/confirm UI with zero localhost requests.
+=======
+**Verified Results (2026-09-22):**
+- **Phase 4 contract-unit delivery:** Commit 2f34416defe54914940c0a43ea318d4250b86810 pushed and local/remote SHA matched. 2/8 gates (25%) completed, six left, Gate 3 current (not yet implemented).
+>>>>>>> d9d50a0 (docs: record Phase 4 contract delivery)
 - **Phase 3 delivery:** PR [#15](https://github.com/nguyenthanhdat2707/FutureMe/pull/15) merged into `main` at `d01b848f083ac274bfad82619831c30044912cb4`; post-merge CI run [35710887996](https://github.com/nguyenthanhdat2707/FutureMe/actions/runs/35710887996) passed Lint, Unit Tests, and Build & Scan. Local and `origin/main` were verified at the same SHA.
 - **Production fetch hotfix:** Root cause was confirmed on Home, What Future Me Understands, and Calendar: the Amplify branch had no frontend API/Cognito build variables, so the production bundle requested `http://localhost:3001/api`. Amplify branch variables were set from verified Terraform outputs without changing Google Calendar credentials. Focused client tests 9/9, quiet lint, and production build pass. PR [#16](https://github.com/nguyenthanhdat2707/FutureMe/pull/16) merged at `8b15b2f0680c265dc30bc68181122555b37202f5`; main CI run [35714575158](https://github.com/nguyenthanhdat2707/FutureMe/actions/runs/35714575158) and Amplify release job 12 succeeded. Final browser readback reached Cognito sign-in with zero localhost requests.
 - **Authenticated production API network blocker — RESOLVED:** The HTTP API JWT-authorized `$default` route caught browser `OPTIONS` preflight; live preflight returned `401` with `WWW-Authenticate: Bearer` before Lambda. Terraform fix PR [#20](https://github.com/nguyenthanhdat2707/FutureMe/pull/20) merged to `main` at `9a605717cd2ee624a574d8696da674ae9aa1eec6`; it adds only `OPTIONS /{proxy+}` with authorization `NONE`, while actual methods remain JWT-protected. CI run [35800331255](https://github.com/nguyenthanhdat2707/FutureMe/actions/runs/35800331255) passed Lint, Unit Tests, Build & Scan, and Trivy.
