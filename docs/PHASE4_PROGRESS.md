@@ -23,8 +23,8 @@
 
 ### 3. Relevant Context Slice
 - **Status:** [x] COMPLETE
-- **Details:** Implementing the retrieval and synthesis of decision-relevant context and material time/capacity evidence required by the decision policy.
-- **Evidence:** focused 30/30 across 4 suites, full backend 93/93 across 14 suites, exact coverage 77.46% statements / 60.18% branches / 78.4% functions / 78.9% lines, lint pass, build pass, git diff --check pass.
+- **Details:** Implemented the retrieval and synthesis of decision-relevant context and material time/capacity evidence required by the decision policy.
+- **Evidence:** focused 30/30 across 4 suites, full backend 93/93 across 14 suites, exact coverage 77.46% statements / 60.18% branches / 78.4% functions / 78.9% lines, lint pass, build pass, git diff --check pass. Delivered evidence: commit a8c2d8811580cfb8e0471d2574a6ac0ad859e6c1 was pushed and local/remote SHA matched.
 
 ### 4. Clarification and Abstention Logic
 - **Status:** [ ] IN PROGRESS
