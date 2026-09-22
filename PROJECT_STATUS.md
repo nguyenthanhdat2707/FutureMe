@@ -20,11 +20,11 @@ This document tracks the verified completion of the Future Me MVP roadmap. It se
 | Phase 8 | NOT STARTED |
 
 ## Current Execution / Next Prioritized Work
-- **Current State:** IMPLEMENTING
+- **Current State:** BLOCKED
 - **Completed AWS Evidence:** Backend AWS deployment applied and verified (no-drift); Health returns 200; Bedrock Haiku smoke invocation returned ok (11 input/4 output tokens). AWS Marketplace note: CloudTrail showed no aws-marketplace Subscribe or Marketplace event; Cost Explorer currently shows estimated `$0.00` (caveat: billing may lag).
-- **Current Task:** Phase 4 Gate 6 Before/After Explanation Support
-- **Next Steps:** Implement Gate 6 Before/After Explanation Support on branch `feat/phase4-decision-journey`. Reference [docs/DECISION_POLICY.md](docs/DECISION_POLICY.md) and [docs/PHASE4_PROGRESS.md](docs/PHASE4_PROGRESS.md). Phase 4 Gate 5 tested decision explainability UI and recommendation/choice boundary is functionally verified and COMPLETE, verified and pushed to origin/feat/phase4-decision-journey at commit b5f1971a723fb4d072021c843be716842d76e9d4. Local and remote SHAs matched exactly; branch was clean and synchronized. No browser verification yet.
-- **Blocked/Decision Status:** The human approved the minimal Phase 4 policy direction; `docs/DECISION_POLICY.md` is now recorded. Authenticated browser readback requires Product Owner sign-in. Google Calendar credentials/OAuth were intentionally not changed; any remaining provider-specific calendar sync failure is a separate owner handoff.
+- **Current Task:** Phase 4 Gate 6 Before/After Explanation Support — blocked before implementation by Antigravity quota exhaustion
+- **Next Steps:** Resume Gate 6 with Antigravity after its reported quota reset, or obtain explicit Product Owner authorization before using another editing worker. Continue on `feat/phase4-decision-journey` from clean commit `5cf2135361b86087b83a99529d2d9d52d1a3982f`, which matches the remote. Phase 4 Gate 5 is delivered and verified; no Gate 6 edits exist yet.
+- **Blocked/Decision Status:** Antigravity returned HTTP 429 (`RESOURCE_EXHAUSTED`) before editing Gate 6 and reported a reset in approximately 2 hours 50 minutes. Progress remains 5/8 (62.5%). The human approved the minimal Phase 4 policy direction; `docs/DECISION_POLICY.md` is recorded. Authenticated browser readback requires Product Owner sign-in. Google Calendar credentials/OAuth were intentionally not changed; any remaining provider-specific calendar sync failure is a separate owner handoff.
 
 ## Roadmap Authority / Cross-Cutting Invariants
 This roadmap is governed by the following contract files:
