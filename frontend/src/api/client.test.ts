@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import api from './client';
+import api, { resolveApiBaseUrl } from './client';
 import type { DecisionApiRequest } from '../types/domain';
 
 // Mock the cognito module so we can control isCognitoMode
@@ -108,6 +108,23 @@ describe('api/client', () => {
       expect(globalThis.fetch).toHaveBeenCalledWith(
         expect.not.stringContaining('userId=test-user'),
         expect.any(Object)
+      );
+    });
+  });
+
+  describe('resolveApiBaseUrl', () => {
+    it('should use provided URL and trim trailing slash', () => {
+      expect(resolveApiBaseUrl('https://api.example.com/', 'production')).toBe('https://api.example.com');
+      expect(resolveApiBaseUrl('https://api.example.com//', 'development')).toBe('https://api.example.com');
+    });
+
+    it('should fall back to localhost in development if env is missing', () => {
+      expect(resolveApiBaseUrl(undefined, 'development')).toBe('http://localhost:3001/api');
+    });
+
+    it('should throw an error in production if env is missing', () => {
+      expect(() => resolveApiBaseUrl(undefined, 'production')).toThrow(
+        'VITE_API_BASE_URL is not configured. The application cannot reach the backend API.'
       );
     });
   });

@@ -2,14 +2,16 @@
 
 ## Current State
 
-- Phase status: READY_FOR_USER_TEST
-- Promotion branch: `feat/phase3-frontend-completion`
-- Completed unit: Phase 3 Context Acquisition (Backend + Frontend + Browser Verification + Repair) — READY_FOR_USER_TEST
+- Phase status: COMPLETE / ACCEPTED
+- Delivery branch: `feat/phase3-frontend-completion` (deleted after merge)
+- Completed unit: Phase 3 Context Acquisition (Backend + Frontend + Browser Verification + Repair) — MERGED AND ACCEPTED
 - Backend commit: `afc5c8e60c71f81f19fe93c8c674474ae50d9739`
 - Source frontend delivery commit: `ed8508b33f43965275d8ec7baf60cb71c9c77cba`
 - Main-based promotion commit: `d99a5c4876bf55a7d0dbaf149f6aff65a4755da7`
-- Promotion PR: [#15](https://github.com/nguyenthanhdat2707/FutureMe/pull/15)
-- Remote verification: source branch `origin/feat/phase3-context-acquisition` is verified at `4b3c475134274218e91ba23651793142baa3c4c2`; PR #15 promotes the equivalent verified tree onto `main`
+- Promotion PR: [#15](https://github.com/nguyenthanhdat2707/FutureMe/pull/15) — MERGED
+- Main merge commit: `d01b848f083ac274bfad82619831c30044912cb4`
+- Post-merge CI: [run 35710887996](https://github.com/nguyenthanhdat2707/FutureMe/actions/runs/35710887996) — SUCCESS
+- Remote verification: local `main` and `origin/main` match at the merge commit; both Phase 3 branches were deleted after merge
 - Implementation worker: Antigravity (Gemini 3.8 Flash High)
 - Supervisor/verification: Hermes
 - Blockers: none (independent Codex found preference edit blocker where backend fallback updated description instead of value, now resolved with JSON value patch).
@@ -63,6 +65,15 @@ Implemented:
 - Added test proving preference correction sends the JSON value patch and reloads context.
 - Dashboard aggregates context status correctly with setup completion logic and calendar-derived plans.
 - Root causes for test setup leakage fixed by grouping `describe` blocks.
+- **Hotfix (API Client Resolver):** Extracted `resolveApiBaseUrl` to explicitly throw configuration error when `VITE_API_BASE_URL` is absent in production, avoiding misleading localhost network errors while maintaining 3001 fallback for dev.
+
+Post-acceptance production fetch repair:
+
+- Confirmed the deployed Home, What Future Me Understands, and Calendar pages were all requesting `http://localhost:3001/api` because the Amplify `main` branch had no frontend API/Cognito build variables.
+- Set only the public frontend API/Cognito build variables from verified Terraform outputs and completed Amplify release job 11 successfully. Google Calendar credentials/OAuth were not changed or redeployed.
+- Browser readback after deployment: `/`, `/context`, and `/calendar` route to Cognito sign-in and issue zero localhost requests.
+- Focused verification: API client tests 9/9 passed, quiet frontend lint passed, and production frontend build passed.
+- Remaining owner smoke: sign in and load the three protected pages. Any later Google Calendar provider sync failure is intentionally outside this repair.
 
 Verification:
 
@@ -96,4 +107,4 @@ Verification:
 - [x] Browser/runtime Phase 3 flows pass.
 - [x] Independent review has no unresolved blocking findings (Codex preference edit defect resolved).
 
-Phase 3 is marked **READY_FOR_USER_TEST**.
+Phase 3 is marked **COMPLETE / ACCEPTED**.
