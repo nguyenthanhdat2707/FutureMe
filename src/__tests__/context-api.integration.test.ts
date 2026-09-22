@@ -4,13 +4,15 @@
 
 import request from 'supertest';
 import { createApp } from '../app';
-import { PersonalContextRepository } from '../repositories/personal-context.repository';
+import { IPersonalContextRepository } from '../repositories/interfaces';
 import { ObservationSource } from '../domain/types';
 import { initDatabase, closeDatabase } from '../database/connection';
 
+import { getContextRepository } from '../services/service-container';
+
 describe('Context API Integration', () => {
   let app: ReturnType<typeof createApp>;
-  let contextRepo: PersonalContextRepository;
+  let contextRepo: IPersonalContextRepository;
 
   beforeAll(async () => {
     await initDatabase();
@@ -22,7 +24,7 @@ describe('Context API Integration', () => {
 
   beforeEach(() => {
     app = createApp();
-    contextRepo = new PersonalContextRepository();
+    contextRepo = getContextRepository();
   });
 
   describe('GET /api/context', () => {
@@ -77,7 +79,7 @@ describe('Context API Integration', () => {
   describe('POST /api/context/confirm', () => {
     it('should confirm an inferred attribute', async () => {
       // Create an inferred attribute
-      const attr = contextRepo.create({
+      const attr = await contextRepo.create({
         userId: 'test-user-3',
         attribute: 'preference',
         value: JSON.stringify({ category: 'work', value: 'focus-time' }),
@@ -97,13 +99,13 @@ describe('Context API Integration', () => {
       expect(response.body).toHaveProperty('success', true);
 
       // Verify the attribute was updated
-      const updated = contextRepo.findById(attr.id);
+      const updated = await contextRepo.findById(attr.id);
       expect(updated?.source).toBe(ObservationSource.USER_CONFIRMED);
       expect(updated?.confidence).toBe(1.0);
     });
 
     it('should not confirm attribute from different user', async () => {
-      const attr = contextRepo.create({
+      const attr = await contextRepo.create({
         userId: 'user-a',
         attribute: 'goal',
         value: JSON.stringify({ description: 'Test goal' }),
@@ -118,17 +120,17 @@ describe('Context API Integration', () => {
           userId: 'user-b',
           attributeId: attr.id
         })
-        .expect(200);
+        .expect(403);
 
       // Attribute should remain unchanged
-      const unchanged = contextRepo.findById(attr.id);
+      const unchanged = await contextRepo.findById(attr.id);
       expect(unchanged?.source).toBe(ObservationSource.SYSTEM_INFERRED);
     });
   });
 
   describe('POST /api/context/correct', () => {
     it('should correct wrong context attribute', async () => {
-      const attr = contextRepo.create({
+      const attr = await contextRepo.create({
         userId: 'test-user-4',
         attribute: 'preference',
         value: JSON.stringify({ category: 'work', value: 'evening' }),
@@ -154,7 +156,7 @@ describe('Context API Integration', () => {
       expect(response.body).toHaveProperty('userId', 'test-user-4');
 
       // Verify the attribute was corrected
-      const corrected = contextRepo.findById(attr.id);
+      const corrected = await contextRepo.findById(attr.id);
       expect(corrected?.value).toBe(correction.correctedValue);
       expect(corrected?.source).toBe(ObservationSource.USER_CONFIRMED);
       expect(corrected?.confidence).toBe(1.0);

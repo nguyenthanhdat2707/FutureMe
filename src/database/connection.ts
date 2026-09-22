@@ -56,7 +56,7 @@ export async function initDatabase(filePath?: string): Promise<SqlJsDatabase> {
 }
 
 export function saveDatabaseToDisk(): void {
-  if (!db || !dbPath) return;
+  if (!db || !dbPath || dbPath === ':memory:') return;
   
   const data = db.export();
   const buffer = Buffer.from(data);

@@ -5,13 +5,13 @@ This document tracks the verified completion of the Future Me MVP roadmap. It se
 ## Status Summary
 - **Last Updated:** 2026-09-22
 - **Overall MVP estimate after Phase 2:** ~50%
-- **Current product position:** BETWEEN Phase 2 and Phase 3 — AWS Deployment / Platform Enablement track IN PROGRESS, Phase 3 product implementation NOT STARTED.
+- **Current product position:** BETWEEN Phase 2 and Phase 3 — AWS Deployment / Platform Enablement is READY FOR APPLY APPROVAL but NOT DEPLOYED; Phase 3 product implementation NOT STARTED.
 
 | Phase / Track | Status |
 |---|---|
 | Phase 1 — Core Decision Logic & Foundation | COMPLETE |
 | Phase 2 — Live Intelligence Loop | COMPLETE |
-| AWS Deployment / Platform Enablement | IN PROGRESS |
+| AWS Deployment / Platform Enablement | READY FOR APPLY APPROVAL (NOT DEPLOYED) |
 | Phase 3 | NOT STARTED |
 | Phase 4 | NOT STARTED |
 | Phase 5 | NOT STARTED |
@@ -62,11 +62,13 @@ The following are explicitly deferred or non-goals for this MVP:
 ---
 
 ## AWS Deployment / Platform Enablement
-- **Status:** IN PROGRESS
+- **Status:** READY FOR APPLY APPROVAL (NOT DEPLOYED)
 - **Description:** Deployment and Platform Enablement. Positioned between Phase 2 and Phase 3.
 - **Goal:** Provide the approved hackathon deployment target and necessary configuration.
 - **Boundary:** It is explicitly not a product phase and does not add new product capability. It never changes the product phase count or the overall ~50% completion estimate.
-- **Exit Evidence:** Verified deployment target configuration and handoff to Phase 8.
+- **Verified planning evidence:** Separate bootstrap and application Terraform roots validate cleanly. Machine-parsed plans propose bootstrap `11 create / 0 update / 0 delete / 0 replace / 0 import` and application `21 create / 0 update / 0 delete / 0 replace / 0 import`. The application plan contains no Amplify resources. Lambda packaging is deterministic and within AWS ZIP size limits. No AWS apply/import/deploy has occurred.
+- **Next approval gate:** Human approval is required before any bootstrap apply. After bootstrap, remote-state initialization/migration and the application apply require their own reviewed plan and explicit approval.
+- **Exit Evidence:** Verified deployed target configuration and handoff to Phase 8; planning completion alone does not satisfy this exit.
 
 ---
 
@@ -131,15 +133,17 @@ The following are explicitly deferred or non-goals for this MVP:
 ## Verification State & Open Debt
 
 **Verified Results (2026-09-22):**
-- **Backend tests:** 40/40 across 7 suites PASS
-- **Backend build:** TypeScript build PASS
+- **Backend tests:** 72/72 across 11 suites PASS; global coverage 76.97% statements, 57.55% branches, 78.04% functions, 78.66% lines
+- **Backend lint/typecheck/build:** PASS
 - **Frontend build:** Production build PASS
 - **Frontend lint:** Exits 0 with one warning: `react(set-state-in-effect)` in `frontend/src/pages/ContextPage.tsx:30`
 - **Frontend tests:** No frontend test suite is currently configured.
+- **Lambda package:** deterministic SHA-256 across consecutive builds; 14,667,392 bytes compressed and 39,503,005 bytes uncompressed; `dist/lambda.js` present
+- **Terraform:** recursive fmt and both roots validate cleanly; bootstrap plan 11 creates and application plan 21 creates, with zero update/delete/replace/import actions
 
 **Open Verification Debt:**
-- **Backend lint:** FAILS with 34 errors in Phase 2 files (`phase2-loop.integration.test.ts`, `Bedrock provider`, `context routes`).
-  *Note: This is open verification debt that must be resolved before Phase 8 can complete. It is not legacy/pre-existing debt.*
+- Frontend lint still reports one non-blocking `react(set-state-in-effect)` warning, and no frontend test suite is configured.
+- Infrastructure is planned but not deployed. The existing Amplify frontend remains externally managed, and frontend Cognito/JWT integration remains a later handoff; neither is evidence of a deployed end-to-end cloud flow.
 
 ---
 

@@ -2,17 +2,18 @@
  * Outcome Repository
  */
 
+import { IOutcomeRepository, Awaitable } from './interfaces';
 import { BaseRepository } from './base.repository';
 import { Outcome } from '../domain/types';
 import { v4 as uuidv4 } from 'uuid';
 
-export class OutcomeRepository extends BaseRepository {
-  findById(id: string): Outcome | null {
+export class SqliteOutcomeRepository extends BaseRepository implements IOutcomeRepository {
+  findById(id: string): Awaitable<Outcome | null> {
     const row = this.db.get('SELECT * FROM outcomes WHERE id = ?', [id]);
     return row ? this.mapToOutcome(row) : null;
   }
 
-  findByDecisionId(decisionId: string): Outcome[] {
+  findByDecisionId(decisionId: string): Awaitable<Outcome[]> {
     const rows = this.db.all(`
       SELECT * FROM outcomes
       WHERE decision_id = ?
@@ -22,7 +23,7 @@ export class OutcomeRepository extends BaseRepository {
     return rows.map(this.mapToOutcome.bind(this));
   }
 
-  findByUserId(userId: string, limit: number = 50): Outcome[] {
+  findByUserId(userId: string, limit: number = 50): Awaitable<Outcome[]> {
     const rows = this.db.all(`
       SELECT * FROM outcomes
       WHERE user_id = ?
@@ -33,7 +34,7 @@ export class OutcomeRepository extends BaseRepository {
     return rows.map(this.mapToOutcome.bind(this));
   }
 
-  create(outcome: Omit<Outcome, 'id' | 'createdAt'>): Outcome {
+  create(outcome: Omit<Outcome, 'id' | 'createdAt'>): Awaitable<Outcome> {
     const id = uuidv4();
     const now = new Date().toISOString();
 
@@ -49,7 +50,7 @@ export class OutcomeRepository extends BaseRepository {
       now
     ]);
 
-    return this.findById(id)!;
+    return this.findById(id) as Outcome;
   }
 
   private mapToOutcome(row: unknown): Outcome {

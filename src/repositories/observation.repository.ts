@@ -2,18 +2,19 @@
  * Observation Repository
  */
 
+import { IObservationRepository, Awaitable } from './interfaces';
 import { BaseRepository } from './base.repository';
 import { Observation, ObservationType, ObservationSource } from '../domain/types';
 import { v4 as uuidv4 } from 'uuid';
 import { safeJsonParse } from '../utils/json';
 
-export class ObservationRepository extends BaseRepository {
-  findById(id: string): Observation | null {
+export class SqliteObservationRepository extends BaseRepository implements IObservationRepository {
+  findById(id: string): Awaitable<Observation | null> {
     const row = this.db.get('SELECT * FROM observations WHERE id = ?', [id]);
     return row ? this.mapToObservation(row) : null;
   }
 
-  findByUserId(userId: string, limit: number = 100): Observation[] {
+  findByUserId(userId: string, limit: number = 100): Awaitable<Observation[]> {
     const rows = this.db.all(`
       SELECT * FROM observations
       WHERE user_id = ?
@@ -24,7 +25,7 @@ export class ObservationRepository extends BaseRepository {
     return rows.map(this.mapToObservation.bind(this));
   }
 
-  findRecent(userId: string, hoursBack: number = 24): Observation[] {
+  findRecent(userId: string, hoursBack: number = 24): Awaitable<Observation[]> {
     const cutoff = new Date(Date.now() - hoursBack * 60 * 60 * 1000).toISOString();
 
     const rows = this.db.all(`
@@ -36,7 +37,7 @@ export class ObservationRepository extends BaseRepository {
     return rows.map(this.mapToObservation.bind(this));
   }
 
-  create(observation: Omit<Observation, 'id' | 'createdAt'>): Observation {
+  create(observation: Omit<Observation, 'id' | 'createdAt'>): Awaitable<Observation> {
     const id = uuidv4();
     const now = new Date().toISOString();
 
@@ -54,7 +55,7 @@ export class ObservationRepository extends BaseRepository {
       now
     ]);
 
-    return this.findById(id)!;
+    return this.findById(id) as Observation;
   }
 
   private mapToObservation(row: unknown): Observation {

@@ -10,6 +10,7 @@ import { calendarRouter } from './routes/calendar.routes';
 import { observationRouter } from './routes/observation.routes';
 import { outcomeRouter } from './routes/outcome.routes';
 import { demoRouter } from './routes/demo.routes';
+import { UnauthorizedError, getUserId } from './utils/identity';
 
 export function createApp() {
   const app = express();
@@ -20,9 +21,12 @@ export function createApp() {
 
   // CORS Middleware
   app.use((req: Request, res: Response, next: NextFunction) => {
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    // API Gateway handles production CORS. We only emit bounded localhost CORS locally.
+    if (process.env.NODE_ENV !== 'production') {
+      res.header('Access-Control-Allow-Origin', 'http://localhost:5173');
+      res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+      res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    }
 
     if (req.method === 'OPTIONS') {
       res.sendStatus(204);
@@ -39,6 +43,16 @@ export function createApp() {
 
   // Routes
   app.use('/api/health', healthRouter);
+
+  app.use('/api', (req: Request, _res: Response, next: NextFunction) => {
+    try {
+      getUserId(req);
+      next();
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.use('/api/context', contextRouter);
   app.use('/api/decisions', decisionRouter);
   app.use('/api/calendar', calendarRouter);
@@ -57,6 +71,13 @@ export function createApp() {
   // Error handler
   app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
     console.error('[Error]', err);
+    if (err instanceof UnauthorizedError || err.name === 'UnauthorizedError') {
+      res.status(401).json({
+        error: 'Unauthorized',
+        message: err.message
+      });
+      return;
+    }
     res.status(500).json({
       error: 'Internal Server Error',
       message: err.message

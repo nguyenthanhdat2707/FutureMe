@@ -2,17 +2,18 @@
  * Calendar Event Repository
  */
 
+import { ICalendarEventRepository, Awaitable } from './interfaces';
 import { BaseRepository } from './base.repository';
 import { CalendarEvent } from '../domain/types';
 import { v4 as uuidv4 } from 'uuid';
 
-export class CalendarEventRepository extends BaseRepository {
-  findById(id: string): CalendarEvent | null {
+export class SqliteCalendarEventRepository extends BaseRepository implements ICalendarEventRepository {
+  findById(id: string): Awaitable<CalendarEvent | null> {
     const row = this.db.get('SELECT * FROM calendar_events WHERE id = ?', [id]);
     return row ? this.mapToCalendarEvent(row) : null;
   }
 
-  findByUserId(userId: string, limit: number = 100): CalendarEvent[] {
+  findByUserId(userId: string, limit: number = 100): Awaitable<CalendarEvent[]> {
     const rows = this.db.all(`
       SELECT * FROM calendar_events
       WHERE user_id = ?
@@ -23,7 +24,7 @@ export class CalendarEventRepository extends BaseRepository {
     return rows.map(this.mapToCalendarEvent.bind(this));
   }
 
-  findUpcoming(userId: string, fromDate?: Date): CalendarEvent[] {
+  findUpcoming(userId: string, fromDate?: Date): Awaitable<CalendarEvent[]> {
     const from = (fromDate || new Date()).toISOString();
 
     const rows = this.db.all(`
@@ -35,7 +36,7 @@ export class CalendarEventRepository extends BaseRepository {
     return rows.map(this.mapToCalendarEvent.bind(this));
   }
 
-  findByExternalId(userId: string, externalId: string): CalendarEvent | null {
+  findByExternalId(userId: string, externalId: string): Awaitable<CalendarEvent | null> {
     const row = this.db.get(`
       SELECT * FROM calendar_events
       WHERE user_id = ? AND external_id = ?
@@ -44,7 +45,7 @@ export class CalendarEventRepository extends BaseRepository {
     return row ? this.mapToCalendarEvent(row) : null;
   }
 
-  create(event: Omit<CalendarEvent, 'id' | 'createdAt'>): CalendarEvent {
+  create(event: Omit<CalendarEvent, 'id' | 'createdAt'>): Awaitable<CalendarEvent> {
     const id = uuidv4();
     const now = new Date().toISOString();
 
@@ -64,11 +65,11 @@ export class CalendarEventRepository extends BaseRepository {
       now
     ]);
 
-    return this.findById(id)!;
+    return this.findById(id) as CalendarEvent;
   }
 
-  upsert(event: Omit<CalendarEvent, 'id' | 'createdAt'>): CalendarEvent {
-    const existing = this.findByExternalId(event.userId, event.externalId);
+  upsert(event: Omit<CalendarEvent, 'id' | 'createdAt'>): Awaitable<CalendarEvent> {
+    const existing = this.findByExternalId(event.userId, event.externalId) as CalendarEvent | null;
 
     if (existing) {
       this.db.run(`
@@ -85,7 +86,7 @@ export class CalendarEventRepository extends BaseRepository {
         existing.id
       ]);
 
-      return this.findById(existing.id)!;
+      return this.findById(existing.id) as CalendarEvent;
     }
 
     return this.create(event);

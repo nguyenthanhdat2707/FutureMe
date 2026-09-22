@@ -3,19 +3,19 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { getCalendarAdapter } from '../services/service-container';
-import { CalendarEventRepository } from '../repositories/calendar-event.repository';
+import { getCalendarAdapter, getCalendarEventRepository } from '../services/service-container';
+import { getUserId } from '../utils/identity';
 
 import { getErrorMessage } from '../utils/error';
 
 export const calendarRouter = Router();
 
 // List calendar events
-calendarRouter.get('/events', (req: Request, res: Response) => {
+calendarRouter.get('/events', async (req: Request, res: Response) => {
   try {
-    const calendarRepo = new CalendarEventRepository();
-    const userId = typeof req.query.userId === 'string' ? req.query.userId : 'demo-user';
-    const events = calendarRepo.findUpcoming(userId);
+    const calendarRepo = getCalendarEventRepository();
+    const userId = getUserId(req);
+    const events = await calendarRepo.findUpcoming(userId);
     
     res.json({ events });
   } catch (error: unknown) {
@@ -26,16 +26,15 @@ calendarRouter.get('/events', (req: Request, res: Response) => {
 // Trigger sync
 calendarRouter.post('/sync', async (req: Request, res: Response) => {
   try {
-    const calendarRepo = new CalendarEventRepository();
-    const body = req.body as { userId?: string };
-    const userId = typeof body.userId === 'string' ? body.userId : 'demo-user';
+    const calendarRepo = getCalendarEventRepository();
+    const userId = getUserId(req);
     
     const adapter = getCalendarAdapter();
     const events = await adapter.syncEvents(userId);
     
     // Store events
     for (const event of events) {
-      calendarRepo.upsert(event);
+      await calendarRepo.upsert(event);
     }
     
     res.json({
@@ -49,11 +48,11 @@ calendarRouter.post('/sync', async (req: Request, res: Response) => {
 });
 
 // Get sync status
-calendarRouter.get('/status', (req: Request, res: Response) => {
+calendarRouter.get('/status', async (req: Request, res: Response) => {
   try {
-    const calendarRepo = new CalendarEventRepository();
-    const userId = typeof req.query.userId === 'string' ? req.query.userId : 'demo-user';
-    const events = calendarRepo.findByUserId(userId, 1);
+    const calendarRepo = getCalendarEventRepository();
+    const userId = getUserId(req);
+    const events = await calendarRepo.findByUserId(userId, 1);
     
     const lastSync = events.length > 0 ? events[0].syncedAt : null;
     

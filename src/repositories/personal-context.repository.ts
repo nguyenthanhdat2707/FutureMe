@@ -2,12 +2,13 @@
  * Personal Context Repository
  */
 
+import { IPersonalContextRepository, Awaitable } from './interfaces';
 import { BaseRepository } from './base.repository';
 import { ContextAttribute, ObservationSource } from '../domain/types';
 import { v4 as uuidv4 } from 'uuid';
 
-export class PersonalContextRepository extends BaseRepository {
-  findByUserId(userId: string, limit: number = 100): ContextAttribute[] {
+export class SqlitePersonalContextRepository extends BaseRepository implements IPersonalContextRepository {
+  findByUserId(userId: string, limit: number = 100): Awaitable<ContextAttribute[]> {
     const rows = this.db.all(`
       SELECT * FROM personal_context
       WHERE user_id = ?
@@ -18,7 +19,7 @@ export class PersonalContextRepository extends BaseRepository {
     return rows.map(this.mapToContextAttribute.bind(this));
   }
 
-  findByUserIdAndAttribute(userId: string, attribute: string): ContextAttribute[] {
+  findByUserIdAndAttribute(userId: string, attribute: string): Awaitable<ContextAttribute[]> {
     const rows = this.db.all(`
       SELECT * FROM personal_context
       WHERE user_id = ? AND attribute = ?
@@ -28,12 +29,12 @@ export class PersonalContextRepository extends BaseRepository {
     return rows.map(this.mapToContextAttribute.bind(this));
   }
 
-  findById(id: string): ContextAttribute | null {
+  findById(id: string): Awaitable<ContextAttribute | null> {
     const row = this.db.get('SELECT * FROM personal_context WHERE id = ?', [id]);
     return row ? this.mapToContextAttribute(row) : null;
   }
 
-  create(attr: Omit<ContextAttribute, 'id' | 'createdAt'>): ContextAttribute {
+  create(attr: Omit<ContextAttribute, 'id' | 'createdAt'>): Awaitable<ContextAttribute> {
     const id = uuidv4();
     const now = new Date().toISOString();
 
@@ -52,11 +53,11 @@ export class PersonalContextRepository extends BaseRepository {
       now
     ]);
 
-    return this.findById(id)!;
+    return this.findById(id) as ContextAttribute;
   }
 
-  update(id: string, updates: Partial<Omit<ContextAttribute, 'id' | 'userId' | 'createdAt'>>): ContextAttribute | null {
-    const attr = this.findById(id);
+  update(id: string, updates: Partial<Omit<ContextAttribute, 'id' | 'userId' | 'createdAt'>>): Awaitable<ContextAttribute | null> {
+    const attr = this.findById(id) as ContextAttribute | null;
     if (!attr) return null;
 
     const fields: string[] = [];

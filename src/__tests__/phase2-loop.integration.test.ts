@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any, @typescript-eslint/require-await, @typescript-eslint/no-unused-vars */
 import request from 'supertest';
 import { createApp } from '../app';
 import { initDatabase, closeDatabase } from '../database/connection';
@@ -53,7 +54,7 @@ describe('Phase 2 Live Intelligence Loop End-to-End', () => {
     await new Promise(resolve => setTimeout(resolve, 10));
 
     const contextRepo = serviceContainer.getContextRepository();
-    const attr = contextRepo.create({
+    const attr = await contextRepo.create({
       userId,
       attribute: 'preferred-work-time',
       value: JSON.stringify({ category: 'work', value: 'evening' }),
@@ -97,7 +98,6 @@ describe('Phase 2 Live Intelligence Loop End-to-End', () => {
       .expect(200);
 
     const analyzeBody = analyzeRes.body;
-    console.log('Analyze validation:', analyzeBody.validation);
     
     expect(analyzeBody.candidateClarificationQuestions.length).toBe(1);
     expect(analyzeBody.candidateClarificationQuestions[0].resolvesContextAttributeIds[0]).toBe(attr.id);
@@ -114,7 +114,7 @@ describe('Phase 2 Live Intelligence Loop End-to-End', () => {
       .expect(200);
 
     // 4. Verify attribute in DB has source=USER_CONFIRMED, confidence=1.0
-    const updatedAttr = contextRepo.findById(attr.id);
+    const updatedAttr = await contextRepo.findById(attr.id);
     expect(updatedAttr?.source).toBe(ObservationSource.USER_CONFIRMED);
     expect(updatedAttr?.confidence).toBe(1.0);
     expect(updatedAttr?.value).toBe('Yes, I prefer evenings');

@@ -2,18 +2,19 @@
  * Decision Repository
  */
 
+import { IDecisionRepository, Awaitable } from './interfaces';
 import { BaseRepository } from './base.repository';
 import { Decision, DecisionStatus, ContextSnapshot } from '../domain/types';
 import { v4 as uuidv4 } from 'uuid';
 import { safeJsonParse } from '../utils/json';
 
-export class DecisionRepository extends BaseRepository {
-  findById(id: string): Decision | null {
+export class SqliteDecisionRepository extends BaseRepository implements IDecisionRepository {
+  findById(id: string): Awaitable<Decision | null> {
     const row = this.db.get('SELECT * FROM decisions WHERE id = ?', [id]);
     return row ? this.mapToDecision(row) : null;
   }
 
-  findByUserId(userId: string, limit: number = 50): Decision[] {
+  findByUserId(userId: string, limit: number = 50): Awaitable<Decision[]> {
     const rows = this.db.all(`
       SELECT * FROM decisions
       WHERE user_id = ?
@@ -24,7 +25,7 @@ export class DecisionRepository extends BaseRepository {
     return rows.map(this.mapToDecision.bind(this));
   }
 
-  create(decision: Omit<Decision, 'createdAt'>): Decision {
+  create(decision: Omit<Decision, 'createdAt'>): Awaitable<Decision> {
     const id = decision.id || uuidv4();
     const now = new Date().toISOString();
 
@@ -42,11 +43,11 @@ export class DecisionRepository extends BaseRepository {
       now
     ]);
 
-    return this.findById(id)!;
+    return this.findById(id) as Decision;
   }
 
-  updateChoice(id: string, userChoice: string): Decision | null {
-    const decision = this.findById(id);
+  updateChoice(id: string, userChoice: string): Awaitable<Decision | null> {
+    const decision = this.findById(id) as Decision | null;
     if (!decision) return null;
 
     this.db.run(`
@@ -55,16 +56,16 @@ export class DecisionRepository extends BaseRepository {
       WHERE id = ?
     `, [JSON.stringify(userChoice), DecisionStatus.CHOSEN, id]);
 
-    return this.findById(id);
+    return this.findById(id) as Decision | null;
   }
 
-  updateStatus(id: string, status: DecisionStatus): Decision | null {
-    const decision = this.findById(id);
+  updateStatus(id: string, status: DecisionStatus): Awaitable<Decision | null> {
+    const decision = this.findById(id) as Decision | null;
     if (!decision) return null;
 
     this.db.run('UPDATE decisions SET status = ? WHERE id = ?', [status, id]);
 
-    return this.findById(id);
+    return this.findById(id) as Decision | null;
   }
 
   private mapToDecision(row: unknown): Decision {

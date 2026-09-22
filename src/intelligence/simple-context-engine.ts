@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/restrict-template-expressions */
 /**
  * Simple Context Engine Implementation
  * MVP: Key-value storage with recency-based retrieval
@@ -17,25 +18,22 @@ import {
   ObservationType
 } from '../domain/types';
 import { IContextEngine, IStateEstimator } from './interfaces';
-import { PersonalContextRepository } from '../repositories/personal-context.repository';
-import { DecisionRepository } from '../repositories/decision.repository';
-import { CalendarEventRepository } from '../repositories/calendar-event.repository';
-import { ObservationRepository } from '../repositories/observation.repository';
+import { IPersonalContextRepository, IDecisionRepository, ICalendarEventRepository, IObservationRepository } from '../repositories/interfaces';
 import { safeJsonParse } from '../utils/json';
 
 export class SimpleContextEngine implements IContextEngine {
   constructor(
-    private contextRepo: PersonalContextRepository,
-    private decisionRepo: DecisionRepository,
-    private calendarRepo: CalendarEventRepository,
-    private observationRepo: ObservationRepository,
+    private contextRepo: IPersonalContextRepository,
+    private decisionRepo: IDecisionRepository,
+    private calendarRepo: ICalendarEventRepository,
+    private observationRepo: IObservationRepository,
     private stateEstimator: IStateEstimator
   ) {}
 
-  getCurrentContext(userId: string): Promise<PersonalContext> {
-    const attributes = this.contextRepo.findByUserId(userId, 100);
-    const recentDecisions = this.decisionRepo.findByUserId(userId, 10);
-    const upcomingEvents = this.calendarRepo.findUpcoming(userId);
+  async getCurrentContext(userId: string): Promise<PersonalContext> {
+    const attributes = await this.contextRepo.findByUserId(userId, 100);
+    const recentDecisions = await this.decisionRepo.findByUserId(userId, 10);
+    const upcomingEvents = await this.calendarRepo.findUpcoming(userId);
 
     // Extract structured data from attributes
     const goals: Goal[] = [];
@@ -78,14 +76,14 @@ export class SimpleContextEngine implements IContextEngine {
     const todayEnd = new Date(now);
     todayEnd.setHours(23, 59, 59);
 
-    const busyHoursToday = upcomingEvents
-      .filter(e => e.startTime < todayEnd && e.endTime > now)
+    const busyHoursToday = (upcomingEvents as any[])
+      .filter((e) => e.startTime < todayEnd && e.endTime > now)
       .reduce((sum, e) => {
         const duration = (e.endTime.getTime() - e.startTime.getTime()) / (1000 * 60 * 60);
         return sum + duration;
       }, 0);
 
-    return Promise.resolve({
+    return {
       userId,
       goals,
       commitments,
@@ -97,16 +95,16 @@ export class SimpleContextEngine implements IContextEngine {
       },
       recentDecisions,
       lastUpdated: new Date()
-    });
+    };
   }
 
-  updateContext(userId: string, observation: Observation): Promise<PersonalContext> {
+  async updateContext(userId: string, observation: Observation): Promise<PersonalContext> {
     const timestamp = observation.timestamp ? new Date(observation.timestamp) : new Date();
     const confidence = Number.isFinite(observation.confidence)
       ? Math.min(1, Math.max(0, observation.confidence))
       : 1;
 
-    this.observationRepo.create({
+    await this.observationRepo.create({
       userId,
       type: observation.type ?? ObservationType.USER_REPORTED,
       data: observation.data ?? {},
@@ -120,7 +118,7 @@ export class SimpleContextEngine implements IContextEngine {
 
   async getRelevantContext(userId: string, _decision: DecisionQuery): Promise<RelevantContext> {
     const context = await this.getCurrentContext(userId);
-    const recentObs = this.observationRepo.findRecent(userId, 24);
+    const recentObs = await this.observationRepo.findRecent(userId, 24);
     const state = await this.stateEstimator.estimateCurrentState(context, recentObs);
 
     // PROVISIONAL: Return all context as "relevant"
@@ -129,26 +127,25 @@ export class SimpleContextEngine implements IContextEngine {
       goals: context.goals,
       commitments: context.commitments,
       constraints: [],
-      recentHistory: recentObs.map(o => `${o.type}: ${JSON.stringify(o.data)}`),
+      recentHistory: recentObs.map((o: any) => `${o.type}: ${JSON.stringify(o.data)}`),
       state
     };
   }
 
-  confirmContextAttribute(userId: string, attributeId: string): Promise<void> {
-    const attr = this.contextRepo.findById(attributeId);
+  async confirmContextAttribute(userId: string, attributeId: string): Promise<void> {
+    const attr = await this.contextRepo.findById(attributeId);
     if (attr && attr.userId === userId) {
-      this.contextRepo.update(attributeId, {
+      await this.contextRepo.update(attributeId, {
         source: ObservationSource.USER_CONFIRMED,
         confidence: 1.0
       });
     }
-    return Promise.resolve();
   }
 
-  correctContext(userId: string, correction: ContextCorrection): Promise<PersonalContext> {
-    const attr = this.contextRepo.findById(correction.attributeId);
+  async correctContext(userId: string, correction: ContextCorrection): Promise<PersonalContext> {
+    const attr = await this.contextRepo.findById(correction.attributeId);
     if (attr && attr.userId === userId) {
-      this.contextRepo.update(correction.attributeId, {
+      await this.contextRepo.update(correction.attributeId, {
         value: correction.correctedValue,
         source: ObservationSource.USER_CONFIRMED,
         confidence: 1.0

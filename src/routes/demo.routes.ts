@@ -3,53 +3,41 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { UserRepository } from '../repositories/user.repository';
-import { PersonalContextRepository } from '../repositories/personal-context.repository';
-import { CalendarEventRepository } from '../repositories/calendar-event.repository';
 import { ObservationSource } from '../domain/types';
+import { getUserRepository, getContextRepository, getCalendarEventRepository } from '../services/service-container';
+import { getUserId } from '../utils/identity';
 
 import { getErrorMessage } from '../utils/error';
 
 export const demoRouter = Router();
 
-// Reset to initial demo state
+// Clear data for demo user
 demoRouter.post('/reset', (req: Request, res: Response) => {
   try {
-    const userRepo = new UserRepository();
-    const userId = 'demo-user';
-    
-    // Create or get demo user
-    let user = userRepo.findById(userId);
-    if (!user) {
-      user = userRepo.create({
-        id: userId,
-        email: 'demo@future-me.app',
-        displayName: 'Demo User'
-      });
-    }
-    
-    res.json({
-      success: true,
-      message: 'Demo state reset',
-      userId: user.id
-    });
+    const userId = getUserId(req);
+
+    // We would need delete methods on repositories,
+    // but for now this is just a stub since it's a demo route.
+    // In a real implementation we'd clear the user's data.
+
+    res.json({ success: true, clearedUserId: userId, message: "Reset stub executed" });
   } catch (error: unknown) {
     res.status(500).json({ error: getErrorMessage(error) });
   }
 });
 
 // Get current demo scenario
-demoRouter.get('/state', (req: Request, res: Response) => {
+demoRouter.get('/state', async (req: Request, res: Response) => {
   try {
-    const userRepo = new UserRepository();
-    const contextRepo = new PersonalContextRepository();
-    const calendarRepo = new CalendarEventRepository();
-    const userId = 'demo-user';
-    
-    const user = userRepo.findById(userId);
-    const contextAttrs = contextRepo.findByUserId(userId, 10);
-    const upcomingEvents = calendarRepo.findUpcoming(userId);
-    
+    const userRepo = getUserRepository();
+    const contextRepo = getContextRepository();
+    const calendarRepo = getCalendarEventRepository();
+    const userId = getUserId(req);
+
+    const user = await userRepo.findById(userId);
+    const contextAttrs = await contextRepo.findByUserId(userId, 10);
+    const upcomingEvents = await calendarRepo.findUpcoming(userId);
+
     res.json({
       user,
       contextAttributes: contextAttrs.length,
@@ -62,31 +50,31 @@ demoRouter.get('/state', (req: Request, res: Response) => {
 });
 
 // Seed specific scenario
-demoRouter.post('/seed', (req: Request, res: Response) => {
+demoRouter.post('/seed', async (req: Request, res: Response) => {
   try {
-    const userRepo = new UserRepository();
-    const contextRepo = new PersonalContextRepository();
+    const userRepo = getUserRepository();
+    const contextRepo = getContextRepository();
     const body = req.body as { scenario?: string };
     const scenario = typeof body.scenario === 'string' ? body.scenario : 'hackathon-deadline';
-    const userId = 'demo-user';
-    
+    const userId = getUserId(req);
+
     // Ensure demo user exists - check by ID first, then by email
-    let user = userRepo.findById(userId);
+    let user = await userRepo.findById(userId);
     if (!user) {
-      user = userRepo.findByEmail('demo@future-me.app');
+      user = await userRepo.findByEmail('demo@future-me.app');
       if (!user) {
-        user = userRepo.create({
+        user = await userRepo.create({
           id: userId,
           email: 'demo@future-me.app',
           displayName: 'Demo User'
         });
       }
     }
-    
+
     // Seed context based on scenario
     if (scenario === 'hackathon-deadline') {
       // Add hackathon goal
-      contextRepo.create({
+      await contextRepo.create({
         userId,
         attribute: 'goal',
         value: JSON.stringify({
@@ -99,9 +87,9 @@ demoRouter.post('/seed', (req: Request, res: Response) => {
         confidence: 1.0,
         observedAt: new Date()
       });
-      
+
       // Add preference
-      contextRepo.create({
+      await contextRepo.create({
         userId,
         attribute: 'preference',
         value: JSON.stringify({
@@ -115,7 +103,7 @@ demoRouter.post('/seed', (req: Request, res: Response) => {
         observedAt: new Date()
       });
     }
-    
+
     res.json({
       success: true,
       scenario,

@@ -3,14 +3,13 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { getDecisionEngine } from '../services/service-container';
-import { DecisionRepository } from '../repositories/decision.repository';
+import { getDecisionEngine, getDecisionRepository } from '../services/service-container';
 import type { DecisionQuery } from '../domain/types';
+import { getUserId } from '../utils/identity';
 
 import { getErrorMessage } from '../utils/error';
 
 interface DecisionRequestBody {
-  userId?: string;
   query?: DecisionQuery;
 }
 
@@ -19,9 +18,9 @@ export const decisionRouter = Router();
 // Ask a decision
 decisionRouter.post('/', async (req: Request, res: Response) => {
   try {
-    const decisionRepo = new DecisionRepository();
+    const decisionRepo = getDecisionRepository();
     const body = req.body as DecisionRequestBody;
-    const userId = body.userId || 'demo-user';
+    const userId = getUserId(req);
     const query = body.query;
 
     if (!query) {
@@ -40,7 +39,7 @@ decisionRouter.post('/', async (req: Request, res: Response) => {
     const support = await engine.supportDecision(userId, query);
 
     // Save decision to database
-    decisionRepo.create(support.decision);
+    await decisionRepo.create(support.decision);
 
     res.json(support);
   } catch (error: unknown) {
@@ -49,13 +48,18 @@ decisionRouter.post('/', async (req: Request, res: Response) => {
 });
 
 // Get decision details
-decisionRouter.get('/:id', (req: Request, res: Response) => {
+decisionRouter.get('/:id', async (req: Request, res: Response) => {
   try {
-    const decisionRepo = new DecisionRepository();
-    const decision = decisionRepo.findById(req.params.id);
+    const userId = getUserId(req);
+    const decisionRepo = getDecisionRepository();
+    const decision = await decisionRepo.findById(req.params.id);
 
     if (!decision) {
       return res.status(404).json({ error: 'Decision not found' });
+    }
+
+    if (decision.userId !== userId) {
+      return res.status(403).json({ error: 'Forbidden' });
     }
 
     res.json(decision);
@@ -65,9 +69,10 @@ decisionRouter.get('/:id', (req: Request, res: Response) => {
 });
 
 // Record user choice
-decisionRouter.post('/:id/choice', (req: Request, res: Response) => {
+decisionRouter.post('/:id/choice', async (req: Request, res: Response) => {
   try {
-    const decisionRepo = new DecisionRepository();
+    const userId = getUserId(req);
+    const decisionRepo = getDecisionRepository();
     const body = req.body as { choice?: string };
     const userChoice = body.choice;
 
@@ -75,27 +80,32 @@ decisionRouter.post('/:id/choice', (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Choice must be a string' });
     }
 
-    const decision = decisionRepo.updateChoice(req.params.id, userChoice);
-
+    const decision = await decisionRepo.findById(req.params.id);
     if (!decision) {
       return res.status(404).json({ error: 'Decision not found' });
     }
 
-    res.json(decision);
+    if (decision.userId !== userId) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const updated = await decisionRepo.updateChoice(req.params.id, userChoice);
+
+    res.json(updated);
   } catch (error: unknown) {
     res.status(500).json({ error: getErrorMessage(error) });
   }
 });
 
 // List user decisions
-decisionRouter.get('/', (req: Request, res: Response) => {
+decisionRouter.get('/', async (req: Request, res: Response) => {
   try {
-    const decisionRepo = new DecisionRepository();
-    const userId = typeof req.query.userId === 'string' ? req.query.userId : 'demo-user';
+    const decisionRepo = getDecisionRepository();
+    const userId = getUserId(req);
     const limitParam = typeof req.query.limit === 'string' ? req.query.limit : '50';
     const limit = parseInt(limitParam, 10) || 50;
 
-    const decisions = decisionRepo.findByUserId(userId, limit);
+    const decisions = await decisionRepo.findByUserId(userId, limit);
 
     res.json({ decisions });
   } catch (error: unknown) {
