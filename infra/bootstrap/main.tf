@@ -22,8 +22,11 @@ data "aws_caller_identity" "current" {}
 
 locals {
   bucket_name = "future-me-tfstate-728033416182"
-  github_repo = "nguyenthanhdat2707/FutureMe"
-  state_key   = "future-me/app/terraform.tfstate"
+  # This repository uses GitHub's immutable owner/repository ID OIDC subject
+  # format. Binding to IDs also prevents a renamed repository from inheriting
+  # this trust relationship by reusing the previous owner/repository names.
+  github_oidc_repository = "nguyenthanhdat2707@154571295/FutureMe@1377472785"
+  state_key              = "future-me/app/terraform.tfstate"
 }
 
 resource "aws_s3_bucket" "terraform_state" {
@@ -116,7 +119,7 @@ resource "aws_iam_role" "github_plan_role" {
         Condition = {
           StringEquals = {
             "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
-            "token.actions.githubusercontent.com:sub" = "repo:${local.github_repo}:pull_request"
+            "token.actions.githubusercontent.com:sub" = "repo:${local.github_oidc_repository}:pull_request"
           }
         }
       }
@@ -204,7 +207,7 @@ resource "aws_iam_role" "github_apply_role" {
         Condition = {
           StringEquals = {
             "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
-            "token.actions.githubusercontent.com:sub" = "repo:${local.github_repo}:ref:refs/heads/main"
+            "token.actions.githubusercontent.com:sub" = "repo:${local.github_oidc_repository}:ref:refs/heads/main"
           }
         }
       }
