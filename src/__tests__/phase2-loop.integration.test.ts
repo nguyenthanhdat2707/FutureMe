@@ -114,10 +114,11 @@ describe('Phase 2 Live Intelligence Loop End-to-End', () => {
       .expect(200);
 
     // 4. Verify attribute in DB has source=USER_CONFIRMED, confidence=1.0
-    const updatedAttr = await contextRepo.findById(attr.id);
+    // 4. Verify attribute in DB was appended with source=USER_CONFIRMED, confidence=1.0
+    const allAttrs = await contextRepo.findByUserId(userId, 10);
+    const updatedAttr = allAttrs.find(a => a.value === 'Yes, I prefer evenings' || a.value.includes('prefer evenings'));
     expect(updatedAttr?.source).toBe(ObservationSource.USER_CONFIRMED);
     expect(updatedAttr?.confidence).toBe(1.0);
-    expect(updatedAttr?.value).toBe('Yes, I prefer evenings');
 
     // 5. Decision: POST /api/decisions
     const decisionRes = await request(app)

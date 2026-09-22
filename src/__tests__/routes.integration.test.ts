@@ -314,12 +314,10 @@ describe('API route integration', () => {
 
     expect(confirmResponse.status).toBe(200);
     expect(confirmResponse.body).toEqual({ success: true });
-    expect(await contextRepo.findById(inferredAttribute.id)).toEqual(
-      expect.objectContaining({
-        source: ObservationSource.USER_CONFIRMED,
-        confidence: 1,
-      })
-    );
+    const allConfirmAttrs = await contextRepo.findByUserId('demo-user', 10);
+    const confirmedAttr = allConfirmAttrs.find(a => a.value === inferredAttribute.value && a.source === ObservationSource.USER_CONFIRMED);
+    expect(confirmedAttr).toBeDefined();
+    expect(confirmedAttr?.confidence).toBe(1);
 
     const correctedValue = JSON.stringify({
       description: 'Corrected generic preference',
@@ -340,13 +338,10 @@ describe('API route integration', () => {
         expect.objectContaining({ description: 'Corrected generic preference' }),
       ])
     );
-    expect(await contextRepo.findById(inferredAttribute.id)).toEqual(
-      expect.objectContaining({
-        value: correctedValue,
-        source: ObservationSource.USER_CONFIRMED,
-        confidence: 1,
-      })
-    );
+    const allCorrectAttrs = await contextRepo.findByUserId('demo-user', 10);
+    const correctAttr = allCorrectAttrs.find(a => a.value === correctedValue && a.source === ObservationSource.USER_CONFIRMED);
+    expect(correctAttr).toBeDefined();
+    expect(correctAttr?.confidence).toBe(1);
   });
 
   it('returns JSON 404 details for an unknown route', async () => {

@@ -98,9 +98,10 @@ describe('Context API Integration', () => {
 
       expect(response.body).toHaveProperty('success', true);
 
-      // Verify the attribute was updated
-      const updated = await contextRepo.findById(attr.id);
-      expect(updated?.source).toBe(ObservationSource.USER_CONFIRMED);
+      // Verify the attribute was updated (a new row was appended)
+      const all = await contextRepo.findByUserId('test-user-3', 10);
+      const updated = all.find(a => a.source === ObservationSource.USER_CONFIRMED && a.value === attr.value);
+      expect(updated).toBeDefined();
       expect(updated?.confidence).toBe(1.0);
     });
 
@@ -155,9 +156,10 @@ describe('Context API Integration', () => {
 
       expect(response.body).toHaveProperty('userId', 'test-user-4');
 
-      // Verify the attribute was corrected
-      const corrected = await contextRepo.findById(attr.id);
-      expect(corrected?.value).toBe(correction.correctedValue);
+      // Verify the attribute was corrected (a new row was appended)
+      const all = await contextRepo.findByUserId('test-user-4', 10);
+      const corrected = all.find(a => a.value === correction.correctedValue);
+      expect(corrected).toBeDefined();
       expect(corrected?.source).toBe(ObservationSource.USER_CONFIRMED);
       expect(corrected?.confidence).toBe(1.0);
     });

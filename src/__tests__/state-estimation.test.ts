@@ -29,9 +29,9 @@ describe('SimpleStateEstimator', () => {
   describe('estimateCurrentState', () => {
     it('returns UNCERTAIN when no recent observations', async () => {
       const observations: Observation[] = [];
-      
+
       const state = await estimator.estimateCurrentState(baseContext, observations);
-      
+
       expect(state.state).toBe(PersonalState.UNCERTAIN);
       expect(state.confidence).toBeGreaterThan(0);
       expect(state.evidence).toContain('No recent observations in last 30 minutes');
@@ -51,9 +51,9 @@ describe('SimpleStateEstimator', () => {
           createdAt: oldTimestamp
         }
       ];
-      
+
       const state = await estimator.estimateCurrentState(baseContext, observations);
-      
+
       expect(state.state).toBe(PersonalState.UNCERTAIN);
     });
 
@@ -79,9 +79,9 @@ describe('SimpleStateEstimator', () => {
           createdAt: new Date()
         }
       ];
-      
+
       const state = await estimator.estimateCurrentState(overloadedContext, recentObs);
-      
+
       expect(state.state).toBe(PersonalState.OVERLOADED);
       expect(state.evidence.some(e => e.includes('Busy hours today'))).toBe(true);
     });
@@ -99,19 +99,47 @@ describe('SimpleStateEstimator', () => {
           createdAt: new Date()
         }
       ];
-      
+
       const state = await estimator.estimateCurrentState(baseContext, recentObs);
-      
+
       expect(state.state).toBe(PersonalState.FLOW);
       expect(state.confidence).toBeGreaterThan(0);
       expect(state.evidence).toContain('Normal activity level detected');
+    });
+
+    it('returns UNCERTAIN with explicit missing-calendar evidence when calendar busy hours are null', async () => {
+      const nullCalendarContext = {
+        ...baseContext,
+        calendar: {
+          ...baseContext.calendar,
+          busyHoursToday: null
+        }
+      };
+
+      const recentObs: Observation[] = [
+        {
+          id: 'obs-1',
+          userId: 'test-user',
+          type: ObservationType.USER_REPORTED,
+          data: { description: 'Recent activity' },
+          source: ObservationSource.USER_CONFIRMED,
+          confidence: 1.0,
+          timestamp: new Date(),
+          createdAt: new Date()
+        }
+      ];
+
+      const state = await estimator.estimateCurrentState(nullCalendarContext, recentObs);
+
+      expect(state.state).toBe(PersonalState.UNCERTAIN);
+      expect(state.evidence).toContain('Calendar state unknown');
     });
 
     it('considers only observations within 30 minute window', async () => {
       const now = new Date();
       const recent = new Date(now.getTime() - 10 * 60 * 1000); // 10 minutes ago
       const old = new Date(now.getTime() - 40 * 60 * 1000); // 40 minutes ago
-      
+
       const observations: Observation[] = [
         {
           id: 'obs-1',
@@ -134,9 +162,9 @@ describe('SimpleStateEstimator', () => {
           createdAt: old
         }
       ];
-      
+
       const state = await estimator.estimateCurrentState(baseContext, observations);
-      
+
       // Should have recent observation, so not UNCERTAIN
       expect(state.state).toBe(PersonalState.FLOW);
     });
@@ -144,9 +172,9 @@ describe('SimpleStateEstimator', () => {
     it('returns valid timestamp in state estimate', async () => {
       const observations: Observation[] = [];
       const beforeCall = new Date();
-      
+
       const state = await estimator.estimateCurrentState(baseContext, observations);
-      
+
       const afterCall = new Date();
       expect(state.timestamp.getTime()).toBeGreaterThanOrEqual(beforeCall.getTime());
       expect(state.timestamp.getTime()).toBeLessThanOrEqual(afterCall.getTime());
@@ -154,9 +182,9 @@ describe('SimpleStateEstimator', () => {
 
     it('always includes evidence array', async () => {
       const observations: Observation[] = [];
-      
+
       const state = await estimator.estimateCurrentState(baseContext, observations);
-      
+
       expect(Array.isArray(state.evidence)).toBe(true);
       expect(state.evidence.length).toBeGreaterThan(0);
     });
@@ -174,9 +202,9 @@ describe('SimpleStateEstimator', () => {
           createdAt: new Date()
         }
       ];
-      
+
       const state = await estimator.estimateCurrentState(baseContext, observations);
-      
+
       expect(state.confidence).toBeGreaterThanOrEqual(0);
       expect(state.confidence).toBeLessThanOrEqual(1);
     });
