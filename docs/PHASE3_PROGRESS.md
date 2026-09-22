@@ -3,11 +3,13 @@
 ## Current State
 
 - Phase status: READY_FOR_USER_TEST
-- Active branch: `feat/phase3-context-acquisition`
+- Promotion branch: `feat/phase3-frontend-completion`
 - Completed unit: Phase 3 Context Acquisition (Backend + Frontend + Browser Verification + Repair) — READY_FOR_USER_TEST
 - Backend commit: `afc5c8e60c71f81f19fe93c8c674474ae50d9739`
-- Frontend delivery commit: `ed8508b33f43965275d8ec7baf60cb71c9c77cba`
-- Remote verification: `origin/feat/phase3-context-acquisition` contains both delivery commits after the tracking update is pushed and verified
+- Source frontend delivery commit: `ed8508b33f43965275d8ec7baf60cb71c9c77cba`
+- Main-based promotion commit: `d99a5c4876bf55a7d0dbaf149f6aff65a4755da7`
+- Promotion PR: [#15](https://github.com/nguyenthanhdat2707/FutureMe/pull/15)
+- Remote verification: source branch `origin/feat/phase3-context-acquisition` is verified at `4b3c475134274218e91ba23651793142baa3c4c2`; PR #15 promotes the equivalent verified tree onto `main`
 - Implementation worker: Antigravity (Gemini 3.8 Flash High)
 - Supervisor/verification: Hermes
 - Blockers: none (independent Codex found preference edit blocker where backend fallback updated description instead of value, now resolved with JSON value patch).
