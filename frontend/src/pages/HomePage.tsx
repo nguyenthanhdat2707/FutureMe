@@ -11,19 +11,28 @@ function HomePage() {
   const [setupAnswers, setSetupAnswers] = useState<SetupAnswers>({});
   const [submitting, setSubmitting] = useState(false);
 
-  const loadContext = useCallback(async () => {
+  const loadContext = useCallback(async (signal?: AbortSignal) => {
     try {
       const data = await api.context.getCurrent();
+      if (signal?.aborted) return;
       setContext(data);
     } catch (err) {
+      if (signal?.aborted) return;
       setError(err instanceof Error ? err.message : 'Failed to load context');
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) {
+        setLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
-    void loadContext();
+    const controller = new AbortController();
+    const init = async () => {
+      await loadContext(controller.signal);
+    };
+    void init();
+    return () => controller.abort();
   }, [loadContext]);
 
   const handleSetupSubmit = async (answersToSubmit: SetupAnswers = setupAnswers) => {
