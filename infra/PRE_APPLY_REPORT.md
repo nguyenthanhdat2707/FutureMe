@@ -59,7 +59,7 @@ S3 state bucket
   -> noncurrent-version lifecycle
 GitHub OIDC provider
   -> pull-request plan role + state-read/native-lock policy
-  -> main-branch apply role + scoped stack-management policy
+  -> main-branch apply role + AdministratorAccess (explicit decision)
 ```
 
 Application:
