@@ -4,9 +4,10 @@
 
 - Phase status: READY_FOR_USER_TEST
 - Active branch: `feat/phase3-context-acquisition`
-- Completed unit: Phase 3 Context Acquisition (Backend + Frontend + Browser Verification + Repair) — DELIVERED
-- Verified commit: `afc5c8e60c71f81f19fe93c8c674474ae50d9739`
-- Remote verification: `origin/feat/phase3-context-acquisition` matches the local commit
+- Completed unit: Phase 3 Context Acquisition (Backend + Frontend + Browser Verification + Repair) — READY_FOR_USER_TEST
+- Backend commit: `afc5c8e60c71f81f19fe93c8c674474ae50d9739`
+- Frontend delivery commit: `ed8508b33f43965275d8ec7baf60cb71c9c77cba`
+- Remote verification: `origin/feat/phase3-context-acquisition` contains both delivery commits after the tracking update is pushed and verified
 - Implementation worker: Antigravity (Gemini 3.8 Flash High)
 - Supervisor/verification: Hermes
 - Blockers: none (independent Codex found preference edit blocker where backend fallback updated description instead of value, now resolved with JSON value patch).
