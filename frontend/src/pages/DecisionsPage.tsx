@@ -100,6 +100,32 @@ function formatHours(value: number | null): string {
   return value === null ? 'Not available' : value + ' hours';
 }
 
+const CLARIFICATION_ALLOWLIST = [
+  'target',
+  'deadline',
+  'timeCostHours',
+  'availableHoursBeforeDeadline',
+  'workloadHoursBeforeDeadline',
+  'energyCost',
+  'availableEnergy',
+] as const;
+
+type ClarificationField = typeof CLARIFICATION_ALLOWLIST[number];
+
+function isClarificationField(field: string): field is ClarificationField {
+  return (CLARIFICATION_ALLOWLIST as readonly string[]).includes(field);
+}
+
+const FIELD_DEFINITIONS: Record<string, { label: string, type: string, min?: number, max?: number, step?: number }> = {
+  timeCostHours: { label: 'Time cost (hours)', type: 'number', min: 0, step: 0.5 },
+  availableHoursBeforeDeadline: { label: 'Available time before deadline (hours)', type: 'number', min: 0, step: 0.5 },
+  workloadHoursBeforeDeadline: { label: 'Existing workload before deadline (hours)', type: 'number', min: 0, step: 0.5 },
+  deadline: { label: 'Deadline', type: 'datetime-local' },
+  energyCost: { label: 'Energy cost (0–10)', type: 'number', min: 0, max: 10, step: 1 },
+  availableEnergy: { label: 'Available energy (0–10)', type: 'number', min: 0, max: 10, step: 1 },
+  target: { label: 'Decision target', type: 'text' },
+};
+
 function DecisionsPage() {
   const [form, setForm] = useState<DemoForm>(() => readSessionValue('decisions_form', INITIAL_FORM));
   const [observationForm, setObservationForm] = useState<ObservationForm>(() => readSessionValue('decisions_observationForm', INITIAL_OBSERVATION));
@@ -231,62 +257,36 @@ function DecisionsPage() {
     }
   };
 
-    const handleClarificationSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
+    const submitWithClarification = async (skip: boolean) => {
     if (!result) return;
-
-    const hasNegative = Object.values(clarificationAnswers).some(answer => {
-      const num = optionalNumber(answer);
-      return num !== undefined && num < 0;
-    });
-    if (hasNegative) {
-      setError('Numeric values cannot be negative.');
-      return;
-    }
-
-    // Save the current result as "before"
     setBeforeResult(result);
 
-    // Merge clarification answers into the impact profile
     const updatedProfile = { ...form };
+    const unresolvedFields: string[] = [];
 
-    Object.entries(clarificationAnswers).forEach(([question, answer]) => {
-      const normalizedQuestion = question.toLowerCase();
-      const answerNum = optionalNumber(answer);
-
-      if (answerNum !== undefined) {
-        if (normalizedQuestion.includes('existing workload') || normalizedQuestion.includes('workload hours')) {
-          updatedProfile.workloadHoursBeforeDeadline = answer;
-        } else if (
-          normalizedQuestion.includes('available before it') ||
-          normalizedQuestion.includes('available time') ||
-          normalizedQuestion.includes('hours are available') ||
-          normalizedQuestion.includes('hours available')
-        ) {
-          updatedProfile.availableHoursBeforeDeadline = answer;
-        } else if (
-          normalizedQuestion.includes('time cost') ||
-          normalizedQuestion.includes('how long') ||
-          normalizedQuestion.includes('how many hours')
-        ) {
-          updatedProfile.timeCostHours = answer;
-        } else if (
-          normalizedQuestion.includes('available energy') ||
-          normalizedQuestion.includes('energy is currently available') ||
-          normalizedQuestion.includes('energy level')
-        ) {
-          updatedProfile.availableEnergy = answer;
-        } else if (normalizedQuestion.includes('energy')) {
-          updatedProfile.energyCost = answer;
+    const unresolvedMaterialFields = result.policy.unresolvedMaterialFields || [];
+    unresolvedMaterialFields.forEach(field => {
+      if (clarificationAnswers[field] && clarificationAnswers[field].trim() !== '') {
+        if (isClarificationField(field)) {
+          updatedProfile[field] = clarificationAnswers[field];
+        } else {
+          unresolvedFields.push(field);
         }
-      } else if (normalizedQuestion.includes('deadline')) {
-        const date = new Date(answer);
-        if (!Number.isNaN(date.getTime())) updatedProfile.deadline = answer;
-      } else if (normalizedQuestion.includes('target')) {
-        updatedProfile.target = answer;
+      } else {
+        unresolvedFields.push(field);
       }
     });
+
+    if (!skip) {
+      const hasNegative = Object.values(clarificationAnswers).some(answer => {
+        const num = optionalNumber(answer);
+        return num !== undefined && num < 0;
+      });
+      if (hasNegative) {
+        setError('Numeric values cannot be negative.');
+        return;
+      }
+    }
 
     setForm(updatedProfile);
 
@@ -304,6 +304,11 @@ function DecisionsPage() {
           goalRelevance: updatedProfile.goalRelevance,
           source: updatedProfile.source,
         },
+        clarification: {
+          attempted: true,
+          unresolvedFields: skip ? unresolvedMaterialFields : unresolvedFields,
+          unresolvedConflicts: result.policy.unresolvedMaterialConflicts,
+        }
       },
     };
 
@@ -313,25 +318,31 @@ function DecisionsPage() {
 
     setIsLoading(true);
     setError(null);
+    setResult(null);
+    setClarificationAnswers({});
 
     try {
       const response = await decisionsApi.query(request);
       setResult(response);
-      setClarificationAnswers({});
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : 'Unable to re-assess decision.');
+      setError(caughtError instanceof Error ? caughtError.message : 'Unable to request decision support.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const recommendation = result?.decision.recommendation;
+  const handleClarificationSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    await submitWithClarification(false);
+  };
+
+  const recommendation = result?.decision?.recommendation;
   const assessment = result?.assessment;
   const confidencePercent = recommendation
     ? Math.round(Math.min(1, Math.max(0, recommendation.confidence)) * 100)
     : 0;
 
-  const beforeRecommendation = beforeResult?.decision.recommendation;
+  const beforeRecommendation = beforeResult?.decision?.recommendation;
   const beforeAssessment = beforeResult?.assessment;
 
   const hasChangedRecommendation = beforeRecommendation && recommendation &&
@@ -587,42 +598,77 @@ function DecisionsPage() {
         </form>
       )}
 
-      {result && result.clarificationNeeded && result.clarificationNeeded.length > 0 && (
+      {result && result.policy.outcome === 'ASK' && (
         <form className="card border-l-4 border-accent-warning p-6 space-y-4" onSubmit={handleClarificationSubmit}>
-          <h2 className="text-xl font-medium text-text-primary">Clarification Needed</h2>
+          <h2 className="text-xl font-medium text-text-primary">Needs your input</h2>
           <p className="text-sm text-text-secondary">
-            The following information is needed to improve the assessment:
+            {result.policy.reason || 'The following information is needed to improve the assessment:'}
           </p>
 
-          {result.clarificationNeeded.map((question) => {
-            const isNumeric = !question.toLowerCase().includes('deadline');
-            return (
-            <label key={question} className="text-sm text-text-secondary">
-              {question}
-              <input
-                type={isNumeric ? "number" : "text"}
-                min={isNumeric ? "0" : undefined}
-                step={isNumeric ? "0.5" : undefined}
-                value={clarificationAnswers[question] || ''}
-                onChange={(event) => setClarificationAnswers(prev => ({
-                  ...prev,
-                  [question]: event.target.value
-                }))}
-                className={inputClassName + ' mt-1'}
-                required
-              />
-            </label>
-            );
-          })}
+          {result.policy.unresolvedMaterialFields && result.policy.unresolvedMaterialFields.length > 0 && (
+            <div className="space-y-4 mt-4">
+              {result.policy.unresolvedMaterialFields.map((field) => {
+                const def = FIELD_DEFINITIONS[field] || { label: field, type: 'text' };
+                return (
+                  <label key={field} className="block text-sm text-text-secondary">
+                    {def.label}
+                    <input
+                      type={def.type}
+                      min={def.min}
+                      max={def.max}
+                      step={def.step}
+                      aria-label={field}
+                      value={clarificationAnswers[field] || ''}
+                      onChange={(event) => setClarificationAnswers(prev => ({
+                        ...prev,
+                        [field]: event.target.value
+                      }))}
+                      className={inputClassName + ' mt-1 w-full max-w-md block'}
+                    />
+                  </label>
+                );
+              })}
+            </div>
+          )}
 
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="inline-flex items-center gap-2 rounded-lg bg-accent-warning px-6 py-3 font-medium text-white hover:bg-opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            Re-assess with Clarifications
-          </button>
+          {result.policy.unresolvedMaterialConflicts && result.policy.unresolvedMaterialConflicts.length > 0 && (
+            <div className="space-y-2 mt-4 p-4 bg-amber-50 rounded-lg border border-amber-200">
+              <p className="font-medium text-amber-800 text-sm">Please resolve the following conflicts:</p>
+              <ul className="list-disc pl-5 text-sm text-amber-900">
+                {result.policy.unresolvedMaterialConflicts.map((conflict, idx) => (
+                  <li key={idx}>{conflict}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-4 mt-6">
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="inline-flex items-center gap-2 rounded-lg bg-accent-warning px-6 py-3 font-medium text-white hover:bg-opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Re-assess with Clarifications
+            </button>
+            <button
+              type="button"
+              disabled={isLoading}
+              onClick={() => submitWithClarification(true)}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-6 py-3 font-medium text-text-primary hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              I'm not sure / continue without resolving
+            </button>
+          </div>
         </form>
+      )}
+
+      {result && result.policy.outcome === 'ABSTAIN' && (
+        <article className="card border-l-4 border-slate-400 p-6 space-y-4 bg-slate-50">
+          <h2 className="text-xl font-medium text-text-primary">Cannot recommend yet</h2>
+          <p className="text-sm text-text-secondary">
+            {result.policy.reason}
+          </p>
+        </article>
       )}
 
       {beforeResult && hasChangedRecommendation && (
@@ -631,7 +677,7 @@ function DecisionsPage() {
           <p className="text-sm text-text-secondary">
             The recommendation changed after clarification:
           </p>
-          
+
           <div className="grid gap-4 md:grid-cols-2">
             <div className="rounded-lg border border-slate-200 p-4 bg-slate-50">
               <p className="text-xs font-medium uppercase tracking-wide text-text-secondary mb-2">Before</p>
@@ -665,23 +711,35 @@ function DecisionsPage() {
         </article>
       )}
 
-      {result && recommendation && assessment && (
+      {result && result.policy.outcome === 'RECOMMEND' && recommendation && assessment && (
         <section className="space-y-6" aria-live="polite">
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800" role="alert">
+            <p className="font-medium">Decision guidance</p>
+            <p className="mt-1">
+              This recommendation is non-binding. Future Me cannot record your final choice in this phase. The decision is yours to make. Trade-offs are explanatory and do not determine the policy outcome.
+            </p>
+          </div>
+
           <article className="card p-6">
             <div className="flex items-start gap-3">
               <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-violet-100">
-                <span className="text-sm font-bold text-accent-ai">AI</span>
+                <span className="text-sm font-bold text-accent-ai">FM</span>
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h2 className="text-xl font-medium text-text-primary">Recommendation</h2>
+                  <h2 className="text-xl font-medium text-text-primary">
+                    Recommendation
+                    <span className="ml-2 rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800 uppercase tracking-wide">
+                      {result.policy.outcome}
+                    </span>
+                  </h2>
                   <span className="rounded-full bg-violet-100 px-3 py-1 text-sm font-medium text-accent-ai">
                     {titleCase(recommendation.option)}
                   </span>
                 </div>
                 <p className="mt-3 text-text-primary">{recommendation.reasoning}</p>
                 <div className="mt-4 flex items-center gap-3">
-                  <span className="text-sm text-text-secondary">Confidence</span>
+                  <span className="text-sm text-text-secondary">Confidence (Input Completeness & Trustworthiness - not chance of success)</span>
                   <div className="h-2 max-w-xs flex-1 rounded-full bg-slate-200">
                     <div
                       className="h-2 rounded-full bg-accent-ai"
@@ -694,8 +752,35 @@ function DecisionsPage() {
             </div>
           </article>
 
+          {result.decision.tradeoffs && result.decision.tradeoffs.length > 0 && (
+            <article className="card p-6 space-y-4">
+              <h2 className="text-xl font-medium text-text-primary">Trade-offs</h2>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {result.decision.tradeoffs.map((t, idx) => (
+                  <div key={idx} className="rounded-lg border border-slate-200 p-4">
+                    <h3 className="font-medium text-text-primary">{titleCase(t.option)}</h3>
+                    <div className="mt-3 space-y-3">
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-wide text-green-700">Gains</p>
+                        <ul className="mt-1 list-disc pl-5 text-sm text-text-secondary">
+                          {t.gains.map((g, i) => <li key={i}>{g}</li>)}
+                        </ul>
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-wide text-red-700">Costs</p>
+                        <ul className="mt-1 list-disc pl-5 text-sm text-text-secondary">
+                          {t.costs.map((c, i) => <li key={i}>{c}</li>)}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </article>
+          )}
+
           <article className="card p-6 space-y-4">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-xl font-medium text-text-primary">Feasibility assessment</h2>
               <div className="flex gap-2">
                 {result.state && (
@@ -752,14 +837,16 @@ function DecisionsPage() {
           </article>
 
           <article className="card p-6 space-y-4">
-            <h2 className="text-xl font-medium text-text-primary">Evidence</h2>
-            {assessment.evidence.length > 0 ? (
+            <h2 className="text-xl font-medium text-text-primary">Explanation</h2>
+
+            <h3 className="text-lg font-medium text-text-primary mt-4">Confirmed facts</h3>
+            {assessment.evidence.filter(e => e.source === 'user-confirmed' || e.source === 'provided').length > 0 ? (
               <div className="space-y-3">
-                {assessment.evidence.map((item, index) => {
+                {assessment.evidence.filter(e => e.source === 'user-confirmed' || e.source === 'provided').map((item, index) => {
                   const isChanged = changedEvidence.some(ce => ce.fact === item.fact);
                   return (
-                    <div 
-                      key={item.fact + index} 
+                    <div
+                      key={item.fact + index}
                       className={`rounded-lg border p-4 ${isChanged ? 'border-green-500 bg-green-50' : 'border-slate-200'}`}
                     >
                       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -782,7 +869,35 @@ function DecisionsPage() {
                 })}
               </div>
             ) : (
-              <p className="text-sm text-text-secondary">No evidence was returned.</p>
+              <p className="text-sm text-text-secondary">No confirmed facts.</p>
+            )}
+
+            <h3 className="text-lg font-medium text-text-primary mt-4">Derived context</h3>
+            {assessment.evidence.filter(e => e.source === 'calculated' || e.source === 'estimated' || e.source === 'context').length > 0 ? (
+              <div className="space-y-3">
+                {assessment.evidence.filter(e => e.source === 'calculated' || e.source === 'estimated' || e.source === 'context').map((item, index) => {
+                  const isChanged = changedEvidence.some(ce => ce.fact === item.fact);
+                  return (
+                    <div
+                      key={item.fact + index}
+                      className={`rounded-lg border p-4 ${isChanged ? 'border-green-500 bg-green-50' : 'border-slate-200'}`}
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <p className="font-medium text-text-primary">{item.fact}</p>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-sm text-text-primary">{String(item.value)}</span>
+                          <span className="rounded bg-slate-100 px-2 py-1 text-xs text-text-secondary">
+                            {titleCase(item.source)}
+                          </span>
+                        </div>
+                      </div>
+                      <p className="mt-2 text-sm text-text-secondary">{item.explanation}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-sm text-text-secondary">No derived context.</p>
             )}
           </article>
 
@@ -801,21 +916,38 @@ function DecisionsPage() {
             </article>
 
             <article className="card p-6">
-              <h2 className="text-xl font-medium text-text-primary">Missing data</h2>
-              {assessment.missingData.length > 0 ? (
-                <ul className="mt-4 list-disc space-y-2 pl-5 text-sm text-text-primary">
-                  {assessment.missingData.map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="mt-4 text-sm text-text-secondary">No required data is missing.</p>
-              )}
+              <h2 className="text-xl font-medium text-text-primary">Uncertainty</h2>
+              <div className="mt-4 space-y-4">
+                <div>
+                  <h3 className="font-medium text-sm text-text-primary">Missing Data</h3>
+                  {assessment.missingData.length > 0 ? (
+                    <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-text-secondary">
+                      {assessment.missingData.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-2 text-sm text-text-secondary">No missing data.</p>
+                  )}
+                </div>
+                <div>
+                  <h3 className="font-medium text-sm text-text-primary">Invalid Inputs</h3>
+                  {assessment.invalidInputs.length > 0 ? (
+                    <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-text-secondary">
+                      {assessment.invalidInputs.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-2 text-sm text-text-secondary">No invalid inputs.</p>
+                  )}
+                </div>
+              </div>
             </article>
           </div>
         </section>
       )}
-    </div>
+</div>
   );
 }
 

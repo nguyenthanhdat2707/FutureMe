@@ -315,11 +315,18 @@ export interface DecisionImpactProfile {
   source?: DecisionImpactSource;
 }
 
+export interface DecisionClarificationMetadata {
+  attempted: boolean;
+  unresolvedFields?: string[];
+  unresolvedConflicts?: string[];
+}
+
 export interface DecisionApiRequest {
   userId?: string;
   query: {
     question: string;
     impactProfile?: DecisionImpactProfile;
+    clarification?: DecisionClarificationMetadata;
   };
 }
 
@@ -327,6 +334,15 @@ export interface DecisionRecommendation {
   option: string;
   confidence: number;
   reasoning: string;
+}
+
+export type DecisionPolicyOutcome = 'RECOMMEND' | 'ASK' | 'ABSTAIN';
+
+export interface DecisionPolicyResult {
+  outcome: DecisionPolicyOutcome;
+  reason: string;
+  unresolvedMaterialFields?: string[];
+  unresolvedMaterialConflicts?: string[];
 }
 
 export type DeadlinePressure = 'low' | 'moderate' | 'high' | 'unknown';
@@ -368,12 +384,20 @@ export interface StateEstimate {
   timestamp: string;
 }
 
+export interface DecisionTradeoff {
+  option: string;
+  gains: string[];
+  costs: string[];
+}
+
 export interface DecisionApiResponse {
   decision: {
     recommendation: DecisionRecommendation;
+    tradeoffs?: DecisionTradeoff[];
   };
   assessment: DecisionFeasibilityAssessment;
-  clarificationNeeded: string[];
+  clarificationNeeded?: string[];
+  policy: DecisionPolicyResult;
   state?: StateEstimate;
 }
 
