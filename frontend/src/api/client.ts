@@ -34,7 +34,17 @@ import {
   InterventionIntensity,
 } from '../types/domain';
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api').replace(/\/$/, '');
+export function resolveApiBaseUrl(envBaseUrl?: string, mode?: string): string {
+  if (envBaseUrl) {
+    return envBaseUrl.replace(/\/+$/, '');
+  }
+  if (mode === 'production') {
+    throw new Error('VITE_API_BASE_URL is not configured. The application cannot reach the backend API.');
+  }
+  return 'http://localhost:3001/api';
+}
+
+export const API_BASE_URL = resolveApiBaseUrl(import.meta.env.VITE_API_BASE_URL, import.meta.env.MODE);
 
 // ============================================================================
 // Mock Data Helpers
