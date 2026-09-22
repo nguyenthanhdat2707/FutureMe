@@ -102,6 +102,17 @@ jobs:
           terraform show -no-color application.tfplan > application-plan.txt
           terraform show -json application.tfplan > application-plan.json
 
+      - name: Upload reviewed plan artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: future-me-application-plan-${{ github.run_id }}
+          path: |
+            infra/terraform/application.tfplan
+            infra/terraform/application-plan.txt
+            infra/terraform/application-plan.json
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Reject destructive or replacement actions
         working-directory: ${{ env.TERRAFORM_DIR }}
         run: |
@@ -150,17 +161,6 @@ jobs:
               print(json.dumps(destructive, indent=2), file=sys.stderr)
               sys.exit(1)
           PY
-
-      - name: Upload reviewed plan artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: future-me-application-plan-${{ github.run_id }}
-          path: |
-            infra/terraform/application.tfplan
-            infra/terraform/application-plan.txt
-            infra/terraform/application-plan.json
-          if-no-files-found: error
-          retention-days: 14
 
       - name: Require explicit apply confirmation
         if: inputs.operation == 'apply'

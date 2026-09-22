@@ -5,9 +5,9 @@
 - Account and principal: account `728033416182`, IAM user `arn:aws:iam::728033416182:user/TDat_admin_CLi`.
 - Credential/profile mechanism: shared credentials file; no profile override; configured default region `ap-southeast-1`.
 - Existing hosting: Amplify app `d6nuwvgegqhns` (`FutureMe`) in `us-east-1`, repository `nguyenthanhdat2707/FutureMe`, production branch `main`; latest observed production status `SUCCEED`.
-- Existing relevant resources: the approved bootstrap has created state bucket `future-me-tfstate-728033416182`, the GitHub OIDC provider, and scoped `future-me-github-plan` / `future-me-github-apply` roles. No Future-Me application DynamoDB tables, Lambda function, HTTP API, Cognito pool, or application log groups are deployed. The unrelated Cognito pool and unrelated `xbrain` state bucket remain unmanaged.
+- Existing relevant resources: the approved bootstrap has created state bucket `future-me-tfstate-728033416182`, the GitHub OIDC provider with exactly scoped trust, the scoped `future-me-github-plan` role, and the `future-me-github-apply` role with operator-approved AdministratorAccess. A verified 1-create bootstrap apply attached this access and readback confirms it. The Future-Me application DynamoDB tables, Lambda function, HTTP API, Cognito pool, and application log groups are now deployed. The unrelated Cognito pool and unrelated `xbrain` state bucket remain unmanaged.
 - Bedrock: direct model `anthropic.claude-3-haiku-20240307-v1:0` is currently `ACTIVE` in `ap-southeast-1`.
-- Post-bootstrap readback confirms `11 added / 0 changed / 0 destroyed`; the state bucket is private, versioned, AES256-encrypted, lifecycle-managed, and non-public. No application resource has been created, imported, deployed, changed, or deleted.
+- Post-bootstrap readback confirms `11 added / 0 changed / 0 destroyed`; the state bucket is private, versioned, AES256-encrypted, lifecycle-managed, and non-public. The application resources have been successfully deployed.
 
 ## Current Repository State
 
@@ -26,7 +26,7 @@
 | Existing Amplify app `d6nuwvgegqhns` | Existing unmanaged | Leave unchanged | Avoid duplicate hosting/deployment ownership |
 | Unrelated Cognito pool and `xbrain` state bucket | Existing unmanaged | Leave unchanged | Not Future-Me dependencies |
 | Future-Me state bucket, S3 security controls, GitHub OIDC provider and roles | Bootstrap Terraform root | Applied and verified | One-time bootstrap using local state |
-| Cognito, seven DynamoDB tables, Lambda/IAM/logs, HTTP API/JWT routes | Application Terraform root | Proposed create | Cohesive backend stack |
+| Cognito, seven DynamoDB tables, Lambda/IAM/logs, HTTP API/JWT routes | Application Terraform root | Applied and verified | Cohesive backend stack |
 | Amplify frontend environment values | Manual handoff after approved apply | Pending | Terraform outputs values but does not mutate Amplify |
 | Imports | None | Not proposed | Inventory found no matching Future-Me resources |
 
@@ -164,8 +164,10 @@ No destroy, replacement, import, or existing-resource change appears in either p
 - The frontend lint warning and absence of frontend tests remain visible verification debt but do not alter this infrastructure plan.
 - Cognito deletion protection and state-bucket `prevent_destroy` intentionally make rollback a separately planned action.
 
-## Final Pre-Apply Verdict
+## Post-Apply Outcome
 
-`SAFE TO APPLY`
+`DEPLOYED AND VERIFIED`
 
-The bootstrap is applied and verified. The reviewed application plan meets the acceptance criteria and contains create-only changes with no Amplify ownership conflict. Application execution remains gated behind the manual GitHub Actions workflow, a fresh remote-state plan, destructive-action guard, and exact `APPLY_APPLICATION` confirmation.
+The application stack is now deployed. A GitHub Actions apply run completed successfully after an initial run failed due to missing tags/read permissions, which left 8 resources tainted (seven DynamoDB tables and one Cognito pool). Those 8 resources were verified to be successfully created and then explicitly untainted. The final application plan was cleanly applied with 9 create, 12 no-op, 0 update/delete/replace. A post-deploy refreshed Terraform plan shows no changes.
+
+The API is active at `https://f5efnl82m5.execute-api.ap-southeast-1.amazonaws.com/api` and `GET /api/health` returns `200` with `database=dynamodb`. Unauthenticated requests to `/api/decisions` correctly return `401`. The Bedrock Claude 3 Haiku model is configured and verified working.

@@ -86,6 +86,8 @@ Do not create any `aws_amplify_*` resource.
 - Do not attach `AdministratorAccess` or create long-lived access keys.
 - Document that the first approved bootstrap/apply is local; after state migration and role creation a later approved unit can add the workflow.
 
+**Operator-Approved Deviation (2026-09-22):** By explicit operator decision, the `future-me-github-apply` role was granted AWS managed `AdministratorAccess`. The trust relationship remains strictly scoped to the exact immutable repository ID and `refs/heads/main`.
+
 ### Runtime adaptation
 
 Preserve local SQLite and tests. Add the smallest explicit persistence abstractions/adapters needed so local/test use SQLite and Lambda production uses DynamoDB. Do not emulate SQLite by storing a database blob in DynamoDB. Prefer repository interfaces with awaitable methods or a clean factory/container; update route/service call sites to await both local and Dynamo implementations. Avoid rewriting stable intelligence/domain logic.
