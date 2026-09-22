@@ -13,18 +13,18 @@ This document tracks the verified completion of the Future Me MVP roadmap. It se
 | Phase 2 — Live Intelligence Loop | COMPLETE |
 | AWS Deployment / Platform Enablement | DEPLOYED AND VERIFIED |
 | Phase 3 | COMPLETE |
-| Phase 4 | NOT STARTED |
+| Phase 4 | IMPLEMENTING |
 | Phase 5 | NOT STARTED |
 | Phase 6 | NOT STARTED |
 | Phase 7 | NOT STARTED |
 | Phase 8 | NOT STARTED |
 
 ## Current Execution / Next Prioritized Work
-- **Current State:** READY_FOR_USER_TEST
+- **Current State:** IMPLEMENTING
 - **Completed AWS Evidence:** Backend AWS deployment applied and verified (no-drift); Health returns 200; Bedrock Haiku smoke invocation returned ok (11 input/4 output tokens). AWS Marketplace note: CloudTrail showed no aws-marketplace Subscribe or Marketplace event; Cost Explorer currently shows estimated `$0.00` (caveat: billing may lag).
-- **Current Task:** Calendar sync 500 is RESOLVED and production-verified; Phase 4 remains NOT STARTED pending Product Owner approval or restoration of `docs/DECISION_POLICY.md`.
-- **Next Steps:** Approve or restore `docs/DECISION_POLICY.md`, then create a dedicated Phase 4 branch and implement the user-invoked decision journey.
-- **Blocked/Decision Status:** Account creation blocker RESOLVED. Authenticated production API network blocker RESOLVED. Calendar sync 500 RESOLVED. Real Google Calendar OAuth/integration remains unimplemented and unconfigured as a separate owner/product handoff; production currently demonstrates seeded/mock calendar behavior. Phase 4 policy implementation must not begin until the Product Owner approves the missing decision policy.
+- **Current Task:** Phase 4 Gate 3: Relevant-context slice (implementing retrieval and synthesis of relevant context).
+- **Next Steps:** Implement the Gate 3 relevant-context slice on branch `feat/phase4-decision-journey`. Reference [docs/DECISION_POLICY.md](docs/DECISION_POLICY.md) and [docs/PHASE4_PROGRESS.md](docs/PHASE4_PROGRESS.md).
+- **Blocked/Decision Status:** The human approved the minimal Phase 4 policy direction; `docs/DECISION_POLICY.md` is now recorded. Authenticated browser readback requires Product Owner sign-in. Google Calendar credentials/OAuth were intentionally not changed; any remaining provider-specific calendar sync failure is a separate owner handoff.
 
 ## Roadmap Authority / Cross-Cutting Invariants
 This roadmap is governed by the following contract files:
@@ -32,7 +32,7 @@ This roadmap is governed by the following contract files:
 - `docs/MVP_SCOPE_UPDATED.md`
 - `docs/DOMAIN_CONTRACT.md`
 - `docs/USER_FLOWS.md`
-- *Gap identified: `docs/DECISION_POLICY.md` must be restored/frozen.*
+- `docs/DECISION_POLICY.md` (restored/frozen active authority)
 
 The following cross-cutting invariants apply to all phases:
 - Calendar is plan evidence, never proof of actual behavior.
@@ -91,7 +91,7 @@ The following are explicitly deferred or non-goals for this MVP:
 - **Explicitly not part of this phase:** Autonomous calendar optimization, surveillance, or continuous screen monitoring.
 
 ### Phase 4: Complete the user-invoked decision journey and planning/explainability experience
-- **Status:** NOT STARTED
+- **Status:** IMPLEMENTING
 - **Goal:** Deliver a complete, explainable decision support experience based on current user context.
 - **Capability boundary:** Decision-scoped relevant context retrieval, minimum material clarification, transparent options/trade-offs, and separation of system recommendation from final user choice.
 - **Main deliverables:** Decision-scoped relevant context assembly, minimum material clarification, options/trade-offs generation, clear boundary between recommendation vs choice separation, separation of facts/inferences/assumptions/uncertainty/confidence, and same-decision before/after explanation UI.
