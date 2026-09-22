@@ -3,9 +3,9 @@
 This document tracks the verified completion of the Future Me MVP roadmap. It separates structural scaffolding from verified behavioral capabilities. Completion criteria require passing automated tests or explicit visual proof, not just code existence.
 
 ## Status Summary
-- **Last Updated:** 2026-09-22
+- **Last Updated:** 2026-09-23
 - **Overall MVP estimate:** Phases 1-3 are COMPLETE; Phases 4-8 remain.
-- **Current product position:** AWS backend DEPLOYED AND VERIFIED; frontend Cognito/JWT prerequisite READY_FOR_USER_TEST; Phase 3 context acquisition is merged, verified, and accepted.
+- **Current product position:** AWS backend DEPLOYED AND VERIFIED; frontend Cognito/JWT account creation and sign-in are VERIFIED; Phase 3 context acquisition is merged, verified, and accepted.
 
 | Phase / Track | Status |
 |---|---|
@@ -22,9 +22,9 @@ This document tracks the verified completion of the Future Me MVP roadmap. It se
 ## Current Execution / Next Prioritized Work
 - **Current State:** READY_FOR_USER_TEST
 - **Completed AWS Evidence:** Backend AWS deployment applied and verified (no-drift); Health returns 200; Bedrock Haiku smoke invocation returned ok (11 input/4 output tokens). AWS Marketplace note: CloudTrail showed no aws-marketplace Subscribe or Marketplace event; Cost Explorer currently shows estimated `$0.00` (caveat: billing may lag).
-- **Current Task:** Product Owner signs in once and smoke-tests Home, What Future Me Understands, and Calendar after the focused production API configuration repair.
+- **Current Task:** Product Owner smoke-tests Home, What Future Me Understands, and Calendar after the focused production API configuration repair.
 - **Next Steps:** After that smoke test, approve or restore `docs/DECISION_POLICY.md`, then create a dedicated Phase 4 branch and implement the user-invoked decision journey.
-- **Blocked/Decision Status:** Authenticated browser readback requires Product Owner sign-in. Google Calendar credentials/OAuth were intentionally not changed; any remaining provider-specific calendar sync failure is a separate owner handoff. Phase 4 policy implementation must not begin until the Product Owner approves the missing decision policy.
+- **Blocked/Decision Status:** Account creation blocker RESOLVED. Google Calendar credentials/OAuth were intentionally not changed; any remaining provider-specific calendar sync failure is a separate owner handoff. Phase 4 policy implementation must not begin until the Product Owner approves the missing decision policy.
 
 ## Roadmap Authority / Cross-Cutting Invariants
 This roadmap is governed by the following contract files:
@@ -139,7 +139,8 @@ The following are explicitly deferred or non-goals for this MVP:
 
 ## Verification State & Open Debt
 
-**Verified Results (2026-09-22):**
+**Verified Results (2026-09-23):**
+- **Production auth hotfix:** PR [#18](https://github.com/nguyenthanhdat2707/FutureMe/pull/18), main merge 26aa96e161eb35ac4531461e39b085d07880ba25, CI run 35795580526 all checks pass, Amplify job 14 BUILD/DEPLOY/VERIFY SUCCEED, live Cognito Sign Up/email/Confirm/CONFIRMED/SRP Sign In pass, cleanup pass with zero residual users, production browser asset index-_CiXeMqD.js and verified password/recovery/confirm UI with zero localhost requests.
 - **Phase 3 delivery:** PR [#15](https://github.com/nguyenthanhdat2707/FutureMe/pull/15) merged into `main` at `d01b848f083ac274bfad82619831c30044912cb4`; post-merge CI run [35710887996](https://github.com/nguyenthanhdat2707/FutureMe/actions/runs/35710887996) passed Lint, Unit Tests, and Build & Scan. Local and `origin/main` were verified at the same SHA.
 - **Production fetch hotfix:** Root cause was confirmed on Home, What Future Me Understands, and Calendar: the Amplify branch had no frontend API/Cognito build variables, so the production bundle requested `http://localhost:3001/api`. Amplify branch variables were set from verified Terraform outputs without changing Google Calendar credentials. Focused client tests 9/9, quiet lint, and production build pass. PR [#16](https://github.com/nguyenthanhdat2707/FutureMe/pull/16) merged at `8b15b2f0680c265dc30bc68181122555b37202f5`; main CI run [35714575158](https://github.com/nguyenthanhdat2707/FutureMe/actions/runs/35714575158) and Amplify release job 12 succeeded. Final browser readback reaches Cognito sign-in with zero localhost requests. Authenticated page readback remains for the Product Owner sign-in smoke.
 - **Backend tests (Phase 3):** Context API and Context Engine implemented. Tests added for setup <=4 answers, calendar sparse representation, calendar sync marker generation and retrieval, deterministic overlapping calendar interval union, populating correctly typed calendar commitments, typed evidence metadata (observedAt/validUntil) mapping, deterministic entity tie-breaking, and confirm/correct splitting where confirmation appends USER_CONFIRMED while retaining original rows, and correction properly merges JSON shapes. All 10 tests across 3 Phase 3 suites PASS.
@@ -147,15 +148,15 @@ The following are explicitly deferred or non-goals for this MVP:
 - **Backend lint/typecheck/build:** Build PASS. Lint PASS with 0 errors/warnings.
 - **Frontend build:** Production build PASS
 - **Frontend lint/build:** Both exit 0; lint reports 3 nonblocking `react(set-state-in-effect)` warnings in the Phase 3 pages.
-- **Frontend tests:** 25/25 tests across 7 frontend test files PASS.
-- **Browser smoke evidence:** Local onboarding persisted two exact `USER_CONFIRMED` answers; seeded calendar sync displayed three events; context showed provenance/observation/validity and never represented sparse data as free capacity. Existing Cognito route-protection smoke remains verified; full external signup/signin still requires identity provisioning.
+- **Frontend tests:** 39/39 tests across 7 frontend test files PASS.
+- **Browser smoke evidence:** Local onboarding persisted two exact `USER_CONFIRMED` answers; seeded calendar sync displayed three events; context showed provenance/observation/validity and never represented sparse data as free capacity. Existing Cognito route-protection smoke remains verified; production auth E2E is verified.
 - **Independent review:** Codex found one blocking preference-correction payload defect; Antigravity repaired it and the 25-test frontend suite, lint, and build passed afterward. No unresolved Phase 3 blocking finding remains.
 - **Lambda package:** deterministic SHA-256 across consecutive builds; 14,667,392 bytes compressed and 39,503,005 bytes uncompressed; `dist/lambda.js` present
 - **Terraform:** recursive fmt and both roots validate cleanly; bootstrap plan 11 creates and application plan 21 creates, with zero update/delete/replace/import actions
 
 **Open Verification Debt:**
 - Frontend lint reports three non-blocking `react(set-state-in-effect)` warnings in the Phase 3 pages; deferred for the MVP demo because there is no runtime or build failure.
-- The AWS backend infrastructure is deployed and no-drift. Frontend Cognito/JWT integration prerequisite unit testing is complete, marked READY_FOR_USER_TEST after supervisor verification. Full browser end-to-end auth flow depends on external identity provisioning/deployment.
+- The AWS backend infrastructure is deployed and no-drift. Frontend Cognito/JWT integration prerequisite unit testing is complete, marked VERIFIED. Production auth E2E is verified.
 
 ---
 
