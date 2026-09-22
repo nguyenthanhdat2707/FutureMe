@@ -6,8 +6,8 @@
 - **Progress:** 5 / 8 Gates Completed
 - **Percentage:** 62.5%
 - **Steps Left:** 3
-- **Current State:** IMPLEMENTING
-- **Current Task:** Gate 6
+- **Current State:** BLOCKED
+- **Current Task:** Gate 6 — waiting for the Antigravity editing quota to reset or explicit authorization to use another editor
 - **Active Agent:** Antigravity (Gemini 3.1 Pro (High))
 - **Branch:** feat/phase4-decision-journey
 
@@ -37,9 +37,9 @@
 - **Evidence:** 6 focused DecisionsPage tests pass. Full frontend tests (34/34) pass across 8 files. Frontend build passes. Lint exits 0 with exactly three pre-existing react(set-state-in-effect) warnings in CalendarPage, HomePage, ContextPage. git diff/check pass. No browser verification yet. Delivered evidence: commit b5f1971a723fb4d072021c843be716842d76e9d4 was pushed to origin/feat/phase4-decision-journey. Local and remote SHAs matched exactly; branch was clean and synchronized.
 
 ### 6. Before/After Explanation Support
-- **Status:** [ ] IN PROGRESS
+- **Status:** [ ] BLOCKED
 - **Details:** Implementing before/after explanation logic for repeating the same decision after a context change.
-- **Blockers / Human Decisions:** None currently.
+- **Blockers / Human Decisions:** Antigravity returned HTTP 429 before producing edits because its individual quota was exhausted; the CLI reported a reset in approximately 2 hours 50 minutes. The branch remains clean at `5cf2135361b86087b83a99529d2d9d52d1a3982f`, matching the remote. Resume with Antigravity after reset, or obtain explicit Product Owner authorization before using another editing worker.
 
 ### 7. Full Gates / Review
 - **Status:** [ ] PENDING
@@ -64,3 +64,4 @@
 - **2026-09-22:** pre-commit git diff --cached --check caught trailing whitespace in newly added files that working-tree git diff --check missed because those files were untracked; repaired before delivery.
 - **2026-09-22:** Supervisor review caught multiple Gate 5 implementation defects: conflict contract violation (`unresolvedMaterialConflicts` missing from ASK display/payload), model boundary violation (false AI badge/authority), type safety violation (`any` cast bypassed for DemoForm), contract fidelity issue (`policy` optional, fake generic tradeoff shape docs claim), UI semantics issue (RECOMMEND status and exact confidence wording missing), and test isolation/quality flaws (missing `sessionStorage.clear()`, async `waitFor`, precise choices/responses/reasons, typed fixtures). Fixed all defects using focused RED/GREEN TDD on `DecisionsPage.test.tsx` and implementation `DecisionsPage.tsx`. Removed AI badge, added type guard `isDemoFormField`, fixed payload carry-over, rewrote test file completely. Frontend build and tests fully pass. Delivered evidence: commit b5f1971a723fb4d072021c843be716842d76e9d4 was pushed to origin/feat/phase4-decision-journey. Local and remote SHAs matched exactly; branch was clean and synchronized. No browser verification yet.
 - **2026-09-22:** Supervisor direct verification corrected the worker's focused count from 7 to 6 and fixed the inconsistent hardening fixture before delivery.
+- **2026-09-22:** Gate 6 was blocked before implementation when Antigravity returned HTTP 429 (`RESOURCE_EXHAUSTED`) and reported an individual-quota reset in approximately 2 hours 50 minutes. No Gate 6 edits were produced. Supervisor readback confirmed the feature branch remained clean and local/remote SHAs both equaled `5cf2135361b86087b83a99529d2d9d52d1a3982f`. Progress remains 5/8 (62.5%).
