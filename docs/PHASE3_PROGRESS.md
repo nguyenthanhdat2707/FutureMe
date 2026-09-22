@@ -73,7 +73,7 @@ Post-acceptance production fetch repair:
 - Set only the public frontend API/Cognito build variables from verified Terraform outputs and completed Amplify release job 11 successfully. Google Calendar credentials/OAuth were not changed or redeployed.
 - Browser readback after deployment: `/`, `/context`, and `/calendar` route to Cognito sign-in and issue zero localhost requests.
 - Focused verification: API client tests 9/9 passed, quiet frontend lint passed, and production frontend build passed.
-- Code guard and tracking delivery: PR [#16](https://github.com/nguyenthanhdat2707/FutureMe/pull/16).
+- Code guard and tracking delivery: PR [#16](https://github.com/nguyenthanhdat2707/FutureMe/pull/16) merged at `8b15b2f0680c265dc30bc68181122555b37202f5`; main CI run [35714575158](https://github.com/nguyenthanhdat2707/FutureMe/actions/runs/35714575158) and Amplify release job 12 succeeded.
 - Remaining owner smoke: sign in and load the three protected pages. Any later Google Calendar provider sync failure is intentionally outside this repair.
 
 Verification:
