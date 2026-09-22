@@ -13,21 +13,30 @@ function ContextPage() {
   const [editingItem, setEditingItem] = useState<{ type: string; id: string; value: string } | null>(null);
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
 
-  const loadContext = useCallback(async (isInitial = false) => {
+  const loadContext = useCallback(async (isInitial = false, signal?: AbortSignal) => {
     try {
       if (isInitial) setLoading(true);
       const data = await api.context.getCurrent();
+      if (signal?.aborted) return;
       setContext(data);
       setError(null);
     } catch (err) {
+      if (signal?.aborted) return;
       setError(err instanceof Error ? err.message : 'Failed to load context');
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) {
+        setLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
-    loadContext(false);
+    const controller = new AbortController();
+    const init = async () => {
+      await loadContext(false, controller.signal);
+    };
+    void init();
+    return () => controller.abort();
   }, [loadContext]);
 
   const handleConfirm = async (attributeId: string) => {

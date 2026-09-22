@@ -9,24 +9,33 @@ function CalendarPage() {
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (signal?: AbortSignal) => {
     try {
       const [statusData, eventsData] = await Promise.all([
         api.calendar.getStatus(),
         api.calendar.getEvents()
       ]);
+      if (signal?.aborted) return;
       setStatus(statusData);
       setEvents(eventsData);
       setError(null);
     } catch (err) {
+      if (signal?.aborted) return;
       setError(err instanceof Error ? err.message : 'Failed to load calendar data');
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) {
+        setLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
-    void loadData();
+    const controller = new AbortController();
+    const init = async () => {
+      await loadData(controller.signal);
+    };
+    void init();
+    return () => controller.abort();
   }, [loadData]);
 
   const handleSync = async () => {
