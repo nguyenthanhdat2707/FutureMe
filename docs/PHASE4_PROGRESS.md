@@ -3,11 +3,11 @@
 **Phase 4: User-Invoked Decision Journey**
 
 ## Overall Status
-- **Progress:** 3 / 8 Gates Completed
-- **Percentage:** 37.5%
-- **Steps Left:** 5
+- **Progress:** 4 / 8 Gates Completed
+- **Percentage:** 50%
+- **Steps Left:** 4
 - **Current State:** IMPLEMENTING
-- **Current Task:** Gate 4 (Clarification and Abstention Logic)
+- **Current Task:** Gate 5 tested decision explainability UI and recommendation/choice boundary
 - **Active Agent:** Antigravity (Gemini 3.1 Pro (High))
 - **Branch:** feat/phase4-decision-journey
 
@@ -27,9 +27,9 @@
 - **Evidence:** focused 30/30 across 4 suites, full backend 93/93 across 14 suites, exact coverage 77.46% statements / 60.18% branches / 78.4% functions / 78.9% lines, lint pass, build pass, git diff --check pass. Delivered evidence: commit a8c2d8811580cfb8e0471d2574a6ac0ad859e6c1 was pushed and local/remote SHA matched.
 
 ### 4. Clarification and Abstention Logic
-- **Status:** [ ] IN PROGRESS
-- **Details:** Implementing deterministic mapping for ASK (missing facts) and ABSTAIN (unresolved conflicts).
-- **Blockers / Human Decisions:** None currently.
+- **Status:** [x] COMPLETE
+- **Details:** Implemented deterministic mapping for ASK (missing facts) and ABSTAIN (unresolved conflicts), updated policy evaluator, added counting LLM fake, bound validation, repaired prompt format drift, and verified via pure/integration testing.
+- **Evidence:** Gate 4 is functionally verified and COMPLETE. Focused policy/engine/route suites: 22/22 passed. Relevant Phase 2/3 and decision regressions: 35/35 passed. Full backend: 115/115 passed across 17 suites. Coverage: 77.91% statements, 60.74% branches, 78.27% functions, 79.38% lines. npm run lint PASS; npm run build PASS; git diff --check PASS. Gate 4 implementation is local and not yet committed/pushed.
 
 ### 5. Tested UI (Decision Surface)
 - **Status:** [ ] PENDING
@@ -59,3 +59,6 @@
 - **2026-09-22:** During Gate 3 implementation, simple token extraction stripped 3-letter acronyms (like "AWS") and repository-provided JSON dates were parsed as strings preventing proper capacity overlap comparisons. Fixed word length filter to keep 3-letter words and implemented safe Date parsing.
 - **2026-09-22:** Supervisor review identified three defects in Gate 3 implementation: simple substring matching incorrectly matched "shoulder" for "should", capacity intervals incorrectly handled ended vs future commitments relative to the assessment time/deadline, and material observations required payload redundancy for disruption/context-change semantics. Gate 3 was repaired using strict TDD, cleaning up tests and adding exact normalized token matching, robust interval overlap checks, and semantic type matching. All relevant tests pass cleanly. Gate 3 status remains COMPLETE.
 - **2026-09-22:** worker scratch scripts and the invalid test fixture were caught during supervisor diff review and removed before delivery.
+- **2026-09-22:** Supervisor review identified issues in Gate 4: missing engine/route integration tests, drift in mock-decision-engine prompt format (escaping newlines) and LLM error handling, fake assertions in pure evaluator tests, and unused parameters. Fixed mock-decision-engine to restore original actual-newline prompt formatting, removed silent LLM exception catching, bound HTTP clarification arrays (max 20 entries / trimmed strings), replaced fake conflict test with real first-pass/second-pass ASK/ABSTAIN logic, and unioned missingData with unresolvedFields as metadata. Verified via CountingFakeLLM.
+- **2026-09-22:** Gate 4 final cleanup: Note that the first worker exited while terminating internal tests, resulting in placeholder test/lint/behavior drift findings and a missing RED transcript. The supervisor independently verified the final behavior but exact RED evidence for the last repair was unavailable.
+- **2026-09-22:** pre-commit git diff --cached --check caught trailing whitespace in newly added files that working-tree git diff --check missed because those files were untracked; repaired before delivery.
