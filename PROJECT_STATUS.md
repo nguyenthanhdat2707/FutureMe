@@ -5,7 +5,7 @@ This document tracks the verified completion of the Future Me MVP roadmap. It se
 ## Status Summary
 - **Last Updated:** 2026-09-22
 - **Overall MVP estimate after Phase 2:** ~50%
-- **Current product position:** BETWEEN Phase 2 and Phase 3 — AWS bootstrap is applied; application deployment is pending the manual GitHub Actions apply workflow. Phase 3 product implementation is NOT STARTED.
+- **Current product position:** AWS backend DEPLOYED AND VERIFIED; frontend Cognito/JWT code unit READY_FOR_USER_TEST after supervisor verification; product Phase 3 remains NOT STARTED.
 
 | Phase / Track | Status |
 |---|---|
@@ -18,6 +18,13 @@ This document tracks the verified completion of the Future Me MVP roadmap. It se
 | Phase 6 | NOT STARTED |
 | Phase 7 | NOT STARTED |
 | Phase 8 | NOT STARTED |
+
+## Current Execution / Next Prioritized Work
+- **Current State:** READY_FOR_USER_TEST
+- **Completed AWS Evidence:** Backend AWS deployment applied and verified (no-drift); Health returns 200; Bedrock Haiku smoke invocation returned ok (11 input/4 output tokens). AWS Marketplace note: CloudTrail showed no aws-marketplace Subscribe or Marketplace event; Cost Explorer currently shows estimated `$0.00` (caveat: billing may lag).
+- **Current Task:** Frontend Cognito/JWT code unit READY_FOR_USER_TEST after supervisor verification; 8/8 frontend tests across 4 suites, frontend build, lint exit 0 with only the pre-existing ContextPage warning, backend 72/72, build/lint passed.
+- **Next Steps:** Phase 3 seeded calendar/context acquisition as next prioritized implementation.
+- **Blocked/Decision Status:** Real browser Cognito signup/signin end-to-end remains unverified because it requires external identity provisioning/email verification/deployment.
 
 ## Roadmap Authority / Cross-Cutting Invariants
 This roadmap is governed by the following contract files:
@@ -136,14 +143,15 @@ The following are explicitly deferred or non-goals for this MVP:
 - **Backend tests:** 72/72 across 11 suites PASS; global coverage 76.97% statements, 57.55% branches, 78.04% functions, 78.66% lines
 - **Backend lint/typecheck/build:** PASS
 - **Frontend build:** Production build PASS
-- **Frontend lint:** Exits 0 with one warning: `react(set-state-in-effect)` in `frontend/src/pages/ContextPage.tsx:30`
-- **Frontend tests:** No frontend test suite is currently configured.
+- **Frontend lint:** Exits 0 with one warning (out of scope): `react(set-state-in-effect)` in `frontend/src/pages/ContextPage.tsx:30`.
+- **Frontend tests:** 8/8 tests across 4 frontend suites PASS.
+- **Browser smoke evidence:** In Cognito mode `/context` redirects to `/auth` and renders "Sign In to Future Me" with password input/non-empty root after the globalThis fix; in local mode `/` renders "Home" without an auth form.
 - **Lambda package:** deterministic SHA-256 across consecutive builds; 14,667,392 bytes compressed and 39,503,005 bytes uncompressed; `dist/lambda.js` present
 - **Terraform:** recursive fmt and both roots validate cleanly; bootstrap plan 11 creates and application plan 21 creates, with zero update/delete/replace/import actions
 
 **Open Verification Debt:**
-- Frontend lint still reports one non-blocking `react(set-state-in-effect)` warning, and no frontend test suite is configured.
-- The AWS backend infrastructure is deployed and no-drift, while the externally-managed Amplify frontend Cognito/JWT integration remains pending, so full browser end-to-end auth flow is not yet verified.
+- Frontend lint still reports one non-blocking `react(set-state-in-effect)` warning in ContextPage.
+- The AWS backend infrastructure is deployed and no-drift. Frontend Cognito/JWT integration prerequisite unit testing is complete, marked READY_FOR_USER_TEST after supervisor verification. Full browser end-to-end auth flow depends on external identity provisioning/deployment.
 
 ---
 

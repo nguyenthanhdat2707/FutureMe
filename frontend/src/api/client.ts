@@ -37,73 +37,95 @@ const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:300
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+import { getAuthToken, isCognitoMode } from '../auth/cognito';
+
+async function authFetch(url: string, options: RequestInit = {}) {
+  const headers = new Headers(options.headers || {});
+
+  if (isCognitoMode) {
+    const token = await getAuthToken();
+    if (token) {
+      headers.set('Authorization', `Bearer ${token}`);
+    } else {
+      throw new Error('Authentication required');
+    }
+  }
+
+  const response = await fetch(url, { ...options, headers });
+  if (response.status === 401) {
+    throw new Error('Unauthorized session. Please sign in again.');
+  }
+  return response;
+}
+
+
 // ============================================================================
 // Context API
 // ============================================================================
 
 export const contextApi = {
   async getCurrent(userId: string = 'demo-user'): Promise<PersonalContext> {
-    const response = await fetch(`${API_BASE_URL}/context?userId=${encodeURIComponent(userId)}`);
-    
+    const response = await authFetch(isCognitoMode ? `${API_BASE_URL}/context` : `${API_BASE_URL}/context?userId=${encodeURIComponent(userId)}`);
+
     if (!response.ok) {
       throw new Error(`Failed to fetch context: ${response.status}`);
     }
-    
+
     return response.json();
   },
 
   async update(observation: ContextUpdateObservation, userId: string = 'demo-user'): Promise<PersonalContext> {
-    const response = await fetch(`${API_BASE_URL}/context/update`, {
+    const response = await authFetch(`${API_BASE_URL}/context/update`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
+      body: JSON.stringify(isCognitoMode ? { observation } : {
         userId,
         observation,
       }),
     });
-    
+
     if (!response.ok) {
       throw new Error(`Failed to update context: ${response.status}`);
     }
-    
+
     return response.json();
   },
 
   async confirm(attributeId: string, userId: string = 'demo-user'): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/context/confirm`, {
+    const response = await authFetch(`${API_BASE_URL}/context/confirm`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
+      body: JSON.stringify(isCognitoMode ? { attributeId } : {
         userId,
         attributeId,
       }),
     });
-    
+
     if (!response.ok) {
       throw new Error(`Failed to confirm attribute: ${response.status}`);
     }
   },
 
   async correct(correction: ContextCorrection, userId: string = 'demo-user'): Promise<PersonalContext> {
-    const response = await fetch(`${API_BASE_URL}/context/correct`, {
+    const response = await authFetch(`${API_BASE_URL}/context/correct`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
+      body: JSON.stringify(isCognitoMode ? { correction } : {
         userId,
         correction,
       }),
     });
-    
+
     if (!response.ok) {
       throw new Error(`Failed to correct context: ${response.status}`);
     }
-    
+
     return response.json();
   },
 };
@@ -180,11 +202,11 @@ export const calendarApi = {
     await delay(400);
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    
+
     // Silence unused params - will be used when real API is connected
     void startDate;
     void endDate;
-    
+
     return [
       {
         id: 'block-1',
@@ -253,12 +275,20 @@ export const calendarApi = {
 
 export const decisionsApi = {
   async query(request: DecisionApiRequest): Promise<DecisionApiResponse> {
-    const response = await fetch(`${API_BASE_URL}/decisions`, {
+    const requestBody = (() => {
+      if (isCognitoMode) {
+        const { userId: _userId, ...rest } = request;
+        return rest;
+      }
+      return request;
+    })();
+
+    const response = await authFetch(`${API_BASE_URL}/decisions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(request),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
@@ -380,7 +410,7 @@ export const demoApi = {
   },
 
   async loadScenario(scenarioId: string): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/demo/seed`, {
+    const response = await authFetch(`${API_BASE_URL}/demo/seed`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ scenario: scenarioId }),
@@ -391,7 +421,7 @@ export const demoApi = {
   },
 
   async reset(): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/demo/reset`, {
+    const response = await authFetch(`${API_BASE_URL}/demo/reset`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
     });
