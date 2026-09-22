@@ -10,6 +10,7 @@ import { ILLMProvider } from '../adapters/llm-provider.interface';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import { assessDecisionFeasibility } from './deterministic-feasibility-assessment';
+import { evaluateDecisionPolicy } from './decision-policy-evaluator';
 
 const tradeoffSchema: z.ZodType<Tradeoff> = z.object({
   option: z.string().trim().min(1).max(200),
@@ -31,9 +32,15 @@ export class MockDecisionEngine implements IDecisionEngine {
     // Get relevant context
     const relevantContext = await this.contextEngine.getRelevantContext(userId, query);
     const assessment = assessDecisionFeasibility(query.impactProfile, new Date(), relevantContext);
-    
-    // Build LLM prompt
-    const systemPrompt = `You are a decision support assistant. Analyze the user's question in context of their goals, commitments, and constraints. Describe clear tradeoffs.
+
+    // Evaluate policy
+    const policyResult = evaluateDecisionPolicy(assessment, query.clarification);
+
+    let tradeoffs: Tradeoff[] = [];
+
+    if (policyResult.outcome === 'RECOMMEND') {
+      // Build LLM prompt
+      const systemPrompt = `You are a decision support assistant. Analyze the user's question in context of their goals, commitments, and constraints. Describe clear tradeoffs.
 
 Return your response as JSON with this structure:
 {
@@ -46,7 +53,7 @@ Return your response as JSON with this structure:
   ]
 }`;
 
-    const userPrompt = `Question: ${query.question}
+      const userPrompt = `Question: ${query.question}
 
 Context:
 - Goals: ${JSON.stringify(relevantContext.goals)}
@@ -56,12 +63,12 @@ Context:
 
 Please describe meaningful tradeoffs without inventing feasibility facts.`;
 
-    const response = await this.llmProvider.generate([
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt }
-    ]);
-
-    const tradeoffs = parseTradeoffs(response.content);
+      const response = await this.llmProvider.generate([
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ]);
+      tradeoffs = parseTradeoffs(response.content);
+    }
 
     // Create decision object
     const decision: Decision = {
@@ -78,16 +85,25 @@ Please describe meaningful tradeoffs without inventing feasibility facts.`;
       },
       tradeoffs,
       recommendation: assessment.recommendation,
-      reasoning: assessment.recommendation.reasoning,
+      reasoning: policyResult.outcome === 'ABSTAIN' ? policyResult.reason : assessment.recommendation.reasoning,
       confidence: assessment.recommendation.confidence,
       status: DecisionStatus.PENDING,
       createdAt: new Date()
     };
 
+    let clarificationNeeded: string[] | undefined;
+    if (policyResult.outcome === 'ASK') {
+      clarificationNeeded = Array.from(new Set(clarificationQuestions(policyResult.unresolvedMaterialFields || [])));
+      if (policyResult.unresolvedMaterialConflicts && policyResult.unresolvedMaterialConflicts.length > 0) {
+        clarificationNeeded.push('Please resolve the conflicting information provided.');
+      }
+    }
+
     return {
       decision,
       assessment,
-      clarificationNeeded: clarificationQuestions(assessment.missingData),
+      clarificationNeeded,
+      policy: policyResult,
       state: relevantContext.state
     };
   }
