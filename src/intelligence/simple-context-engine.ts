@@ -187,18 +187,88 @@ export class SimpleContextEngine implements IContextEngine {
     return this.getCurrentContext(userId);
   }
 
-  async getRelevantContext(userId: string, _decision: DecisionQuery): Promise<RelevantContext> {
+  // Helper for simple text token matching
+  private isLexicallyRelevant(text: string | undefined, queryTokens: string[]): boolean {
+    if (!text) return false;
+    const textTokens = new Set(text.toLowerCase().split(/\W+/).filter(w => w.length > 2));
+    return queryTokens.some(token => textTokens.has(token));
+  }
+
+  private extractTokens(query: DecisionQuery): string[] {
+    const textParts = [
+      query.question,
+      ...(query.options || []),
+      query.impactProfile?.target || ''
+    ];
+    const text = textParts.join(' ').toLowerCase();
+
+    const stopWords = new Set(['should', 'could', 'would', 'this', 'that', 'attend', 'the', 'and', 'for', 'with']);
+    const words = text.split(/\W+/).filter(w => w.length > 2 && !stopWords.has(w));
+    return Array.from(new Set(words));
+  }
+
+  async getRelevantContext(userId: string, decision: DecisionQuery): Promise<RelevantContext> {
     const context = await this.getCurrentContext(userId);
     const recentObs = await this.observationRepo.findRecent(userId, 24);
     const state = await this.stateEstimator.estimateCurrentState(context, recentObs);
 
-    // PROVISIONAL: Return all context as "relevant"
-    // Real implementation would filter based on decision query
+    const tokens = this.extractTokens(decision);
+    let deadline: Date | null = null;
+    if (decision.impactProfile?.deadline) {
+      deadline = new Date(decision.impactProfile.deadline);
+      if (isNaN(deadline.getTime())) {
+        deadline = null;
+      }
+    }
+
+    const relevantGoals = context.goals.filter(g =>
+      this.isLexicallyRelevant(g.description, tokens)
+    );
+
+    const relevantCommitments = context.commitments.filter(c => {
+      const now = new Date();
+      const cStart = new Date(c.startTime);
+      const cEnd = c.endTime ? new Date(c.endTime) : null;
+
+      if (cEnd && !isNaN(cEnd.getTime()) && cEnd <= now) {
+        return false;
+      }
+
+      if (deadline) {
+        if (!isNaN(cStart.getTime()) && cStart < deadline) {
+          return true;
+        }
+      }
+      return this.isLexicallyRelevant(c.description, tokens);
+    });
+
+    const constraints = context.preferences
+      .filter(p => this.isLexicallyRelevant(p.description, tokens) || this.isLexicallyRelevant(p.category, tokens) || this.isLexicallyRelevant(p.value, tokens))
+      .map(p => `${p.category}: ${p.value}`);
+
+    const relevantHistory = recentObs.filter((o: Observation) => {
+      const typeStr = String(o.type).toLowerCase();
+      if (typeStr.includes('deadline') ||
+          typeStr.includes('context') ||
+          typeStr.includes('disruption') ||
+          typeStr.includes('workload') ||
+          typeStr.includes('energy')) {
+        return true;
+      }
+
+      const dataStr = JSON.stringify(o.data || {}).toLowerCase();
+      if (dataStr.includes('workload') || dataStr.includes('energy') || dataStr.includes('deadline') || dataStr.includes('disruption')) return true;
+
+      if (this.isLexicallyRelevant(dataStr, tokens)) return true;
+
+      return false;
+    }).map((o: Observation) => `${o.type}: ${JSON.stringify(o.data)}`);
+
     return {
-      goals: context.goals,
-      commitments: context.commitments,
-      constraints: [],
-      recentHistory: recentObs.map((o: any) => `${o.type}: ${JSON.stringify(o.data)}`),
+      goals: relevantGoals,
+      commitments: relevantCommitments,
+      constraints,
+      recentHistory: relevantHistory,
       state
     };
   }
