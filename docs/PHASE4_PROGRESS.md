@@ -15,11 +15,11 @@
 
 ### 1. Documentation, Branch, and Tracker Setup
 - **Status:** [x] COMPLETE
-- **Evidence:** `feat/phase4-decision-journey` branch exists, `PHASE4_TASK.md`, `docs/DECISION_POLICY.md`, and `docs/PHASE4_PROGRESS.md` produced.
+- **Evidence:** `feat/phase4-decision-journey` branch exists, `PHASE4_TASK.md`, `docs/DECISION_POLICY.md`, and `docs/PHASE4_PROGRESS.md` produced. Delivered evidence: commit 2f34416defe54914940c0a43ea318d4250b86810 was pushed and local/remote SHA matched.
 
 ### 2. Policy Freeze
 - **Status:** [x] COMPLETE
-- **Evidence:** Human approved the direction; `docs/DECISION_POLICY.md` MVP contract generated and frozen.
+- **Evidence:** Human approved the direction; `docs/DECISION_POLICY.md` MVP contract generated and frozen. Delivered evidence: commit 2f34416defe54914940c0a43ea318d4250b86810 was pushed and local/remote SHA matched.
 
 ### 3. Relevant Context Slice
 - **Status:** [ ] IN PROGRESS
@@ -55,4 +55,4 @@
 
 ## Difficulties Encountered Log
 - **2026-09-22:** Missing policy difficulty initially encountered prior to policy freeze. Human approval for the minimal Phase 4 policy direction was required before implementation could begin. The direction is now approved and recorded.
-- **2026-09-22:** Supervisor review caught and corrected an invalid ABSTAIN mapping (which incorrectly mapped at-risk/not-feasible to abstain) and an over-strict mandatory-preference requirement before implementation began. The decision policy and task definitions were revised to preserve deterministic behavior and logic authority. These revised documentation files are local/uncommitted/unpushed, not staged.
+- **2026-09-22:** Supervisor review caught and corrected an invalid ABSTAIN mapping (which incorrectly mapped at-risk/not-feasible to abstain) and an over-strict mandatory-preference requirement before implementation began. The decision policy and task definitions were revised to preserve deterministic behavior and logic authority. The corrected contract was delivered in commit 2f34416defe54914940c0a43ea318d4250b86810.
