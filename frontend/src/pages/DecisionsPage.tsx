@@ -135,12 +135,14 @@ function DecisionsPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [clarificationAnswers, setClarificationAnswers] = useState<Record<string, string>>(() => readSessionValue('decisions_clarificationAnswers', {}));
   const [showObservationForm, setShowObservationForm] = useState(false);
+  const [hasStaleContext, setHasStaleContext] = useState(() => readSessionValue('decisions_hasStaleContext', false));
 
   useEffect(() => sessionStorage.setItem('decisions_form', JSON.stringify(form)), [form]);
   useEffect(() => sessionStorage.setItem('decisions_observationForm', JSON.stringify(observationForm)), [observationForm]);
   useEffect(() => sessionStorage.setItem('decisions_result', JSON.stringify(result)), [result]);
   useEffect(() => sessionStorage.setItem('decisions_beforeResult', JSON.stringify(beforeResult)), [beforeResult]);
   useEffect(() => sessionStorage.setItem('decisions_clarificationAnswers', JSON.stringify(clarificationAnswers)), [clarificationAnswers]);
+  useEffect(() => sessionStorage.setItem('decisions_hasStaleContext', JSON.stringify(hasStaleContext)), [hasStaleContext]);
 
   const handleReset = () => {
     sessionStorage.removeItem('decisions_form');
@@ -148,11 +150,13 @@ function DecisionsPage() {
     sessionStorage.removeItem('decisions_result');
     sessionStorage.removeItem('decisions_beforeResult');
     sessionStorage.removeItem('decisions_clarificationAnswers');
+    sessionStorage.removeItem('decisions_hasStaleContext');
     setForm(INITIAL_FORM);
     setObservationForm(INITIAL_OBSERVATION);
     setResult(null);
     setBeforeResult(null);
     setClarificationAnswers({});
+    setHasStaleContext(false);
     setError(null);
   };
 
@@ -205,18 +209,16 @@ function DecisionsPage() {
       request.userId = form.userId.trim();
     }
 
-    if (result) {
-      setBeforeResult(result);
-    }
-
+    const prevResult = result;
     setIsLoading(true);
     setError(null);
-    setResult(null);
-    setClarificationAnswers({});
 
     try {
       const response = await decisionsApi.query(request);
+      setBeforeResult(prevResult);
       setResult(response);
+      setHasStaleContext(false);
+      setClarificationAnswers({});
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : 'Unable to request decision support.');
     } finally {
@@ -249,6 +251,9 @@ function DecisionsPage() {
       await contextApi.update(observation, form.userId);
       setShowObservationForm(false);
       setObservationForm(INITIAL_OBSERVATION);
+      if (result) {
+        setHasStaleContext(true);
+      }
       setError(null);
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : 'Unable to submit observation.');
@@ -257,9 +262,47 @@ function DecisionsPage() {
     }
   };
 
+  const handleReassessSameDecision = async () => {
+    if (!result) return;
+
+    const request: DecisionApiRequest = {
+      userId: form.userId.trim() || undefined,
+      query: {
+        question: form.question.trim(),
+        impactProfile: {
+          target: form.target.trim() || undefined,
+          deadline: form.deadline || undefined,
+          timeCostHours: optionalNumber(form.timeCostHours),
+          availableHoursBeforeDeadline: optionalNumber(form.availableHoursBeforeDeadline),
+          workloadHoursBeforeDeadline: optionalNumber(form.workloadHoursBeforeDeadline),
+          energyCost: optionalNumber(form.energyCost),
+          availableEnergy: optionalNumber(form.availableEnergy),
+          goalRelevance: form.goalRelevance,
+          source: form.source,
+        }
+      }
+    };
+
+    const prevResult = result;
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await decisionsApi.query(request);
+      setBeforeResult(prevResult);
+      setResult(response);
+      setHasStaleContext(false);
+      setClarificationAnswers({});
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : 'Unable to reassess decision.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
     const submitWithClarification = async (skip: boolean) => {
     if (!result) return;
-    setBeforeResult(result);
+    const prevResult = result;
 
     const updatedProfile = { ...form };
     const unresolvedFields: string[] = [];
@@ -318,12 +361,12 @@ function DecisionsPage() {
 
     setIsLoading(true);
     setError(null);
-    setResult(null);
-    setClarificationAnswers({});
 
     try {
       const response = await decisionsApi.query(request);
+      setBeforeResult(prevResult);
       setResult(response);
+      setClarificationAnswers({});
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : 'Unable to request decision support.');
     } finally {
@@ -345,13 +388,18 @@ function DecisionsPage() {
   const beforeRecommendation = beforeResult?.decision?.recommendation;
   const beforeAssessment = beforeResult?.assessment;
 
-  const hasChangedRecommendation = beforeRecommendation && recommendation &&
-    beforeRecommendation.option !== recommendation.option;
+  const hasChangedRecommendation = beforeResult?.policy.outcome !== result?.policy.outcome || beforeRecommendation?.option !== recommendation?.option;
 
   const changedEvidence = beforeAssessment && assessment
     ? assessment.evidence.filter(e => {
         const beforeEv = beforeAssessment.evidence.find(be => be.fact === e.fact);
-        return !beforeEv || beforeEv.value !== e.value;
+        return !beforeEv || beforeEv.value !== e.value || beforeEv.source !== e.source || beforeEv.explanation !== e.explanation;
+      })
+    : [];
+
+  const removedEvidence = beforeAssessment && assessment
+    ? beforeAssessment.evidence.filter(be => {
+        return !assessment.evidence.some(e => e.fact === be.fact);
       })
     : [];
 
@@ -543,6 +591,21 @@ function DecisionsPage() {
         )}
       </form>
 
+      {hasStaleContext && (
+        <div role="status" className="card p-6 border-l-4 border-yellow-400 bg-yellow-50 space-y-4">
+          <h2 className="text-xl font-medium text-text-primary">Context changed. Your current result is stale.</h2>
+          <button
+            type="button"
+            onClick={handleReassessSameDecision}
+            disabled={isLoading}
+            className="inline-flex items-center gap-2 rounded-lg bg-accent-ai px-6 py-3 font-medium text-white hover:bg-opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Re-assess same decision
+          </button>
+        </div>
+      )}
+
+
       {showObservationForm && (
         <form className="card p-6 space-y-4 border-l-4 border-accent-ai" onSubmit={handleObservationSubmit}>
           <h2 className="text-xl font-medium text-text-primary">Report Context Change</h2>
@@ -671,42 +734,65 @@ function DecisionsPage() {
         </article>
       )}
 
-      {beforeResult && hasChangedRecommendation && (
-        <article className="card border-l-4 border-green-500 p-6 space-y-4">
+      {beforeResult && result && (
+        <article className={`card border-l-4 p-6 space-y-4 ${hasChangedRecommendation ? 'border-green-500' : 'border-blue-500'}`}>
           <h2 className="text-xl font-medium text-text-primary">Assessment Updated</h2>
-          <p className="text-sm text-text-secondary">
-            The recommendation changed after clarification:
+          <p className="text-sm font-medium text-text-primary">
+            {hasChangedRecommendation ? 'Recommendation changed' : 'Recommendation unchanged'}
           </p>
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="rounded-lg border border-slate-200 p-4 bg-slate-50">
               <p className="text-xs font-medium uppercase tracking-wide text-text-secondary mb-2">Before</p>
               <p className="text-lg font-medium text-text-primary">
-                {titleCase(beforeRecommendation?.option || '')}
+                {titleCase(beforeResult.policy.outcome)} - {titleCase(beforeRecommendation?.option || 'No recommendation')}
               </p>
-              <p className="mt-2 text-sm text-text-secondary">{beforeRecommendation?.reasoning}</p>
+              <p className="mt-2 text-sm text-text-secondary">{beforeRecommendation?.reasoning || beforeResult.policy.reason}</p>
+              <div className="mt-2 text-xs text-text-secondary flex gap-2">
+                <span>Feasibility: {titleCase(beforeAssessment?.feasibility || '')}</span>
+                <span>Input completeness confidence: {beforeRecommendation?.confidence !== undefined ? `${Math.round(beforeRecommendation.confidence * 100)}%` : 'N/A'}</span>
+              </div>
             </div>
 
-            <div className="rounded-lg border border-green-500 p-4 bg-green-50">
-              <p className="text-xs font-medium uppercase tracking-wide text-green-700 mb-2">After</p>
-              <p className="text-lg font-medium text-green-900">
-                {titleCase(recommendation?.option || '')}
+            <div className={`rounded-lg border p-4 ${hasChangedRecommendation ? 'border-green-500 bg-green-50' : 'border-blue-500 bg-blue-50'}`}>
+              <p className={`text-xs font-medium uppercase tracking-wide mb-2 ${hasChangedRecommendation ? 'text-green-700' : 'text-blue-700'}`}>After</p>
+              <p className={`text-lg font-medium ${hasChangedRecommendation ? 'text-green-900' : 'text-blue-900'}`}>
+                {titleCase(result.policy.outcome)} - {titleCase(recommendation?.option || 'No recommendation')}
               </p>
-              <p className="mt-2 text-sm text-green-800">{recommendation?.reasoning}</p>
+              <p className={`mt-2 text-sm ${hasChangedRecommendation ? 'text-green-800' : 'text-blue-800'}`}>
+                {recommendation?.reasoning || result.policy.reason}
+              </p>
+              <div className={`mt-2 text-xs flex gap-2 ${hasChangedRecommendation ? 'text-green-800' : 'text-blue-800'}`}>
+                <span>Feasibility: {titleCase(assessment?.feasibility || '')}</span>
+                <span>Input completeness confidence: {recommendation?.confidence !== undefined ? `${Math.round(recommendation.confidence * 100)}%` : 'N/A'}</span>
+              </div>
             </div>
           </div>
 
-          {changedEvidence.length > 0 && (
+          {(changedEvidence.length > 0 || removedEvidence.length > 0) ? (
             <div>
-              <p className="text-sm font-medium text-text-primary mb-2">Changed inputs:</p>
+              <p className="text-sm font-medium text-text-primary mb-2">Evidence delta:</p>
               <ul className="list-disc space-y-1 pl-5 text-sm text-text-secondary">
-                {changedEvidence.map((ev) => (
-                  <li key={ev.fact}>
-                    <span className="font-medium text-text-primary">{ev.fact}:</span> {String(ev.value)}
+                {changedEvidence.map((ev) => {
+                  const beforeEv = beforeAssessment?.evidence.find(be => be.fact === ev.fact);
+                  return (
+                    <li key={`evidence-current-${ev.fact}`}>
+                      <span className="font-medium text-text-primary">{ev.fact}:</span>{' '}
+                      {beforeEv
+                        ? `Changed from ${String(beforeEv.value)} (${beforeEv.source}) -> ${String(ev.value)} (${ev.source})`
+                        : `Added: ${String(ev.value)} (${ev.source})`}
+                    </li>
+                  );
+                })}
+                {removedEvidence.map((ev) => (
+                  <li key={`evidence-removed-${ev.fact}`} className="line-through text-slate-400">
+                    <span className="font-medium">{ev.fact}:</span> Removed {String(ev.value)} ({ev.source})
                   </li>
                 ))}
               </ul>
             </div>
+          ) : (
+            <p className="text-sm text-text-secondary">No material evidence change was returned; compare the reasoning above.</p>
           )}
         </article>
       )}
