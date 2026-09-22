@@ -11,7 +11,7 @@ This document tracks the verified completion of the Future Me MVP roadmap. It se
 |---|---|
 | Phase 1 — Core Decision Logic & Foundation | COMPLETE |
 | Phase 2 — Live Intelligence Loop | COMPLETE |
-| AWS Deployment / Platform Enablement | BOOTSTRAP APPLIED — APPLICATION APPLY PENDING |
+| AWS Deployment / Platform Enablement | DEPLOYED AND VERIFIED |
 | Phase 3 | NOT STARTED |
 | Phase 4 | NOT STARTED |
 | Phase 5 | NOT STARTED |
@@ -62,14 +62,13 @@ The following are explicitly deferred or non-goals for this MVP:
 ---
 
 ## AWS Deployment / Platform Enablement
-- **Status:** BOOTSTRAP APPLIED — APPLICATION APPLY PENDING
+- **Status:** DEPLOYED AND VERIFIED
 - **Description:** Deployment and Platform Enablement. Positioned between Phase 2 and Phase 3.
 - **Goal:** Provide the approved hackathon deployment target and necessary configuration.
 - **Boundary:** It is explicitly not a product phase and does not add new product capability. It never changes the product phase count or the overall ~50% completion estimate.
-- **Verified deployment evidence:** The approved bootstrap plan was applied to AWS account `728033416182`: `11 added / 0 changed / 0 destroyed`. Readback confirms the state bucket is private, versioned, AES256-encrypted, lifecycle-managed, and protected by TLS-only/public-access controls. GitHub OIDC plus scoped plan/apply roles are active. The application stack is not deployed.
-- **Verified application-plan evidence:** The latest machine-parsed application plan proposes `21 create / 0 update / 0 delete / 0 replace / 0 import`, contains no Amplify resources, and uses the deterministic Lambda artifact.
-- **Next gate:** Merge the manual Terraform workflow to `main`, then run its `plan` operation. The workflow requires an explicit `APPLY_APPLICATION` confirmation and rejects delete/replace actions before application apply.
-- **Exit Evidence:** Verified deployed target configuration and handoff to Phase 8; planning completion alone does not satisfy this exit.
+- **Verified deployment evidence:** The approved bootstrap plan was applied to AWS account `728033416182`: `11 added / 0 changed / 0 destroyed`. Readback confirms the state bucket is private, versioned, AES256-encrypted, lifecycle-managed, and protected by TLS-only/public-access controls. GitHub OIDC trust is exactly scoped, the plan role remains scoped, and the apply role has operator-approved AdministratorAccess. GitHub Actions apply run https://github.com/nguyenthanhdat2707/FutureMe/actions/runs/35689166339 completed SUCCESS at main commit 599a97c37214ecf9e32eb811183002a44b997c74. The application stack is deployed. Post-deploy refreshed Terraform plan shows no changes (no-drift).
+- **Verified application-plan evidence:** The application plan was successfully applied (`9 create / 12 no-op / 0 update / 0 delete / 0 replace` after a one-time state reconciliation of 8 successfully-created resources from an earlier failed run).
+- **Exit Evidence:** Verified deployed target configuration and handoff to Phase 8; API health check at https://f5efnl82m5.execute-api.ap-southeast-1.amazonaws.com/api/health returns 200 with database=dynamodb.
 
 ---
 
@@ -144,7 +143,7 @@ The following are explicitly deferred or non-goals for this MVP:
 
 **Open Verification Debt:**
 - Frontend lint still reports one non-blocking `react(set-state-in-effect)` warning, and no frontend test suite is configured.
-- Infrastructure is planned but not deployed. The existing Amplify frontend remains externally managed, and frontend Cognito/JWT integration remains a later handoff; neither is evidence of a deployed end-to-end cloud flow.
+- The AWS backend infrastructure is deployed and no-drift, while the externally-managed Amplify frontend Cognito/JWT integration remains pending, so full browser end-to-end auth flow is not yet verified.
 
 ---
 
