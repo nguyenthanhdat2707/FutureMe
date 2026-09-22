@@ -51,6 +51,16 @@ terraform init -reconfigure -backend-config=backend.hcl.example
 ```
 The backend config uses Terraform 1.15 native S3 locking with `use_lockfile = true`; do not add a DynamoDB lock table. State migration and every apply remain separately approval-gated.
 
+### Manual GitHub Actions deployment
+
+The one-time bootstrap is applied. Application plans and applies run through `.github/workflows/terraform-application.yml` without long-lived AWS keys:
+
+1. Open **Actions → Terraform Application → Run workflow**.
+2. Select branch `main` and operation `plan` to review the remote-state plan artifact.
+3. To deploy, run the workflow again with operation `apply` and confirmation `APPLY_APPLICATION`.
+
+Every run rebuilds and tests the backend, creates a fresh Terraform plan, uploads the plan text/JSON/binary, and rejects any delete or replacement action. An apply uses the exact plan produced in the same job and verifies the public health endpoint afterward.
+
 ## Frontend Environment Handoff
 Once approved and applied, the infrastructure will output values needed by the frontend. These should be manually added to the frontend environment without mutating the Amplify app via Terraform:
 - `VITE_API_BASE_URL`: The API Gateway endpoint URL (e.g., `https://<id>.execute-api.ap-southeast-1.amazonaws.com/api`)

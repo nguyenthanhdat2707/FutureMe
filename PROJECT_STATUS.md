@@ -5,13 +5,13 @@ This document tracks the verified completion of the Future Me MVP roadmap. It se
 ## Status Summary
 - **Last Updated:** 2026-09-22
 - **Overall MVP estimate after Phase 2:** ~50%
-- **Current product position:** BETWEEN Phase 2 and Phase 3 — AWS Deployment / Platform Enablement is READY FOR APPLY APPROVAL but NOT DEPLOYED; Phase 3 product implementation NOT STARTED.
+- **Current product position:** BETWEEN Phase 2 and Phase 3 — AWS bootstrap is applied; application deployment is pending the manual GitHub Actions apply workflow. Phase 3 product implementation is NOT STARTED.
 
 | Phase / Track | Status |
 |---|---|
 | Phase 1 — Core Decision Logic & Foundation | COMPLETE |
 | Phase 2 — Live Intelligence Loop | COMPLETE |
-| AWS Deployment / Platform Enablement | READY FOR APPLY APPROVAL (NOT DEPLOYED) |
+| AWS Deployment / Platform Enablement | BOOTSTRAP APPLIED — APPLICATION APPLY PENDING |
 | Phase 3 | NOT STARTED |
 | Phase 4 | NOT STARTED |
 | Phase 5 | NOT STARTED |
@@ -62,12 +62,13 @@ The following are explicitly deferred or non-goals for this MVP:
 ---
 
 ## AWS Deployment / Platform Enablement
-- **Status:** READY FOR APPLY APPROVAL (NOT DEPLOYED)
+- **Status:** BOOTSTRAP APPLIED — APPLICATION APPLY PENDING
 - **Description:** Deployment and Platform Enablement. Positioned between Phase 2 and Phase 3.
 - **Goal:** Provide the approved hackathon deployment target and necessary configuration.
 - **Boundary:** It is explicitly not a product phase and does not add new product capability. It never changes the product phase count or the overall ~50% completion estimate.
-- **Verified planning evidence:** Separate bootstrap and application Terraform roots validate cleanly. Machine-parsed plans propose bootstrap `11 create / 0 update / 0 delete / 0 replace / 0 import` and application `21 create / 0 update / 0 delete / 0 replace / 0 import`. The application plan contains no Amplify resources. Lambda packaging is deterministic and within AWS ZIP size limits. No AWS apply/import/deploy has occurred.
-- **Next approval gate:** Human approval is required before any bootstrap apply. After bootstrap, remote-state initialization/migration and the application apply require their own reviewed plan and explicit approval.
+- **Verified deployment evidence:** The approved bootstrap plan was applied to AWS account `728033416182`: `11 added / 0 changed / 0 destroyed`. Readback confirms the state bucket is private, versioned, AES256-encrypted, lifecycle-managed, and protected by TLS-only/public-access controls. GitHub OIDC plus scoped plan/apply roles are active. The application stack is not deployed.
+- **Verified application-plan evidence:** The latest machine-parsed application plan proposes `21 create / 0 update / 0 delete / 0 replace / 0 import`, contains no Amplify resources, and uses the deterministic Lambda artifact.
+- **Next gate:** Merge the manual Terraform workflow to `main`, then run its `plan` operation. The workflow requires an explicit `APPLY_APPLICATION` confirmation and rejects delete/replace actions before application apply.
 - **Exit Evidence:** Verified deployed target configuration and handoff to Phase 8; planning completion alone does not satisfy this exit.
 
 ---
