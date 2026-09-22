@@ -61,4 +61,54 @@ describe('api/client', () => {
       expect(headers.get('Authorization')).toBe('Bearer mock-token');
     });
   });
+
+  describe('contextApi', () => {
+    it('setup retains userId in local mode', async () => {
+      const { setIsCognitoMode } = await import('../auth/cognito') as unknown as { setIsCognitoMode: (val: boolean) => void };
+      setIsCognitoMode(false);
+      await api.context.setup({ priorities: 'sleep' }, 'test-user');
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/context/setup'),
+        expect.objectContaining({
+          body: JSON.stringify({ answers: [{ questionId: 'priorities', text: 'sleep' }], userId: 'test-user' })
+        })
+      );
+    });
+
+    it('setup strips userId and adds token in cognito mode', async () => {
+      const { setIsCognitoMode } = await import('../auth/cognito') as unknown as { setIsCognitoMode: (val: boolean) => void };
+      setIsCognitoMode(true);
+      await api.context.setup({ priorities: 'sleep' }, 'test-user');
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/context/setup'),
+        expect.objectContaining({
+          body: JSON.stringify({ answers: [{ questionId: 'priorities', text: 'sleep' }] })
+        })
+      );
+    });
+  });
+
+  describe('calendarApi', () => {
+    it('sync sends empty body in cognito mode', async () => {
+      const { setIsCognitoMode } = await import('../auth/cognito') as unknown as { setIsCognitoMode: (val: boolean) => void };
+      setIsCognitoMode(true);
+      await api.calendar.sync('test-user');
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/calendar/sync'),
+        expect.objectContaining({
+          body: JSON.stringify({})
+        })
+      );
+    });
+
+    it('getStatus omits userId from query string in cognito mode', async () => {
+      const { setIsCognitoMode } = await import('../auth/cognito') as unknown as { setIsCognitoMode: (val: boolean) => void };
+      setIsCognitoMode(true);
+      await api.calendar.getStatus('test-user');
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        expect.not.stringContaining('userId=test-user'),
+        expect.any(Object)
+      );
+    });
+  });
 });

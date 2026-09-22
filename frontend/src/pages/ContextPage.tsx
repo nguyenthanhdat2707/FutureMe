@@ -2,7 +2,7 @@
  * ContextPage - What Future Me Understands
  * Display all context AI has about the user
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { api } from '../api/client';
 import type { PersonalContext, Goal, Commitment, Preference, ObservationSource } from '../types/domain';
 
@@ -13,22 +13,22 @@ function ContextPage() {
   const [editingItem, setEditingItem] = useState<{ type: string; id: string; value: string } | null>(null);
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
 
-  const loadContext = async () => {
+  const loadContext = useCallback(async (isInitial = false) => {
     try {
-      setLoading(true);
-      setError(null);
+      if (isInitial) setLoading(true);
       const data = await api.context.getCurrent();
       setContext(data);
+      setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load context');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    loadContext();
-  }, []);
+    loadContext(false);
+  }, [loadContext]);
 
   const handleConfirm = async (attributeId: string) => {
     if (!attributeId) return;
@@ -57,9 +57,13 @@ function ContextPage() {
 
     try {
       setActionInProgress(editingItem.id);
+      const correctedValue = editingItem.type === 'preference'
+        ? JSON.stringify({ value: editingItem.value })
+        : editingItem.value;
+
       await api.context.correct({
         attributeId: editingItem.id,
-        correctedValue: editingItem.value,
+        correctedValue,
         reason: 'User correction'
       });
       await loadContext();
@@ -128,7 +132,7 @@ function ContextPage() {
       <div className="p-8">
         <p className="text-accent-warning">Error: {error}</p>
         <button
-          onClick={loadContext}
+          onClick={() => loadContext()}
           className="mt-4 px-4 py-2 bg-accent-ai text-white rounded hover:opacity-90"
         >
           Retry
@@ -226,8 +230,18 @@ function ContextPage() {
                 <div className="flex items-center justify-between mt-3 pt-3 border-t border-surface-border">
                   <div className="flex items-center gap-2">
                     {getSourceBadge(goal.source, goal.confidence)}
+                    {goal.observedAt && (
+                      <span className="text-xs text-text-secondary ml-2">
+                        Observed: {new Date(goal.observedAt).toLocaleDateString()}
+                      </span>
+                    )}
+                    {goal.validUntil && (
+                      <span className="text-xs text-text-secondary ml-2">
+                        Valid until: {new Date(goal.validUntil).toLocaleDateString()}
+                      </span>
+                    )}
                   </div>
-                  {goal.attributeId && !isUserConfirmed(goal.source) && editingItem?.id !== goal.attributeId && (
+                  {goal.attributeId && !isUserConfirmed(goal.source) && goal.source !== 'CALENDAR' && editingItem?.id !== goal.attributeId && (
                     <div className="flex gap-2">
                       {isInferred(goal.source) && (
                         <button
@@ -316,8 +330,18 @@ function ContextPage() {
                 <div className="flex items-center justify-between mt-3 pt-3 border-t border-surface-border">
                   <div className="flex items-center gap-2">
                     {getSourceBadge(commitment.source, commitment.confidence)}
+                    {commitment.observedAt && (
+                      <span className="text-xs text-text-secondary ml-2">
+                        Observed: {new Date(commitment.observedAt).toLocaleDateString()}
+                      </span>
+                    )}
+                    {commitment.validUntil && (
+                      <span className="text-xs text-text-secondary ml-2">
+                        Valid until: {new Date(commitment.validUntil).toLocaleDateString()}
+                      </span>
+                    )}
                   </div>
-                  {commitment.attributeId && !isUserConfirmed(commitment.source) && editingItem?.id !== commitment.attributeId && (
+                  {commitment.attributeId && !isUserConfirmed(commitment.source) && commitment.source !== 'CALENDAR' && editingItem?.id !== commitment.attributeId && (
                     <div className="flex gap-2">
                       {isInferred(commitment.source) && (
                         <button
@@ -402,8 +426,18 @@ function ContextPage() {
                 <div className="flex items-center justify-between mt-3 pt-3 border-t border-surface-border">
                   <div className="flex items-center gap-2">
                     {getSourceBadge(pref.source, pref.confidence)}
+                    {pref.observedAt && (
+                      <span className="text-xs text-text-secondary ml-2">
+                        Observed: {new Date(pref.observedAt).toLocaleDateString()}
+                      </span>
+                    )}
+                    {pref.validUntil && (
+                      <span className="text-xs text-text-secondary ml-2">
+                        Valid until: {new Date(pref.validUntil).toLocaleDateString()}
+                      </span>
+                    )}
                   </div>
-                  {pref.attributeId && !isUserConfirmed(pref.source) && editingItem?.id !== pref.attributeId && (
+                  {pref.attributeId && !isUserConfirmed(pref.source) && pref.source !== 'CALENDAR' && editingItem?.id !== pref.attributeId && (
                     <div className="flex gap-2">
                       {isInferred(pref.source) && (
                         <button
@@ -434,6 +468,18 @@ function ContextPage() {
         <h2 className="text-xl font-serif text-text-primary">Calendar Overview</h2>
         
         <div className="card p-6 space-y-4">
+                    <div className="grid grid-cols-3 gap-4 mb-4">
+            <div>
+              <p className="text-sm text-text-secondary mb-1">Status</p>
+              <p className="font-mono text-lg text-text-primary capitalize">{context.calendar.status.replace('_', ' ')}</p>
+            </div>
+            <div>
+              <p className="text-sm text-text-secondary mb-1">Last Sync</p>
+              <p className="font-mono text-lg text-text-primary">
+                {context.calendar.lastSync ? new Date(context.calendar.lastSync).toLocaleString() : 'Never'}
+              </p>
+            </div>
+          </div>
           <div className="grid grid-cols-3 gap-4">
             <div>
               <p className="text-sm text-text-secondary mb-1">Upcoming Events</p>
@@ -441,11 +487,11 @@ function ContextPage() {
             </div>
             <div>
               <p className="text-sm text-text-secondary mb-1">Busy Hours Today</p>
-              <p className="font-mono text-2xl text-text-primary">{context.calendar.busyHoursToday.toFixed(1)}h</p>
+              <p className="font-mono text-2xl text-text-primary">{context.calendar.busyHoursToday === null ? 'Unknown' : `${context.calendar.busyHoursToday.toFixed(1)}h`}</p>
             </div>
             <div>
               <p className="text-sm text-text-secondary mb-1">Busy Hours This Week</p>
-              <p className="font-mono text-2xl text-text-primary">{context.calendar.busyHoursThisWeek.toFixed(1)}h</p>
+              <p className="font-mono text-2xl text-text-primary">{context.calendar.busyHoursThisWeek === null ? 'Unknown' : `${context.calendar.busyHoursThisWeek.toFixed(1)}h`}</p>
             </div>
           </div>
         </div>

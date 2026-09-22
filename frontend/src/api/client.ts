@@ -16,6 +16,11 @@ import type {
   Intervention,
   ClarificationRequest,
   DemoScenario,
+  SetupAnswers,
+  SetupResponse,
+  CalendarStatusResponse,
+  CalendarSyncResponse,
+  CalendarEvent,
 } from '../types/domain';
 
 import {
@@ -126,6 +131,26 @@ export const contextApi = {
       throw new Error(`Failed to correct context: ${response.status}`);
     }
 
+    return response.json();
+  },
+
+  async setup(answers: SetupAnswers, userId: string = 'demo-user'): Promise<SetupResponse> {
+    const formattedAnswers = Object.entries(answers)
+      .filter(([, text]) => text && text.trim().length > 0)
+      .map(([questionId, text]) => ({ questionId, text }));
+
+    const body = isCognitoMode ? { answers: formattedAnswers } : { answers: formattedAnswers, userId };
+
+    const response = await authFetch(`${API_BASE_URL}/context/setup`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to setup context: ${response.status}`);
+    }
     return response.json();
   },
 };
@@ -267,6 +292,37 @@ export const calendarApi = {
       updatedAt: new Date().toISOString(),
     };
   },
+
+  async sync(userId: string = 'demo-user'): Promise<CalendarSyncResponse> {
+    const response = await authFetch(`${API_BASE_URL}/calendar/sync`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(isCognitoMode ? {} : { userId }),
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to sync calendar: ${response.status}`);
+    }
+    return response.json();
+  },
+
+  async getStatus(userId: string = 'demo-user'): Promise<CalendarStatusResponse> {
+    const url = isCognitoMode ? `${API_BASE_URL}/calendar/status` : `${API_BASE_URL}/calendar/status?userId=${encodeURIComponent(userId)}`;
+    const response = await authFetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch calendar status: ${response.status}`);
+    }
+    return response.json();
+  },
+
+  async getEvents(userId: string = 'demo-user'): Promise<CalendarEvent[]> {
+    const url = isCognitoMode ? `${API_BASE_URL}/calendar/events` : `${API_BASE_URL}/calendar/events?userId=${encodeURIComponent(userId)}`;
+    const response = await authFetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch calendar events: ${response.status}`);
+    }
+    const data = await response.json();
+    return data.events || [];
+  }
 };
 
 // ============================================================================

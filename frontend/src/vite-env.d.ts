@@ -1,3 +1,4 @@
+/// <reference types="@testing-library/jest-dom" />
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
