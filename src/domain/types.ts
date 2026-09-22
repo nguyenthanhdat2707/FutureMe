@@ -15,6 +15,7 @@ export interface PersonalContext {
   calendar: CalendarSummary;
   recentDecisions: Decision[];
   lastUpdated: Date;
+  setupCompleted?: boolean;
 }
 
 export interface Goal {
@@ -25,6 +26,8 @@ export interface Goal {
   source?: ObservationSource;
   confidence?: number;
   attributeId?: string;
+  observedAt?: Date;
+  validUntil?: Date;
 }
 
 export interface Commitment {
@@ -36,6 +39,9 @@ export interface Commitment {
   source?: ObservationSource;
   confidence?: number;
   attributeId?: string;
+  observedAt?: Date;
+  validUntil?: Date;
+  status?: string;
 }
 
 export interface Preference {
@@ -46,12 +52,16 @@ export interface Preference {
   source?: ObservationSource;
   confidence?: number;
   attributeId?: string;
+  observedAt?: Date;
+  validUntil?: Date;
 }
 
 export interface CalendarSummary {
   upcomingEvents: number;
-  busyHoursToday: number;
-  busyHoursThisWeek: number;
+  busyHoursToday: number | null;
+  busyHoursThisWeek: number | null;
+  status?: string;
+  lastSync?: Date;
 }
 
 // ========================================

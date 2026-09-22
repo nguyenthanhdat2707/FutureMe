@@ -5,19 +5,26 @@ This document tracks the verified completion of the Future Me MVP roadmap. It se
 ## Status Summary
 - **Last Updated:** 2026-09-22
 - **Overall MVP estimate after Phase 2:** ~50%
-- **Current product position:** BETWEEN Phase 2 and Phase 3 — AWS bootstrap is applied; application deployment is pending the manual GitHub Actions apply workflow. Phase 3 product implementation is NOT STARTED.
+- **Current product position:** AWS backend DEPLOYED AND VERIFIED; frontend Cognito/JWT prerequisite READY_FOR_USER_TEST; Phase 3 backend context-acquisition unit delivered at `afc5c8e`, with frontend/browser work remaining.
 
 | Phase / Track | Status |
 |---|---|
 | Phase 1 — Core Decision Logic & Foundation | COMPLETE |
 | Phase 2 — Live Intelligence Loop | COMPLETE |
 | AWS Deployment / Platform Enablement | DEPLOYED AND VERIFIED |
-| Phase 3 | NOT STARTED |
+| Phase 3 | IMPLEMENTING |
 | Phase 4 | NOT STARTED |
 | Phase 5 | NOT STARTED |
 | Phase 6 | NOT STARTED |
 | Phase 7 | NOT STARTED |
 | Phase 8 | NOT STARTED |
+
+## Current Execution / Next Prioritized Work
+- **Current State:** IMPLEMENTING
+- **Completed AWS Evidence:** Backend AWS deployment applied and verified (no-drift); Health returns 200; Bedrock Haiku smoke invocation returned ok (11 input/4 output tokens). AWS Marketplace note: CloudTrail showed no aws-marketplace Subscribe or Marketplace event; Cost Explorer currently shows estimated `$0.00` (caveat: billing may lag).
+- **Current Task:** Implement the Phase 3 frontend onboarding, seeded-calendar status/sync, context evidence/correction, sparse-calendar messaging, and dashboard surfaces using TDD.
+- **Next Steps:** Run frontend and root quality gates, browser/integration verification, and independent review; repair blocking findings before the Phase 3 completion decision.
+- **Blocked/Decision Status:** Real browser Cognito signup/signin end-to-end remains unverified because it requires external identity provisioning/email verification/deployment.
 
 ## Roadmap Authority / Cross-Cutting Invariants
 This roadmap is governed by the following contract files:
@@ -75,7 +82,7 @@ The following are explicitly deferred or non-goals for this MVP:
 ## Remaining Phases
 
 ### Phase 3: Trustworthy context acquisition/population and adaptive setup
-- **Status:** NOT STARTED
+- **Status:** IMPLEMENTING
 - **Goal:** Establish reliable initial context through explicit onboarding, calendar data, and manual updates.
 - **Capability boundary:** Context extraction from calendar plans, short adaptive onboarding mini-interview, and manual user correction. Read-only calendar sync-in may be real or seeded per MVP contract. Where live calendar is used, it must include normalization, status, and connect/disconnect/failure-safe behavior. Sparse-context path for users with no calendar data.
 - **Main deliverables:** Calendar integration (real or seeded), deterministic extraction, sparse-context path, short adaptive onboarding, manual correction, dashboard context surfaces.
@@ -133,17 +140,19 @@ The following are explicitly deferred or non-goals for this MVP:
 ## Verification State & Open Debt
 
 **Verified Results (2026-09-22):**
-- **Backend tests:** 72/72 across 11 suites PASS; global coverage 76.97% statements, 57.55% branches, 78.04% functions, 78.66% lines
-- **Backend lint/typecheck/build:** PASS
+- **Backend tests (Phase 3):** Context API and Context Engine implemented. Tests added for setup <=4 answers, calendar sparse representation, calendar sync marker generation and retrieval, deterministic overlapping calendar interval union, populating correctly typed calendar commitments, typed evidence metadata (observedAt/validUntil) mapping, deterministic entity tie-breaking, and confirm/correct splitting where confirmation appends USER_CONFIRMED while retaining original rows, and correction properly merges JSON shapes. All 10 tests across 3 Phase 3 suites PASS.
+- **Backend tests (Overall):** 87/87 tests across 13 suites PASS.
+- **Backend lint/typecheck/build:** Build PASS. Lint PASS with 0 errors/warnings.
 - **Frontend build:** Production build PASS
-- **Frontend lint:** Exits 0 with one warning: `react(set-state-in-effect)` in `frontend/src/pages/ContextPage.tsx:30`
-- **Frontend tests:** No frontend test suite is currently configured.
+- **Frontend lint:** Exits 0 with one warning (out of scope): `react(set-state-in-effect)` in `frontend/src/pages/ContextPage.tsx:30`.
+- **Frontend tests:** 8/8 tests across 4 frontend suites PASS.
+- **Browser smoke evidence:** In Cognito mode `/context` redirects to `/auth` and renders "Sign In to Future Me" with password input/non-empty root after the globalThis fix; in local mode `/` renders "Home" without an auth form.
 - **Lambda package:** deterministic SHA-256 across consecutive builds; 14,667,392 bytes compressed and 39,503,005 bytes uncompressed; `dist/lambda.js` present
 - **Terraform:** recursive fmt and both roots validate cleanly; bootstrap plan 11 creates and application plan 21 creates, with zero update/delete/replace/import actions
 
 **Open Verification Debt:**
-- Frontend lint still reports one non-blocking `react(set-state-in-effect)` warning, and no frontend test suite is configured.
-- The AWS backend infrastructure is deployed and no-drift, while the externally-managed Amplify frontend Cognito/JWT integration remains pending, so full browser end-to-end auth flow is not yet verified.
+- Frontend lint still reports one non-blocking `react(set-state-in-effect)` warning in ContextPage.
+- The AWS backend infrastructure is deployed and no-drift. Frontend Cognito/JWT integration prerequisite unit testing is complete, marked READY_FOR_USER_TEST after supervisor verification. Full browser end-to-end auth flow depends on external identity provisioning/deployment.
 
 ---
 

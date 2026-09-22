@@ -31,6 +31,16 @@ export class SimpleStateEstimator implements IStateEstimator {
     }
 
     // Rule 2: Check calendar overload
+    if (context.calendar.busyHoursToday === null) {
+      evidence.push('Calendar state unknown');
+      return Promise.resolve({
+        state: PersonalState.UNCERTAIN,
+        confidence: 0.5,
+        evidence,
+        timestamp: now
+      });
+    }
+
     const busyHours = context.calendar.busyHoursToday;
     if (busyHours > 8) {
       evidence.push(`Busy hours today: ${busyHours.toFixed(1)}`);
