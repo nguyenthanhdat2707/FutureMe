@@ -13,6 +13,7 @@ export default function AuthPage() {
   const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const location = useLocation();
@@ -27,14 +28,18 @@ export default function AuthPage() {
     if (!userPool) return;
     setLoading(true);
     setError(null);
+    setSuccess(null);
+
+    const normalizedEmail = email.trim().toLowerCase();
+    setEmail(normalizedEmail);
 
     const authenticationDetails = new AuthenticationDetails({
-      Username: email,
+      Username: normalizedEmail,
       Password: password,
     });
 
     const cognitoUser = new CognitoUser({
-      Username: email,
+      Username: normalizedEmail,
       Pool: userPool,
     });
 
@@ -56,23 +61,81 @@ export default function AuthPage() {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!userPool) return;
-    setLoading(true);
     setError(null);
+    setSuccess(null);
+    if (!userPool) return;
+
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters');
+      return;
+    }
+    if (!/[A-Z]/.test(password)) {
+      setError('Password must contain at least one uppercase letter');
+      return;
+    }
+    if (!/[a-z]/.test(password)) {
+      setError('Password must contain at least one lowercase letter');
+      return;
+    }
+    if (!/[0-9]/.test(password)) {
+      setError('Password must contain at least one number');
+      return;
+    }
+    if (!/[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/.test(password)) {
+      setError('Password must contain at least one symbol');
+      return;
+    }
+
+    setLoading(true);
+
+    const normalizedEmail = email.trim().toLowerCase();
+    setEmail(normalizedEmail);
 
     const attributeList = [
-      new CognitoUserAttribute({ Name: 'email', Value: email }),
+      new CognitoUserAttribute({ Name: 'email', Value: normalizedEmail }),
     ];
 
-    userPool.signUp(email, password, attributeList, [], (err, result) => {
+    userPool.signUp(normalizedEmail, password, attributeList, [], (err, result) => {
       setLoading(false);
       if (err) {
-        setError(err.message || 'Failed to sign up');
+        if (err.name === 'UsernameExistsException') {
+          setError('Account already exists. Please Sign In if confirmed, or use "Already have a confirmation code?" if not.');
+        } else {
+          setError(err.message || 'Failed to sign up');
+        }
         return;
       }
       if (result?.user) {
         setAuthState('CONFIRM');
+      } else {
+        setError('Unexpected response from signup. Please try again.');
       }
+    });
+  };
+
+  const handleResendCode = async () => {
+    if (!userPool) return;
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) {
+      setError('Please enter your email to resend the code.');
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+
+    const cognitoUser = new CognitoUser({
+      Username: normalizedEmail,
+      Pool: userPool,
+    });
+
+    cognitoUser.resendConfirmationCode((err) => {
+      setLoading(false);
+      if (err) {
+        setError(err.message || 'Failed to resend confirmation code');
+        return;
+      }
+      setSuccess('Code resent successfully!');
     });
   };
 
@@ -81,13 +144,18 @@ export default function AuthPage() {
     if (!userPool) return;
     setLoading(true);
     setError(null);
+    setSuccess(null);
+
+    const normalizedEmail = email.trim().toLowerCase();
+    setEmail(normalizedEmail);
+    const trimmedCode = code.trim();
 
     const cognitoUser = new CognitoUser({
-      Username: email,
+      Username: normalizedEmail,
       Pool: userPool,
     });
 
-    cognitoUser.confirmRegistration(code, true, (err) => {
+    cognitoUser.confirmRegistration(trimmedCode, true, (err) => {
       setLoading(false);
       if (err) {
         setError(err.message || 'Failed to confirm registration');
@@ -96,7 +164,7 @@ export default function AuthPage() {
       setAuthState('SIGN_IN');
       setPassword('');
       setCode('');
-      setError('Registration confirmed! Please sign in.');
+      setSuccess('Registration confirmed! Please sign in.');
     });
   };
 
@@ -109,8 +177,13 @@ export default function AuthPage() {
           {authState === 'CONFIRM' && 'Confirm Email'}
         </h1>
 
+        {success && (
+          <div role="status" className="mb-4 p-3 bg-green-50 text-green-700 rounded text-sm">
+            {success}
+          </div>
+        )}
         {error && (
-          <div className="mb-4 p-3 bg-red-50 text-red-700 rounded text-sm">
+          <div role="alert" className="mb-4 p-3 bg-red-50 text-red-700 rounded text-sm">
             {error}
           </div>
         )}
@@ -118,9 +191,11 @@ export default function AuthPage() {
         {authState === 'SIGN_IN' && (
           <form onSubmit={handleSignIn} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+              <label htmlFor="signin-email" className="block text-sm font-medium text-slate-700 mb-1">Email</label>
               <input
+                id="signin-email"
                 type="email"
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none"
@@ -128,9 +203,11 @@ export default function AuthPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
+              <label htmlFor="signin-password" className="block text-sm font-medium text-slate-700 mb-1">Password</label>
               <input
+                id="signin-password"
                 type="password"
+                autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none"
@@ -148,7 +225,11 @@ export default function AuthPage() {
               Don't have an account?{' '}
               <button
                 type="button"
-                onClick={() => { setAuthState('SIGN_UP'); setError(null); }}
+                onClick={() => {
+                  setAuthState('SIGN_UP');
+                  setError(null);
+                  setSuccess(null);
+                }}
                 className="text-blue-600 hover:underline"
               >
                 Sign Up
@@ -160,9 +241,11 @@ export default function AuthPage() {
         {authState === 'SIGN_UP' && (
           <form onSubmit={handleSignUp} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+              <label htmlFor="signup-email" className="block text-sm font-medium text-slate-700 mb-1">Email</label>
               <input
+                id="signup-email"
                 type="email"
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none"
@@ -170,14 +253,18 @@ export default function AuthPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
+              <label htmlFor="signup-password" className="block text-sm font-medium text-slate-700 mb-1">Password</label>
               <input
+                id="signup-password"
                 type="password"
+                minLength={8}
+                autoComplete="new-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none"
                 required
               />
+              <p className="text-xs text-slate-500 mt-1">Minimum 8 characters with uppercase, lowercase, number, and symbol.</p>
             </div>
             <button
               type="submit"
@@ -190,10 +277,33 @@ export default function AuthPage() {
               Already have an account?{' '}
               <button
                 type="button"
-                onClick={() => { setAuthState('SIGN_IN'); setError(null); }}
+                onClick={() => {
+                  setAuthState('SIGN_IN');
+                  setError(null);
+                  setSuccess(null);
+                }}
                 className="text-blue-600 hover:underline"
               >
                 Sign In
+              </button>
+            </div>
+            <div className="text-center text-sm mt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const normalizedEmail = email.trim().toLowerCase();
+                  if (!normalizedEmail) {
+                    setError('Please enter your email address to confirm.');
+                    return;
+                  }
+                  setEmail(normalizedEmail);
+                  setAuthState('CONFIRM');
+                  setError(null);
+                  setSuccess(null);
+                }}
+                className="text-slate-500 hover:text-slate-700 underline"
+              >
+                Already have a confirmation code?
               </button>
             </div>
           </form>
@@ -202,12 +312,27 @@ export default function AuthPage() {
         {authState === 'CONFIRM' && (
           <form onSubmit={handleConfirm} className="space-y-4">
             <p className="text-sm text-slate-600 mb-4">
-              We sent a confirmation code to {email}.
+              Please enter your email and the confirmation code.
             </p>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Confirmation Code</label>
+              <label htmlFor="confirm-email" className="block text-sm font-medium text-slate-700 mb-1">Email</label>
               <input
+                id="confirm-email"
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                required
+              />
+            </div>
+            <div>
+              <label htmlFor="confirm-code" className="block text-sm font-medium text-slate-700 mb-1">Confirmation Code</label>
+              <input
+                id="confirm-code"
                 type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none"
@@ -221,14 +346,40 @@ export default function AuthPage() {
             >
               {loading ? 'Confirming...' : 'Confirm'}
             </button>
-            <div className="text-center text-sm text-slate-600 mt-4">
+            <div className="text-center text-sm text-slate-600 mt-4 flex flex-col space-y-2">
               <button
                 type="button"
-                onClick={() => { setAuthState('SIGN_IN'); setError(null); }}
-                className="text-blue-600 hover:underline"
+                disabled={loading}
+                onClick={handleResendCode}
+                className="text-blue-600 hover:underline disabled:opacity-50"
               >
-                Back to Sign In
+                Resend code
               </button>
+              <div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthState('SIGN_UP');
+                    setError(null);
+                    setSuccess(null);
+                  }}
+                  className="text-slate-500 hover:underline mx-2"
+                >
+                  Back to Sign Up
+                </button>
+                <span className="text-slate-300">|</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthState('SIGN_IN');
+                    setError(null);
+                    setSuccess(null);
+                  }}
+                  className="text-slate-500 hover:underline mx-2"
+                >
+                  Back to Sign In
+                </button>
+              </div>
             </div>
           </form>
         )}
