@@ -1,95 +1,129 @@
-/**
- * CalendarPage - Full calendar view
- * Extended view of the timeline with all time blocks
- */
+import { useState, useEffect, useCallback } from 'react';
+import { api } from '../api/client';
+import type { CalendarStatusResponse, CalendarEvent } from '../types/domain';
+
 function CalendarPage() {
-  const hours = Array.from({ length: 13 }, (_, i) => i + 8); // 8am to 8pm
+  const [status, setStatus] = useState<CalendarStatusResponse | null>(null);
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadData = useCallback(async () => {
+    try {
+      const [statusData, eventsData] = await Promise.all([
+        api.calendar.getStatus(),
+        api.calendar.getEvents()
+      ]);
+      setStatus(statusData);
+      setEvents(eventsData);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load calendar data');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadData();
+  }, [loadData]);
+
+  const handleSync = async () => {
+    setSyncing(true);
+    setError(null);
+    try {
+      await api.calendar.sync();
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to sync calendar');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  if (loading) {
+    return <div className="p-8"><p className="text-text-secondary">Loading calendar data...</p></div>;
+  }
 
   return (
-    <div className="p-8 space-y-8">
-      <header>
-        <h1 className="text-4xl font-serif text-text-primary mb-2">Calendar</h1>
-        <p className="text-text-secondary">Your temporal reality for today</p>
-      </header>
-
-      {/* Legend */}
-      <div className="flex gap-6 text-sm">
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 timeline-anchor rounded"></div>
-          <span className="text-text-secondary">Fixed Commitments</span>
+    <div className="max-w-4xl mx-auto space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-semibold text-text-primary">Calendar Integration</h1>
+          <p className="text-text-secondary mt-1">Connect your calendar to enable smart scheduling</p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 timeline-intention rounded"></div>
-          <span className="text-text-secondary">Flexible Intentions</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 timeline-ghost rounded"></div>
-          <span className="text-text-secondary">AI Suggestions</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 timeline-recovery rounded"></div>
-          <span className="text-text-secondary">Recovery Buffers</span>
-        </div>
+        <button
+          onClick={() => void handleSync()}
+          disabled={syncing || loading}
+          className="px-4 py-2 bg-primary text-white rounded hover:bg-primary-hover disabled:opacity-50"
+        >
+          {syncing ? 'Syncing...' : 'Sync Now'}
+        </button>
       </div>
 
-      {/* Full Timeline */}
-      <div className="card p-6">
-        <div className="space-y-1">
-          {hours.map((hour) => (
-            <div key={hour} className="flex items-start gap-4 border-b border-slate-100 last:border-0 py-3">
-              <time className="font-mono text-sm text-text-secondary w-16 pt-1">
-                {hour === 12 ? '12:00pm' : hour > 12 ? `${hour - 12}:00pm` : `${hour}:00am`}
-              </time>
-              <div className="flex-1 min-h-[80px]">
-                {hour === 9 && (
-                  <div className="timeline-anchor rounded-lg p-4">
-                    <p className="font-medium text-white">Team Standup</p>
-                    <p className="text-sm text-white text-opacity-90 mt-1">30 minutes • Fixed</p>
-                  </div>
-                )}
-                {hour === 10 && (
-                  <div className="timeline-intention rounded-lg p-4">
-                    <p className="font-medium text-accent-intention">Deep Work: Frontend Implementation</p>
-                    <p className="text-sm text-text-secondary mt-1">3 hours • Flexible</p>
-                    <p className="text-xs text-text-secondary mt-2">🎯 Launch MVP at Hackathon</p>
-                  </div>
-                )}
-                {hour === 13 && (
-                  <div className="timeline-recovery rounded-lg p-4">
-                    <p className="font-medium text-accent-rest">Lunch Break</p>
-                    <p className="text-sm text-text-secondary mt-1">1 hour • Recovery</p>
-                  </div>
-                )}
-                {hour === 15 && (
-                  <div className="timeline-ghost rounded-lg p-4">
-                    <p className="font-medium text-text-secondary">Suggested: Review & Testing</p>
-                    <p className="text-sm text-text-secondary mt-1">2 hours • AI Proposal</p>
-                    <button className="text-xs text-accent-ai font-medium mt-2 hover:underline">
-                      Add to schedule
-                    </button>
-                  </div>
-                )}
-              </div>
+      {error && (
+        <div className="p-4 bg-error/10 text-error rounded border border-error/20">
+          {error}
+        </div>
+      )}
+
+      <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="card p-6">
+          <h2 className="text-lg font-medium text-text-primary mb-4">Connection Status</h2>
+          <div className="space-y-4">
+            <div className="flex justify-between items-center py-2 border-b border-surface-border">
+              <span className="text-text-secondary">Status</span>
+              <span className="font-medium text-text-primary capitalize">
+                {status?.status === 'synced' ? 'Synced' : 'Never'}
+              </span>
             </div>
-          ))}
+            <div className="flex justify-between items-center py-2 border-b border-surface-border">
+              <span className="text-text-secondary">Last Sync</span>
+              <span className="font-medium text-text-primary">
+                {status?.lastSync ? new Date(status.lastSync).toLocaleString() : 'Never'}
+              </span>
+            </div>
+            <div className="flex justify-between items-center py-2 border-b border-surface-border">
+              <span className="text-text-secondary">Events Indexed</span>
+              <span className="font-medium text-text-primary">
+                {events.length}
+              </span>
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
 
-      {/* Capacity Summary */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="card p-4">
-          <p className="text-sm text-text-secondary mb-2">Total Available</p>
-          <p className="text-3xl font-mono text-text-primary">12h</p>
-        </div>
-        <div className="card p-4">
-          <p className="text-sm text-text-secondary mb-2">Committed</p>
-          <p className="text-3xl font-mono text-accent-anchor">7h</p>
-        </div>
-        <div className="card p-4">
-          <p className="text-sm text-text-secondary mb-2">Remaining</p>
-          <p className="text-3xl font-mono text-accent-intention">5h</p>
-        </div>
-      </div>
+      {/* Events List */}
+      <section className="space-y-4">
+        <h2 className="text-xl font-serif text-text-primary">Calendar Plans</h2>
+
+        {status?.status === 'never' ? (
+          <div className="card p-8 text-center space-y-4">
+            <p className="text-text-secondary">No calendar connected yet. Click Sync to fetch your seeded plans.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {events.length === 0 ? (
+              <div className="card p-6">
+                <p className="text-text-secondary">No plans found in calendar.</p>
+              </div>
+            ) : (
+              events.map((event) => (
+                <div key={event.id} className="card p-6">
+                  <h3 className="font-medium text-text-primary mb-1">{event.title}</h3>
+                  <p className="text-sm text-text-secondary mb-2">
+                    {new Date(event.startTime).toLocaleString()} - {new Date(event.endTime).toLocaleString()}
+                  </p>
+                  <div className="inline-block px-2 py-1 bg-surface-hover text-text-secondary text-xs font-medium rounded uppercase">
+                    Plan Evidence
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

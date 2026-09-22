@@ -1,87 +1,218 @@
-/**
- * HomePage - Dashboard view
- * Overview of interventions, clarifications, and upcoming commitments
- */
+import { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
+import { api } from '../api/client';
+import type { PersonalContext, SetupAnswers } from '../types/domain';
+
 function HomePage() {
+  const [context, setContext] = useState<PersonalContext | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [setupAnswers, setSetupAnswers] = useState<SetupAnswers>({});
+  const [submitting, setSubmitting] = useState(false);
+
+  const loadContext = useCallback(async () => {
+    try {
+      const data = await api.context.getCurrent();
+      setContext(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load context');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadContext();
+  }, [loadContext]);
+
+  const handleSetupSubmit = async (answersToSubmit: SetupAnswers = setupAnswers) => {
+    setSubmitting(true);
+    try {
+      await api.context.setup(answersToSubmit);
+      await loadContext();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save setup');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const updateAnswer = (key: keyof SetupAnswers, value: string) => {
+    if (value.trim() === '') {
+      skipAnswer(key);
+    } else {
+      setSetupAnswers(prev => ({ ...prev, [key]: value }));
+    }
+  };
+
+  const skipAnswer = (key: keyof SetupAnswers) => {
+    setSetupAnswers(prev => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
+
+  if (loading) {
+    return <div className="p-8"><p className="text-text-secondary">Loading your context...</p></div>;
+  }
+
+  if (error) {
+    return <div className="p-8"><p className="text-red-500">Error: {error}</p></div>;
+  }
+
+  if (!context) {
+    return null;
+  }
+
+  // Setup Flow
+  if (!context.setupCompleted) {
+    return (
+      <div className="p-8 max-w-2xl mx-auto space-y-8">
+        <header>
+          <h1 className="text-4xl font-serif text-text-primary mb-2">Welcome</h1>
+          <p className="text-text-secondary">Let's set up your context so I can help you better.</p>
+        </header>
+
+        <div className="space-y-6">
+          <div className="card p-6 space-y-4">
+            <h3 className="font-medium text-text-primary">1. What are your main priorities right now?</h3>
+            <textarea
+              className="w-full p-3 border border-surface-border rounded bg-surface-card"
+              placeholder="E.g., Finishing the hackathon, exercising daily..."
+              value={setupAnswers.priorities || ''}
+              onChange={(e) => updateAnswer('priorities', e.target.value)}
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => skipAnswer('priorities')}
+                className="text-sm text-text-secondary hover:text-text-primary"
+              >
+                Not sure / Skip
+              </button>
+            </div>
+          </div>
+
+          <div className="card p-6 space-y-4">
+            <h3 className="font-medium text-text-primary">2. Any hard deadlines or non-negotiable commitments?</h3>
+            <textarea
+              className="w-full p-3 border border-surface-border rounded bg-surface-card"
+              placeholder="E.g., Demo on Sunday at 5PM, picking up kids at 3PM..."
+              value={setupAnswers.deadlines || ''}
+              onChange={(e) => updateAnswer('deadlines', e.target.value)}
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => skipAnswer('deadlines')}
+                className="text-sm text-text-secondary hover:text-text-primary"
+              >
+                Not sure / Skip
+              </button>
+            </div>
+          </div>
+
+          <div className="card p-6 space-y-4">
+            <h3 className="font-medium text-text-primary">3. How do you track your plans?</h3>
+            <textarea
+              className="w-full p-3 border border-surface-border rounded bg-surface-card"
+              placeholder="E.g., Google Calendar, Notion, mostly in my head..."
+              value={setupAnswers.tracking || ''}
+              onChange={(e) => updateAnswer('tracking', e.target.value)}
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => skipAnswer('tracking')}
+                className="text-sm text-text-secondary hover:text-text-primary"
+              >
+                Not sure / Skip
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-4 pt-4 border-t border-surface-border">
+          <button
+            onClick={() => void handleSetupSubmit()}
+            disabled={submitting}
+            className="px-6 py-2 bg-accent-ai text-white rounded-lg font-medium hover:bg-opacity-90 disabled:opacity-50"
+          >
+            {submitting ? 'Saving...' : 'Complete Setup'}
+          </button>
+          <button
+            onClick={() => {
+              setSetupAnswers({});
+              void handleSetupSubmit({});
+            }}
+            disabled={submitting}
+            className="px-6 py-2 text-text-secondary border border-surface-border rounded-lg hover:bg-surface-hover disabled:opacity-50"
+          >
+            Skip for now
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Dashboard Flow
   return (
     <div className="p-8 space-y-8">
       <header>
-        <h1 className="text-4xl font-serif text-text-primary mb-2">Good afternoon</h1>
-        <p className="text-text-secondary">Here's what needs your attention</p>
+        <h1 className="text-4xl font-serif text-text-primary mb-2">Dashboard</h1>
+        <p className="text-text-secondary">Here's your current context summary.</p>
       </header>
-
-      {/* Interventions Section */}
-      <section className="space-y-4">
-        <h2 className="text-xl font-serif text-text-primary">Needs Your Input</h2>
-        
-        <div className="intervention-suggestion space-y-3">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <h3 className="font-medium text-text-primary mb-1">Phát hiện lời mời họp mới: 'Project Review' (14:00 - 15:30)</h3>
-              <p className="text-sm text-text-secondary mb-2">
-                Tác động: Lịch làm việc hôm nay sẽ vượt ngưỡng 8h (chuyển sang trạng thái OVERLOADED). Thời gian dự phòng cho deadline giảm về âm.
-              </p>
-              <details className="text-sm">
-                <summary className="cursor-pointer text-accent-ai font-medium">Khuyến nghị</summary>
-                <p className="mt-2 text-text-secondary">
-                  Từ chối hoặc đề xuất dời sang ngày mai.
-                </p>
-              </details>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <button className="px-4 py-2 bg-accent-ai text-white rounded-lg text-sm font-medium hover:bg-opacity-90">
-              Chấp nhận
-            </button>
-            <button className="px-4 py-2 text-text-secondary text-sm hover:bg-slate-100 border border-slate-200 rounded-lg">
-              Từ chối
-            </button>
-            <button className="px-4 py-2 text-text-secondary text-sm hover:bg-slate-100 border border-slate-200 rounded-lg">
-              Đề xuất dời lịch
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* Clarifications Section */}
-      <section className="space-y-4">
-        <h2 className="text-xl font-serif text-text-primary">Help Future Me Understand</h2>
-        
-        <div className="card p-6 space-y-3">
-          <h3 className="font-medium text-text-primary">What is your preferred morning routine duration?</h3>
-          <p className="text-sm text-text-secondary">
-            This helps me schedule recovery buffers and avoid early meetings
-          </p>
-          <div className="grid grid-cols-2 gap-2 mt-4">
-            <button className="px-4 py-2 border border-slate-300 rounded-lg text-sm hover:border-accent-ai hover:bg-accent-ai hover:bg-opacity-5">
-              30 minutes
-            </button>
-            <button className="px-4 py-2 border border-slate-300 rounded-lg text-sm hover:border-accent-ai hover:bg-accent-ai hover:bg-opacity-5">
-              1 hour
-            </button>
-            <button className="px-4 py-2 border border-slate-300 rounded-lg text-sm hover:border-accent-ai hover:bg-accent-ai hover:bg-opacity-5">
-              1.5 hours
-            </button>
-            <button className="px-4 py-2 border border-slate-300 rounded-lg text-sm hover:border-accent-ai hover:bg-accent-ai hover:bg-opacity-5">
-              2 hours
-            </button>
-          </div>
-        </div>
-      </section>
 
       {/* Quick Stats */}
       <section className="grid grid-cols-3 gap-4">
         <div className="card p-4">
-          <p className="text-sm text-text-secondary mb-1">Available Today</p>
-          <p className="text-2xl font-mono text-accent-intention">5h</p>
+          <p className="text-sm text-text-secondary mb-1">Goals & Commitments</p>
+          <p className="text-2xl font-mono text-text-primary">
+            {context.goals.length + context.commitments.length}
+          </p>
         </div>
         <div className="card p-4">
-          <p className="text-sm text-text-secondary mb-1">Commitments</p>
-          <p className="text-2xl font-mono text-accent-anchor">3</p>
+          <p className="text-sm text-text-secondary mb-1">Calendar Status</p>
+          <p className="text-lg font-mono text-text-primary capitalize">
+            {context.calendar.status.replace('_', ' ')}
+          </p>
         </div>
         <div className="card p-4">
-          <p className="text-sm text-text-secondary mb-1">Energy Level</p>
-          <p className="text-2xl font-mono text-text-primary">Medium</p>
+          <p className="text-sm text-text-secondary mb-1">Recent Decisions</p>
+          <p className="text-2xl font-mono text-text-primary">{context.recentDecisions.length}</p>
+        </div>
+      </section>
+
+      {/* Calendar State */}
+      <section className="space-y-4">
+        <h2 className="text-xl font-serif text-text-primary">Calendar Plans</h2>
+        <div className="card p-6">
+          {context.calendar.status === 'unknown' ? (
+            <p className="text-text-secondary">Your calendar is not synced. We have no evidence of your schedule.</p>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-text-primary">
+                Upcoming events: {context.calendar.upcomingEvents}
+              </p>
+              <p className="text-text-secondary text-sm">
+                Last synced: {context.calendar.lastSync ? new Date(context.calendar.lastSync).toLocaleString() : 'Never'}
+              </p>
+            </div>
+          )}
+          <Link to="/calendar" className="inline-block mt-4 text-accent-ai hover:underline">
+            Manage Calendar Sync
+          </Link>
+        </div>
+      </section>
+
+      {/* Links */}
+      <section className="space-y-4 pt-4 border-t border-surface-border">
+        <div className="flex gap-4">
+          <Link to="/context" className="px-4 py-2 bg-surface-card border border-surface-border rounded-lg text-text-primary hover:bg-surface-hover">
+            What Future Me Understands
+          </Link>
+          <Link to="/decisions" className="px-4 py-2 bg-surface-card border border-surface-border rounded-lg text-text-primary hover:bg-surface-hover">
+            Ask Future Me
+          </Link>
         </div>
       </section>
     </div>

@@ -43,6 +43,7 @@ export interface ContextAttribute {
 
 export interface PersonalContext {
   userId: string;
+  setupCompleted: boolean;
   goals: Goal[];
   commitments: Commitment[];
   preferences: Preference[];
@@ -60,6 +61,8 @@ export interface Commitment {
   source?: ObservationSource;
   confidence?: number;
   attributeId?: string;
+  observedAt?: string;
+  validUntil?: string;
 }
 
 export interface Preference {
@@ -70,12 +73,45 @@ export interface Preference {
   source?: ObservationSource;
   confidence?: number;
   attributeId?: string;
+  observedAt?: string;
+  validUntil?: string;
 }
 
 export interface CalendarSummary {
+  status: 'synced' | 'unknown';
+  lastSync: string | null;
   upcomingEvents: number;
-  busyHoursToday: number;
-  busyHoursThisWeek: number;
+  busyHoursToday: number | null;
+  busyHoursThisWeek: number | null;
+}
+
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  startTime: string;
+  endTime: string;
+  source: ObservationSource;
+}
+
+export interface CalendarStatusResponse {
+  status: 'synced' | 'never';
+  lastSync: string | null;
+}
+
+export interface CalendarSyncResponse {
+  success: boolean;
+  synced: number;
+  timestamp: string;
+}
+
+export interface SetupAnswers {
+  priorities?: string;
+  deadlines?: string;
+  tracking?: string;
+}
+
+export interface SetupResponse {
+  setupCompleted: boolean;
 }
 
 export interface ContextUpdateObservation {
@@ -125,6 +161,8 @@ export interface Goal {
   source?: ObservationSource;
   confidence?: number;
   attributeId?: string; // Link to ContextAttribute for confirm/correct
+  observedAt?: string;
+  validUntil?: string;
 }
 
 export enum GoalCategory {
