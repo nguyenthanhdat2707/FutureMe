@@ -29,7 +29,7 @@
 ### 4. Clarification and Abstention Logic
 - **Status:** [x] COMPLETE
 - **Details:** Implemented deterministic mapping for ASK (missing facts) and ABSTAIN (unresolved conflicts), updated policy evaluator, added counting LLM fake, bound validation, repaired prompt format drift, and verified via pure/integration testing.
-- **Evidence:** Gate 4 is functionally verified and COMPLETE. Focused policy/engine/route suites: 22/22 passed. Relevant Phase 2/3 and decision regressions: 35/35 passed. Full backend: 115/115 passed across 17 suites. Coverage: 77.91% statements, 60.74% branches, 78.27% functions, 79.38% lines. npm run lint PASS; npm run build PASS; git diff --check PASS. Gate 4 implementation is local and not yet committed/pushed.
+- **Evidence:** Gate 4 is functionally verified and COMPLETE. Focused policy/engine/route suites: 22/22 passed. Relevant Phase 2/3 and decision regressions: 35/35 passed. Full backend: 115/115 passed across 17 suites. Coverage: 77.91% statements, 60.74% branches, 78.27% functions, 79.38% lines. npm run lint PASS; npm run build PASS; git diff --check PASS. Delivered evidence: commit 7196d3f0c64580f23867cbcd9cdd45d16e219fad pushed to origin/feat/phase4-decision-journey, local and remote SHAs matched exactly, branch clean and synchronized.
 
 ### 5. Tested UI (Decision Surface)
 - **Status:** [ ] PENDING
