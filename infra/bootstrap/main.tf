@@ -215,6 +215,12 @@ resource "aws_iam_role" "github_apply_role" {
   })
 }
 
+# This broad policy is an explicit operator decision for the manual main-branch apply workflow.
+resource "aws_iam_role_policy_attachment" "apply_admin" {
+  role       = aws_iam_role.github_apply_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"
+}
+
 resource "aws_iam_role_policy" "apply_permissions" {
   name = "terraform-manage-resources"
   role = aws_iam_role.github_apply_role.id
