@@ -5,9 +5,9 @@
 - Account and principal: account `728033416182`, IAM user `arn:aws:iam::728033416182:user/TDat_admin_CLi`.
 - Credential/profile mechanism: shared credentials file; no profile override; configured default region `ap-southeast-1`.
 - Existing hosting: Amplify app `d6nuwvgegqhns` (`FutureMe`) in `us-east-1`, repository `nguyenthanhdat2707/FutureMe`, production branch `main`; latest observed production status `SUCCEED`.
-- Existing relevant resources: no `future-me*` DynamoDB tables, Lambda functions, HTTP APIs, Cognito pools, CloudWatch log groups, or IAM roles in `ap-southeast-1`; no IAM OIDC providers; state bucket `future-me-tfstate-728033416182` is not present/accessibile. The unrelated Cognito pool and unrelated `xbrain` state bucket identified during discovery remain unmanaged.
+- Existing relevant resources: the approved bootstrap has created state bucket `future-me-tfstate-728033416182`, the GitHub OIDC provider, and scoped `future-me-github-plan` / `future-me-github-apply` roles. No Future-Me application DynamoDB tables, Lambda function, HTTP API, Cognito pool, or application log groups are deployed. The unrelated Cognito pool and unrelated `xbrain` state bucket remain unmanaged.
 - Bedrock: direct model `anthropic.claude-3-haiku-20240307-v1:0` is currently `ACTIVE` in `ap-southeast-1`.
-- Inventory was read-only. No AWS resource was created, changed, imported, deployed, or deleted.
+- Post-bootstrap readback confirms `11 added / 0 changed / 0 destroyed`; the state bucket is private, versioned, AES256-encrypted, lifecycle-managed, and non-public. No application resource has been created, imported, deployed, changed, or deleted.
 
 ## Current Repository State
 
@@ -25,7 +25,7 @@
 |---|---|---|---|
 | Existing Amplify app `d6nuwvgegqhns` | Existing unmanaged | Leave unchanged | Avoid duplicate hosting/deployment ownership |
 | Unrelated Cognito pool and `xbrain` state bucket | Existing unmanaged | Leave unchanged | Not Future-Me dependencies |
-| Future-Me state bucket, S3 security controls, GitHub OIDC provider and roles | Bootstrap Terraform root | Proposed create | One-time bootstrap using local state |
+| Future-Me state bucket, S3 security controls, GitHub OIDC provider and roles | Bootstrap Terraform root | Applied and verified | One-time bootstrap using local state |
 | Cognito, seven DynamoDB tables, Lambda/IAM/logs, HTTP API/JWT routes | Application Terraform root | Proposed create | Cohesive backend stack |
 | Amplify frontend environment values | Manual handoff after approved apply | Pending | Terraform outputs values but does not mutate Amplify |
 | Imports | None | Not proposed | Inventory found no matching Future-Me resources |
@@ -102,7 +102,7 @@ The final plan JSON confirms the exact GSI key schemas, including the two users-
 | Existing Amplify app | EXISTING / LEAVE UNMANAGED | No `aws_amplify_*` resources in source or plans |
 | Unrelated Cognito pool | EXISTING / LEAVE UNMANAGED | Different name/ownership; no import or reuse |
 | Unrelated `xbrain` state bucket | EXISTING / LEAVE UNMANAGED | Not referenced by this repository |
-| Future-Me state bucket/OIDC/roles | SAFE TO CREATE | No matching bucket, OIDC provider, or named roles found |
+| Future-Me state bucket/OIDC/roles | CREATED / TERRAFORM MANAGED | Applied from the reviewed create-only bootstrap plan and verified by AWS readback |
 | Future-Me app resources | SAFE TO CREATE | No matching Future-Me API, Lambda, tables, pool, or log groups found |
 
 ## Terraform Plan Summary
@@ -110,7 +110,7 @@ The final plan JSON confirms the exact GSI key schemas, including the two users-
 - Terraform CLI: `1.15.9`.
 - Bootstrap provider: `hashicorp/aws 5.100.0`.
 - Application provider: `hashicorp/aws 6.66.0` with `~> 6.0` constraints across root/modules.
-- Bootstrap plan: `11 create / 0 update / 0 delete / 0 replace / 0 import`.
+- Bootstrap result: reviewed plan `11 create / 0 update / 0 delete / 0 replace / 0 import`; apply completed `11 added / 0 changed / 0 destroyed`.
 - Application plan: `21 create / 0 update / 0 delete / 0 replace / 0 import`.
 - Imported resources: none.
 - Existing working resources touched: none.
@@ -168,4 +168,4 @@ No destroy, replacement, import, or existing-resource change appears in either p
 
 `SAFE TO APPLY`
 
-Both reviewed plans meet the planning acceptance criteria and contain create-only changes with no Amplify ownership conflict. This verdict does not authorize execution. The next possible action is an explicitly approved bootstrap apply only; remote-state migration and application apply remain separate approval gates.
+The bootstrap is applied and verified. The reviewed application plan meets the acceptance criteria and contains create-only changes with no Amplify ownership conflict. Application execution remains gated behind the manual GitHub Actions workflow, a fresh remote-state plan, destructive-action guard, and exact `APPLY_APPLICATION` confirmation.

@@ -47,5 +47,8 @@ lambda.zip
 .terraform.tfstate
 terraform.tfstate*
 *.tfplan
+infra/bootstrap/plan.json
+infra/bootstrap/tfplan
+infra/terraform/backend.tf
 
 planning-artifacts/

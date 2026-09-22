@@ -24,7 +24,7 @@ The backend is structured into four main Terraform modules:
 3. **Application Stack:**
    - Before bootstrap is applied, keep `backend.tf.example` inactive and execute `terraform init -backend=false`, `terraform validate`, and `terraform plan -refresh=false` in `infra/terraform`.
    - After a separately approved bootstrap apply, copy `backend.tf.example` to `backend.tf` and run `terraform init -reconfigure -backend-config=backend.hcl.example`. The backend uses native S3 lockfiles; no DynamoDB lock table is used.
-   - State migration and application apply require separate explicit approval.
+   - The bootstrap is now applied. Use **Actions → Terraform Application → Run workflow** on `main`: run `plan` first, then choose `apply` and type `APPLY_APPLICATION` when ready. The workflow uses GitHub OIDC, rejects delete/replacement plans, applies the exact generated plan, and performs a health check.
 4. **Environment Handoff:**
    - Consume the outputs produced by Terraform (`api_base_url`, `cognito_user_pool_id`, `cognito_user_pool_client_id`) in the existing, externally managed Amplify Frontend application via environment variables.
 

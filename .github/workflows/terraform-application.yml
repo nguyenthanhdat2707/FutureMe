@@ -1,0 +1,201 @@
+name: Terraform Application
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Plan or apply the Future-Me application stack
+        required: true
+        default: plan
+        type: choice
+        options:
+          - plan
+          - apply
+      confirmation:
+        description: Type APPLY_APPLICATION to permit apply
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: future-me-production-terraform
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ap-southeast-1
+  TF_IN_AUTOMATION: "true"
+  TF_VERSION: 1.15.9
+  TERRAFORM_DIR: infra/terraform
+  APPLY_ROLE_ARN: arn:aws:iam::728033416182:role/future-me-github-apply
+
+jobs:
+  terraform:
+    name: ${{ inputs.operation == 'apply' && 'Apply application stack' || 'Plan application stack' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Require the default branch
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" != "refs/heads/main" ]]; then
+            echo "Manual Terraform runs are allowed only from main."
+            exit 1
+          fi
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Install backend dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Verify backend
+        run: |
+          npm run lint
+          npx tsc --noEmit --pretty false
+          npm test -- --runInBand
+
+      - name: Build deterministic Lambda artifact
+        run: npm run package:lambda
+
+      - name: Check Terraform formatting
+        run: terraform fmt -check -recursive infra
+
+      - name: Configure AWS credentials through GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ env.APPLY_ROLE_ARN }}
+          role-session-name: future-me-${{ github.run_id }}
+
+      - name: Activate the approved S3 backend configuration
+        working-directory: ${{ env.TERRAFORM_DIR }}
+        run: cp backend.tf.example backend.tf
+
+      - name: Initialize Terraform
+        working-directory: ${{ env.TERRAFORM_DIR }}
+        run: terraform init -input=false -backend-config=backend.hcl.example
+
+      - name: Validate Terraform
+        working-directory: ${{ env.TERRAFORM_DIR }}
+        run: terraform validate
+
+      - name: Create reviewed plan
+        working-directory: ${{ env.TERRAFORM_DIR }}
+        run: |
+          terraform plan -input=false -out=application.tfplan
+          terraform show -no-color application.tfplan > application-plan.txt
+          terraform show -json application.tfplan > application-plan.json
+
+      - name: Reject destructive or replacement actions
+        working-directory: ${{ env.TERRAFORM_DIR }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+          from collections import Counter
+
+          with open("application-plan.json", encoding="utf-8") as plan_file:
+              plan = json.load(plan_file)
+
+          changes = [
+              change
+              for change in plan.get("resource_changes", [])
+              if change.get("mode") == "managed"
+          ]
+          action_counts = Counter(
+              action
+              for change in changes
+              for action in change["change"]["actions"]
+          )
+          destructive = [
+              {
+                  "address": change["address"],
+                  "actions": change["change"]["actions"],
+              }
+              for change in changes
+              if "delete" in change["change"]["actions"]
+          ]
+
+          summary = (
+              f"Managed resources: {len(changes)}; "
+              f"create={action_counts['create']}, "
+              f"update={action_counts['update']}, "
+              f"delete={action_counts['delete']}, "
+              f"no-op={action_counts['no-op']}"
+          )
+          print(summary)
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary_file:
+              summary_file.write("## Terraform plan safety check\n\n")
+              summary_file.write(f"{summary}\n")
+
+          if destructive:
+              print("Delete or replacement actions are forbidden:", file=sys.stderr)
+              print(json.dumps(destructive, indent=2), file=sys.stderr)
+              sys.exit(1)
+          PY
+
+      - name: Upload reviewed plan artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: future-me-application-plan-${{ github.run_id }}
+          path: |
+            infra/terraform/application.tfplan
+            infra/terraform/application-plan.txt
+            infra/terraform/application-plan.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Require explicit apply confirmation
+        if: inputs.operation == 'apply'
+        env:
+          APPLY_CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          if [[ "${APPLY_CONFIRMATION}" != "APPLY_APPLICATION" ]]; then
+            echo "Apply refused: confirmation must equal APPLY_APPLICATION."
+            exit 1
+          fi
+
+      - name: Apply the reviewed plan
+        if: inputs.operation == 'apply'
+        working-directory: ${{ env.TERRAFORM_DIR }}
+        run: terraform apply -input=false application.tfplan
+
+      - name: Export application outputs
+        if: inputs.operation == 'apply'
+        working-directory: ${{ env.TERRAFORM_DIR }}
+        run: terraform output -json > application-outputs.json
+
+      - name: Verify public health endpoint
+        if: inputs.operation == 'apply'
+        working-directory: ${{ env.TERRAFORM_DIR }}
+        run: |
+          API_BASE_URL="$(terraform output -raw api_base_url)"
+          curl --fail --silent --show-error \
+            --retry 12 --retry-delay 5 --retry-all-errors \
+            "${API_BASE_URL}/health"
+
+      - name: Upload application outputs
+        if: inputs.operation == 'apply'
+        uses: actions/upload-artifact@v4
+        with:
+          name: future-me-application-outputs-${{ github.run_id }}
+          path: infra/terraform/application-outputs.json
+          if-no-files-found: error
+          retention-days: 14
