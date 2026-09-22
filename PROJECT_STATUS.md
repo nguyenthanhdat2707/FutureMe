@@ -20,11 +20,11 @@ This document tracks the verified completion of the Future Me MVP roadmap. It se
 | Phase 8 | NOT STARTED |
 
 ## Current Execution / Next Prioritized Work
-- **Current State:** IMPLEMENTING
+- **Current State:** FIXING
 - **Completed AWS Evidence:** Backend AWS deployment applied and verified (no-drift); Health returns 200; Bedrock Haiku smoke invocation returned ok (11 input/4 output tokens). AWS Marketplace note: CloudTrail showed no aws-marketplace Subscribe or Marketplace event; Cost Explorer currently shows estimated `$0.00` (caveat: billing may lag).
 - **Current Task:** Gate 7 Full Gates / Review
 - **Next Steps:** Complete end-to-end integration and verification of the decision loop against the MVP policy contract. Run full automated test coverage for frontend and backend.
-- **Blocked/Decision Status:** None currently. The human approved the minimal Phase 4 policy direction; `docs/DECISION_POLICY.md` is recorded. Authenticated browser readback requires Product Owner sign-in. Google Calendar credentials/OAuth were intentionally not changed; any remaining provider-specific calendar sync failure is a separate owner handoff.
+- **Blocked/Decision Status:** Gate 7 stays FIXING, 6/8=75%, production verification pending. The human approved the minimal Phase 4 policy direction; `docs/DECISION_POLICY.md` is recorded. Authenticated browser readback requires Product Owner sign-in. Google Calendar credentials/OAuth were intentionally not changed; any remaining provider-specific calendar sync failure is a separate owner handoff. (Historical blockers resolved: User reported account-creation blocker where signup path lacked UI password requirements leading to live `InvalidPasswordException` and AuthPage.test.tsx lacked signup coverage. Supervisor caught two explicit any constructor parameters after Auth repair 2. These are now resolved.)
 
 ## Roadmap Authority / Cross-Cutting Invariants
 This roadmap is governed by the following contract files:
