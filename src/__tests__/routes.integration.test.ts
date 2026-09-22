@@ -6,11 +6,11 @@ import path from 'path';
 import request from 'supertest';
 import { createApp } from '../app';
 import { closeDatabase, initDatabase } from '../database/connection';
-import { ObservationSource } from '../domain/types';
-import { FeedbackRepository } from '../repositories/feedback.repository';
-import { ObservationRepository } from '../repositories/observation.repository';
-import { OutcomeRepository } from '../repositories/outcome.repository';
-import { PersonalContextRepository } from '../repositories/personal-context.repository';
+import { ObservationSource, DecisionStatus, Decision } from '../domain/types';
+import { SqliteFeedbackRepository } from '../repositories/feedback.repository';
+import { SqliteObservationRepository } from '../repositories/observation.repository';
+import { SqliteOutcomeRepository } from '../repositories/outcome.repository';
+import { SqlitePersonalContextRepository } from '../repositories/personal-context.repository';
 
 describe('API route integration', () => {
   const app = createApp();
@@ -37,8 +37,8 @@ describe('API route integration', () => {
     expect(resetResponse.status).toBe(200);
     expect(resetResponse.body).toMatchObject({
       success: true,
-      message: 'Demo state reset',
-      userId: 'demo-user',
+      message: 'Reset stub executed',
+      clearedUserId: 'demo-user',
     });
 
     const seedResponse = await request(app)
@@ -86,7 +86,6 @@ describe('API route integration', () => {
     expect(eventsResponse.body.events[0]).toEqual(
       expect.objectContaining({
         id: expect.any(String),
-        userId: 'demo-user',
         externalId: expect.any(String),
         title: expect.any(String),
         startTime: expect.any(String),
@@ -111,7 +110,6 @@ describe('API route integration', () => {
     const createResponse = await request(app)
       .post('/api/decisions')
       .send({
-        userId: 'demo-user',
         query: {
           question,
           options: ['Task A', 'Task B'],
@@ -122,7 +120,6 @@ describe('API route integration', () => {
     expect(createResponse.body.decision).toEqual(
       expect.objectContaining({
         id: expect.any(String),
-        userId: 'demo-user',
         question,
         status: 'PENDING',
         recommendation: expect.any(Object),
@@ -136,7 +133,6 @@ describe('API route integration', () => {
     expect(getResponse.body).toEqual(
       expect.objectContaining({
         id: decisionId,
-        userId: 'demo-user',
         question,
         status: 'PENDING',
         recommendation: expect.any(Object),
@@ -146,7 +142,6 @@ describe('API route integration', () => {
 
     const listResponse = await request(app)
       .get('/api/decisions')
-      .query({ userId: 'demo-user', limit: 5 });
 
     expect(listResponse.status).toBe(200);
     expect(listResponse.body.decisions).toEqual(
@@ -183,7 +178,6 @@ describe('API route integration', () => {
     const response = await request(app)
       .post('/api/observations')
       .send({
-        userId: 'demo-user',
         type: 'USER_REPORTED',
         data: { note: 'Generic observation' },
         source: 'USER_CONFIRMED',
@@ -195,7 +189,6 @@ describe('API route integration', () => {
     expect(response.body).toEqual(
       expect.objectContaining({
         id: expect.any(String),
-        userId: 'demo-user',
         type: 'USER_REPORTED',
         data: { note: 'Generic observation' },
         source: 'USER_CONFIRMED',
@@ -205,11 +198,10 @@ describe('API route integration', () => {
       })
     );
 
-    const persisted = new ObservationRepository().findById(response.body.id);
+    const persisted = await new SqliteObservationRepository().findById(response.body.id);
     expect(persisted).toEqual(
       expect.objectContaining({
         id: response.body.id,
-        userId: 'demo-user',
         data: { note: 'Generic observation' },
       })
     );
@@ -220,7 +212,6 @@ describe('API route integration', () => {
     const outcomeResponse = await request(app)
       .post('/api/outcomes')
       .send({
-        userId: 'demo-user',
         decisionId,
         description: 'The generic task was completed.',
         observedAt,
@@ -231,13 +222,12 @@ describe('API route integration', () => {
       expect.objectContaining({
         id: expect.any(String),
         decisionId,
-        userId: 'demo-user',
         description: 'The generic task was completed.',
         observedAt,
         createdAt: expect.any(String),
       })
     );
-    expect(new OutcomeRepository().findById(outcomeResponse.body.id)).toEqual(
+    expect(await new SqliteOutcomeRepository().findById(outcomeResponse.body.id)).toEqual(
       expect.objectContaining({
         decisionId,
         description: 'The generic task was completed.',
@@ -247,7 +237,6 @@ describe('API route integration', () => {
     const feedbackResponse = await request(app)
       .post('/api/outcomes/feedback')
       .send({
-        userId: 'demo-user',
         targetType: 'decision',
         targetId: decisionId,
         feedbackText: 'The generic recommendation was useful.',
@@ -257,14 +246,13 @@ describe('API route integration', () => {
     expect(feedbackResponse.body).toEqual(
       expect.objectContaining({
         id: expect.any(String),
-        userId: 'demo-user',
         targetType: 'decision',
         targetId: decisionId,
         feedbackText: 'The generic recommendation was useful.',
         createdAt: expect.any(String),
       })
     );
-    expect(new FeedbackRepository().findById(feedbackResponse.body.id)).toEqual(
+    expect(await new SqliteFeedbackRepository().findById(feedbackResponse.body.id)).toEqual(
       expect.objectContaining({
         targetId: decisionId,
         feedbackText: 'The generic recommendation was useful.',
@@ -280,7 +268,6 @@ describe('API route integration', () => {
     expect(getResponse.status).toBe(200);
     expect(getResponse.body).toEqual(
       expect.objectContaining({
-        userId: 'demo-user',
         goals: expect.any(Array),
         commitments: expect.any(Array),
         preferences: expect.any(Array),
@@ -295,7 +282,6 @@ describe('API route integration', () => {
     const updateResponse = await request(app)
       .post('/api/context/update')
       .send({
-        userId: 'demo-user',
         observation: {
           type: 'USER_REPORTED',
           data: { note: 'Generic context update' },
@@ -305,14 +291,13 @@ describe('API route integration', () => {
     expect(updateResponse.status).toBe(200);
     expect(updateResponse.body).toEqual(
       expect.objectContaining({
-        userId: 'demo-user',
         goals: expect.any(Array),
         preferences: expect.any(Array),
       })
     );
 
-    const contextRepo = new PersonalContextRepository();
-    const inferredAttribute = contextRepo.create({
+    const contextRepo = new SqlitePersonalContextRepository();
+    const inferredAttribute = await contextRepo.create({
       userId: 'demo-user',
       attribute: 'preference',
       value: JSON.stringify({ description: 'Original generic preference' }),
@@ -324,13 +309,12 @@ describe('API route integration', () => {
     const confirmResponse = await request(app)
       .post('/api/context/confirm')
       .send({
-        userId: 'demo-user',
         attributeId: inferredAttribute.id,
       });
 
     expect(confirmResponse.status).toBe(200);
     expect(confirmResponse.body).toEqual({ success: true });
-    expect(contextRepo.findById(inferredAttribute.id)).toEqual(
+    expect(await contextRepo.findById(inferredAttribute.id)).toEqual(
       expect.objectContaining({
         source: ObservationSource.USER_CONFIRMED,
         confidence: 1,
@@ -343,7 +327,6 @@ describe('API route integration', () => {
     const correctResponse = await request(app)
       .post('/api/context/correct')
       .send({
-        userId: 'demo-user',
         correction: {
           attributeId: inferredAttribute.id,
           correctedValue,
@@ -357,7 +340,7 @@ describe('API route integration', () => {
         expect.objectContaining({ description: 'Corrected generic preference' }),
       ])
     );
-    expect(contextRepo.findById(inferredAttribute.id)).toEqual(
+    expect(await contextRepo.findById(inferredAttribute.id)).toEqual(
       expect.objectContaining({
         value: correctedValue,
         source: ObservationSource.USER_CONFIRMED,
@@ -375,4 +358,32 @@ describe('API route integration', () => {
       path: '/api/unknown-route',
     });
   });
+
+  it('should reject feedback if decision belongs to another user', async () => {
+    const decisionRepo = (await import('../services/service-container')).getDecisionRepository();
+    const otherDecision = await decisionRepo.create({
+      id: 'd-other',
+      userId: 'other-user',
+      question: 'Other User Decision',
+      status: DecisionStatus.PENDING,
+      options: [],
+      relevantContext: { capturedAt: new Date(), goals: [], commitments: [], constraints: [], relevantHistory: [] },
+      tradeoffs: [],
+      recommendation: { option: '', confidence: 0, reasoning: '' },
+      reasoning: '',
+      confidence: 1
+    } as Omit<Decision, "createdAt">);
+
+    const feedbackResponse = await request(app)
+      .post('/api/outcomes/feedback')
+      .send({
+        targetType: 'decision',
+        targetId: otherDecision.id,
+        feedbackText: 'Great decision!'
+      });
+
+    expect(feedbackResponse.status).toBe(403);
+    expect(feedbackResponse.body.error).toMatch(/Forbidden/);
+  });
+
 });

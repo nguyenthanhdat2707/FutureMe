@@ -2,17 +2,18 @@
  * Feedback Repository
  */
 
+import { IFeedbackRepository, Awaitable } from './interfaces';
 import { BaseRepository } from './base.repository';
 import { Feedback, FeedbackTargetType } from '../domain/types';
 import { v4 as uuidv4 } from 'uuid';
 
-export class FeedbackRepository extends BaseRepository {
-  findById(id: string): Feedback | null {
+export class SqliteFeedbackRepository extends BaseRepository implements IFeedbackRepository {
+  findById(id: string): Awaitable<Feedback | null> {
     const row = this.db.get('SELECT * FROM feedback WHERE id = ?', [id]);
     return row ? this.mapToFeedback(row) : null;
   }
 
-  findByTargetId(targetId: string): Feedback[] {
+  findByTargetId(targetId: string): Awaitable<Feedback[]> {
     const rows = this.db.all(`
       SELECT * FROM feedback
       WHERE target_id = ?
@@ -22,7 +23,7 @@ export class FeedbackRepository extends BaseRepository {
     return rows.map(this.mapToFeedback.bind(this));
   }
 
-  findByUserId(userId: string, limit: number = 50): Feedback[] {
+  findByUserId(userId: string, limit: number = 50): Awaitable<Feedback[]> {
     const rows = this.db.all(`
       SELECT * FROM feedback
       WHERE user_id = ?
@@ -33,7 +34,7 @@ export class FeedbackRepository extends BaseRepository {
     return rows.map(this.mapToFeedback.bind(this));
   }
 
-  create(feedback: Omit<Feedback, 'id' | 'createdAt'>): Feedback {
+  create(feedback: Omit<Feedback, 'id' | 'createdAt'>): Awaitable<Feedback> {
     const id = uuidv4();
     const now = new Date().toISOString();
 
@@ -49,7 +50,7 @@ export class FeedbackRepository extends BaseRepository {
       now
     ]);
 
-    return this.findById(id)!;
+    return this.findById(id) as Feedback;
   }
 
   private mapToFeedback(row: unknown): Feedback {

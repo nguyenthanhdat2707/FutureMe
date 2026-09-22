@@ -1,8 +1,3 @@
-/**
- * Service Container
- * Dependency injection for replaceable components
- */
-
 import { IContextEngine, IDecisionEngine, IStateEstimator, IInterventionPolicy, ILLMContextAnalyst } from '../intelligence/interfaces';
 import { ICalendarAdapter } from '../adapters/calendar-adapter.interface';
 import { ILLMProvider } from '../adapters/llm-provider.interface';
@@ -14,10 +9,33 @@ import { MockCalendarAdapter } from '../adapters/mock-calendar-adapter';
 import { MockLLMProvider } from '../adapters/mock-llm-provider';
 import { BedrockLLMProvider } from '../adapters/bedrock-llm-provider';
 import { BoundedLLMContextAnalyst } from '../intelligence/bounded-llm-context-analyst';
-import { PersonalContextRepository } from '../repositories/personal-context.repository';
-import { DecisionRepository } from '../repositories/decision.repository';
-import { CalendarEventRepository } from '../repositories/calendar-event.repository';
-import { ObservationRepository } from '../repositories/observation.repository';
+
+// Repositories
+import {
+  IPersonalContextRepository,
+  IObservationRepository,
+  IDecisionRepository,
+  ICalendarEventRepository,
+  IUserRepository,
+  IOutcomeRepository,
+  IFeedbackRepository
+} from '../repositories/interfaces';
+
+import { SqlitePersonalContextRepository } from '../repositories/personal-context.repository';
+import { SqliteDecisionRepository } from '../repositories/decision.repository';
+import { SqliteCalendarEventRepository } from '../repositories/calendar-event.repository';
+import { SqliteObservationRepository } from '../repositories/observation.repository';
+import { SqliteUserRepository } from '../repositories/user.repository';
+import { SqliteOutcomeRepository } from '../repositories/outcome.repository';
+import { SqliteFeedbackRepository } from '../repositories/feedback.repository';
+
+import { DynamoPersonalContextRepository } from '../repositories/dynamo/personal-context.repository';
+import { DynamoDecisionRepository } from '../repositories/dynamo/decision.repository';
+import { DynamoCalendarEventRepository } from '../repositories/dynamo/calendar-event.repository';
+import { DynamoObservationRepository } from '../repositories/dynamo/observation.repository';
+import { DynamoUserRepository } from '../repositories/dynamo/user.repository';
+import { DynamoOutcomeRepository } from '../repositories/dynamo/outcome.repository';
+import { DynamoFeedbackRepository } from '../repositories/dynamo/feedback.repository';
 
 // Singleton instances
 let contextEngine: IContextEngine | null = null;
@@ -28,29 +46,49 @@ let calendarAdapter: ICalendarAdapter | null = null;
 let llmProvider: ILLMProvider | null = null;
 let llmContextAnalyst: ILLMContextAnalyst | null = null;
 
-let contextRepo: PersonalContextRepository | null = null;
-let observationRepo: ObservationRepository | null = null;
-let decisionRepo: DecisionRepository | null = null;
-let calendarRepo: CalendarEventRepository | null = null;
+let contextRepo: IPersonalContextRepository | null = null;
+let observationRepo: IObservationRepository | null = null;
+let decisionRepo: IDecisionRepository | null = null;
+let calendarRepo: ICalendarEventRepository | null = null;
+let userRepo: IUserRepository | null = null;
+let outcomeRepo: IOutcomeRepository | null = null;
+let feedbackRepo: IFeedbackRepository | null = null;
 
-export function getContextRepository(): PersonalContextRepository {
-  if (!contextRepo) contextRepo = new PersonalContextRepository();
+const isDynamo = process.env.PERSISTENCE_PROVIDER === 'dynamodb';
+
+export function getContextRepository(): IPersonalContextRepository {
+  if (!contextRepo) contextRepo = isDynamo ? new DynamoPersonalContextRepository() : new SqlitePersonalContextRepository();
   return contextRepo;
 }
 
-export function getObservationRepository(): ObservationRepository {
-  if (!observationRepo) observationRepo = new ObservationRepository();
+export function getObservationRepository(): IObservationRepository {
+  if (!observationRepo) observationRepo = isDynamo ? new DynamoObservationRepository() : new SqliteObservationRepository();
   return observationRepo;
 }
 
-export function getDecisionRepository(): DecisionRepository {
-  if (!decisionRepo) decisionRepo = new DecisionRepository();
+export function getDecisionRepository(): IDecisionRepository {
+  if (!decisionRepo) decisionRepo = isDynamo ? new DynamoDecisionRepository() : new SqliteDecisionRepository();
   return decisionRepo;
 }
 
-export function getCalendarEventRepository(): CalendarEventRepository {
-  if (!calendarRepo) calendarRepo = new CalendarEventRepository();
+export function getCalendarEventRepository(): ICalendarEventRepository {
+  if (!calendarRepo) calendarRepo = isDynamo ? new DynamoCalendarEventRepository() : new SqliteCalendarEventRepository();
   return calendarRepo;
+}
+
+export function getUserRepository(): IUserRepository {
+  if (!userRepo) userRepo = isDynamo ? new DynamoUserRepository() : new SqliteUserRepository();
+  return userRepo;
+}
+
+export function getOutcomeRepository(): IOutcomeRepository {
+  if (!outcomeRepo) outcomeRepo = isDynamo ? new DynamoOutcomeRepository() : new SqliteOutcomeRepository();
+  return outcomeRepo;
+}
+
+export function getFeedbackRepository(): IFeedbackRepository {
+  if (!feedbackRepo) feedbackRepo = isDynamo ? new DynamoFeedbackRepository() : new SqliteFeedbackRepository();
+  return feedbackRepo;
 }
 
 export function getContextEngine(): IContextEngine {
@@ -92,7 +130,6 @@ export function getInterventionPolicy(): IInterventionPolicy {
 
 export function getCalendarAdapter(): ICalendarAdapter {
   if (!calendarAdapter) {
-    // TODO: Check for real Google Calendar credentials
     // For MVP, always use mock
     calendarAdapter = new MockCalendarAdapter();
   }
@@ -101,7 +138,7 @@ export function getCalendarAdapter(): ICalendarAdapter {
 
 export function getLLMProvider(): ILLMProvider {
   if (!llmProvider) {
-    if (process.env.AWS_REGION && process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
+    if (process.env.LLM_PROVIDER === 'bedrock') {
       console.log('Using BedrockLLMProvider for LLM capabilities');
       llmProvider = new BedrockLLMProvider();
     } else {

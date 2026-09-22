@@ -2,27 +2,28 @@
  * User Repository
  */
 
+import { IUserRepository, Awaitable } from './interfaces';
 import { BaseRepository } from './base.repository';
 import { User } from '../domain/types';
 import { v4 as uuidv4 } from 'uuid';
 
-export class UserRepository extends BaseRepository {
-  findById(id: string): User | null {
+export class SqliteUserRepository extends BaseRepository implements IUserRepository {
+  findById(id: string): Awaitable<User | null> {
     const row = this.db.get('SELECT * FROM users WHERE id = ?', [id]);
     return row ? this.mapToUser(row) : null;
   }
 
-  findByEmail(email: string): User | null {
+  findByEmail(email: string): Awaitable<User | null> {
     const row = this.db.get('SELECT * FROM users WHERE email = ?', [email]);
     return row ? this.mapToUser(row) : null;
   }
 
-  findByGoogleId(googleId: string): User | null {
+  findByGoogleId(googleId: string): Awaitable<User | null> {
     const row = this.db.get('SELECT * FROM users WHERE google_id = ?', [googleId]);
     return row ? this.mapToUser(row) : null;
   }
 
-  create(user: Omit<User, 'createdAt' | 'updatedAt'>): User {
+  create(user: Omit<User, 'createdAt' | 'updatedAt'>): Awaitable<User> {
     const id = user.id || uuidv4();
     const now = new Date().toISOString();
 
@@ -31,11 +32,11 @@ export class UserRepository extends BaseRepository {
       [id, user.email, user.googleId || null, user.displayName || null, user.tokens || null, now, now]
     );
 
-    return this.findById(id)!;
+    return this.findById(id) as User;
   }
 
-  update(id: string, updates: Partial<Omit<User, 'id' | 'createdAt' | 'updatedAt'>>): User | null {
-    const user = this.findById(id);
+  update(id: string, updates: Partial<Omit<User, 'id' | 'createdAt' | 'updatedAt'>>): Awaitable<User | null> {
+    const user = this.findById(id) as User | null;
     if (!user) return null;
 
     const now = new Date().toISOString();

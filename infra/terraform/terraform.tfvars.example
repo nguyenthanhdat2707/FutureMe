@@ -1,0 +1,12 @@
+aws_region = "ap-southeast-1"
+expected_account_id = "728033416182"
+project = "future-me"
+environment = "prod"
+artifact_path = "lambda.zip"
+allowed_origins = ["https://main.d6nuwvgegqhns.amplifyapp.com", "http://localhost:5173", "http://localhost:3000"]
+bedrock_model_id = "anthropic.claude-3-haiku-20240307-v1:0"
+lambda_memory_mb = 512
+lambda_timeout_seconds = 30
+log_retention_days = 14
+api_throttling_rate_limit = 10
+api_throttling_burst_limit = 20

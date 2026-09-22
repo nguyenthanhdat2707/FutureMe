@@ -3,7 +3,8 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { ObservationRepository } from '../repositories/observation.repository';
+import { getObservationRepository } from '../services/service-container';
+import { getUserId } from '../utils/identity';
 
 import { getErrorMessage } from '../utils/error';
 import { ObservationType, ObservationSource } from '../domain/types';
@@ -11,7 +12,6 @@ import { ObservationType, ObservationSource } from '../domain/types';
 export const observationRouter = Router();
 
 interface ObservationRequestBody {
-  userId?: string;
   type?: ObservationType;
   data?: Record<string, unknown>;
   source?: ObservationSource;
@@ -20,11 +20,11 @@ interface ObservationRequestBody {
 }
 
 // Create observation (manual)
-observationRouter.post('/', (req: Request, res: Response) => {
+observationRouter.post('/', async (req: Request, res: Response) => {
   try {
-    const observationRepo = new ObservationRepository();
+    const observationRepo = getObservationRepository();
     const body = req.body as ObservationRequestBody;
-    const userId = body.userId || 'demo-user';
+    const userId = getUserId(req);
     const observation = {
       userId,
       type: body.type || ('USER_REPORTED' as ObservationType),
@@ -34,7 +34,7 @@ observationRouter.post('/', (req: Request, res: Response) => {
       timestamp: body.timestamp ? new Date(body.timestamp) : new Date()
     };
     
-    const created = observationRepo.create(observation);
+    const created = await observationRepo.create(observation);
     
     res.json(created);
   } catch (error: unknown) {

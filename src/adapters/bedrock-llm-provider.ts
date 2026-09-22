@@ -7,8 +7,8 @@ export class BedrockLLMProvider implements ILLMProvider {
 
   constructor(region?: string, accessKeyId?: string, secretAccessKey?: string) {
     this.client = new BedrockRuntimeClient({
-      region: region || process.env.AWS_REGION || 'us-east-1',
-      credentials: (accessKeyId && secretAccessKey) 
+      region: region || process.env.AWS_REGION || 'ap-southeast-1',
+      credentials: (accessKeyId && secretAccessKey)
         ? { accessKeyId, secretAccessKey }
         : undefined
     });
@@ -42,11 +42,18 @@ export class BedrockLLMProvider implements ILLMProvider {
       });
 
       const response = await this.client.send(command);
-      
-      const responseBody = JSON.parse(new TextDecoder().decode(response.body));
-      
+      const decodedBody = new TextDecoder().decode(response.body);
+      const responseBody = JSON.parse(decodedBody) as {
+        content?: Array<{ text: string }>;
+        usage?: { input_tokens: number; output_tokens: number };
+      };
+
+      const content = responseBody.content && responseBody.content.length > 0
+        ? responseBody.content[0].text
+        : '';
+
       return {
-        content: responseBody.content[0].text,
+        content,
         usage: {
           inputTokens: responseBody.usage?.input_tokens || 0,
           outputTokens: responseBody.usage?.output_tokens || 0,

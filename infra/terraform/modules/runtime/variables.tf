@@ -1,0 +1,10 @@
+variable "project" { type = string }
+variable "environment" { type = string }
+variable "lambda_memory_mb" { type = number }
+variable "lambda_timeout_seconds" { type = number }
+variable "log_retention_days" { type = number }
+variable "bedrock_model_id" { type = string }
+variable "aws_region" { type = string }
+variable "table_arns" { type = map(string) }
+variable "table_names" { type = map(string) }
+variable "artifact_path" { type = string }

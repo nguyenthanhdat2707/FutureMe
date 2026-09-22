@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /**
  * Health Check Tests
  */
@@ -24,5 +25,32 @@ describe('Health Check', () => {
       status: 'ok',
       service: 'future-me-backend',
     });
+  });
+});
+
+describe('Health Check in Dynamo Mode', () => {
+  it('does not invoke sqlite database connection', async () => {
+    // Setup
+    process.env.PERSISTENCE_PROVIDER = 'dynamodb';
+    const mockGetDatabase = jest.fn();
+    jest.mock('../database/connection', () => ({
+      getDatabase: mockGetDatabase
+    }));
+
+    // Create new app with mocked env
+    const { createApp: createTestApp } = await import('../app');
+    const testApp = createTestApp();
+
+    const response = await request(testApp).get('/api/health');
+    expect(response.status).toBe(200);
+    expect(response.body.database).toBe('dynamodb');
+
+    // Assert
+    const { getDatabase } = await import('../database/connection');
+    expect(getDatabase).not.toHaveBeenCalled();
+
+    // Cleanup
+    delete process.env.PERSISTENCE_PROVIDER;
+    jest.resetModules();
   });
 });

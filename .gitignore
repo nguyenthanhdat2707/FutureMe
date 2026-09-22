@@ -39,3 +39,13 @@ coverage/
 # Temporary
 tmp/
 temp/
+
+# AWS Lambda & Terraform
+dist_lambda/
+lambda.zip
+.terraform/
+.terraform.tfstate
+terraform.tfstate*
+*.tfplan
+
+planning-artifacts/

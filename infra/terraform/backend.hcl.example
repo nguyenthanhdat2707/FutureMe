@@ -1,0 +1,5 @@
+bucket = "future-me-tfstate-728033416182"
+key = "future-me/app/terraform.tfstate"
+region = "ap-southeast-1"
+encrypt = true
+use_lockfile = true

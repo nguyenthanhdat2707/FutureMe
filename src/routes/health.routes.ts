@@ -8,14 +8,19 @@ import { getDatabase } from '../database/connection';
 export const healthRouter = Router();
 
 healthRouter.get('/', (_req: Request, res: Response) => {
-  let database: 'connected' | 'disconnected' = 'disconnected';
+  const isDynamo = process.env.PERSISTENCE_PROVIDER === 'dynamodb';
+  let database: 'connected' | 'disconnected' | 'dynamodb' = 'disconnected';
 
-  try {
-    const db = getDatabase();
-    const result = db.prepare('SELECT 1 as ok').get() as { ok?: number };
-    database = result.ok === 1 ? 'connected' : 'disconnected';
-  } catch {
-    // The liveness endpoint remains available while the database is starting.
+  if (isDynamo) {
+    database = 'dynamodb';
+  } else {
+    try {
+      const db = getDatabase();
+      const result = db.prepare('SELECT 1 as ok').get() as { ok?: number };
+      database = result.ok === 1 ? 'connected' : 'disconnected';
+    } catch {
+      // The liveness endpoint remains available while the database is starting.
+    }
   }
 
   res.json({

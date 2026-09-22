@@ -4,16 +4,17 @@
 
 import { Router, Request, Response } from 'express';
 import { getContextEngine, getLLMContextAnalyst, getContextRepository, getObservationRepository } from '../services/service-container';
+import { getUserId } from '../utils/identity';
 
 import { getErrorMessage } from '../utils/error';
-import type { Observation, ContextCorrection, ContextAnalystRequest } from '../domain/types';
+import { ObservationSource, type Observation, type ContextCorrection, type ContextAnalystRequest } from '../domain/types';
 
 export const contextRouter = Router();
 
 // Get current context
 contextRouter.get('/', async (req: Request, res: Response) => {
   try {
-    const userId = typeof req.query.userId === 'string' ? req.query.userId : 'demo-user';
+    const userId = getUserId(req);
     const contextEngine = getContextEngine();
     
     const context = await contextEngine.getCurrentContext(userId);
@@ -27,8 +28,8 @@ contextRouter.get('/', async (req: Request, res: Response) => {
 // Update context (manual or observation)
 contextRouter.post('/update', async (req: Request, res: Response) => {
   try {
-    const body = req.body as { userId?: string; observation?: Observation };
-    const userId = typeof body.userId === 'string' ? body.userId : 'demo-user';
+    const body = req.body as { observation?: Observation };
+    const userId = getUserId(req);
     const observation = body.observation;
     
     if (!observation) {
@@ -47,13 +48,18 @@ contextRouter.post('/update', async (req: Request, res: Response) => {
 // Confirm inferred attribute
 contextRouter.post('/confirm', async (req: Request, res: Response) => {
   try {
-    const body = req.body as { userId?: string; attributeId?: string };
-    const userId = typeof body.userId === 'string' ? body.userId : 'demo-user';
+    const body = req.body as { attributeId?: string };
+    const userId = getUserId(req);
     const attributeId = body.attributeId;
     
     if (!attributeId) {
       return res.status(400).json({ error: 'attributeId is required' });
     }
+
+    const contextRepo = getContextRepository();
+    const attr = await contextRepo.findById(attributeId);
+    if (!attr) return res.status(404).json({ error: 'Attribute not found' });
+    if (attr.userId !== userId) return res.status(403).json({ error: 'Forbidden' });
 
     const contextEngine = getContextEngine();
     await contextEngine.confirmContextAttribute(userId, attributeId);
@@ -67,13 +73,18 @@ contextRouter.post('/confirm', async (req: Request, res: Response) => {
 // Correct wrong context
 contextRouter.post('/correct', async (req: Request, res: Response) => {
   try {
-    const body = req.body as { userId?: string; correction?: ContextCorrection };
-    const userId = typeof body.userId === 'string' ? body.userId : 'demo-user';
+    const body = req.body as { correction?: ContextCorrection };
+    const userId = getUserId(req);
     const correction = body.correction;
     
     if (!correction || typeof correction.attributeId !== 'string' || typeof correction.correctedValue !== 'string') {
       return res.status(400).json({ error: 'Valid correction object is required' });
     }
+
+    const contextRepo = getContextRepository();
+    const attr = await contextRepo.findById(correction.attributeId);
+    if (!attr) return res.status(404).json({ error: 'Attribute not found' });
+    if (attr.userId !== userId) return res.status(403).json({ error: 'Forbidden' });
 
     const contextEngine = getContextEngine();
     const context = await contextEngine.correctContext(userId, correction);
@@ -87,15 +98,14 @@ contextRouter.post('/correct', async (req: Request, res: Response) => {
 // Analyze context for uncertainty and hypotheses
 contextRouter.post('/analyze', async (req: Request, res: Response) => {
   try {
-    const userId = typeof req.body.userId === 'string' ? req.body.userId : 'demo-user';
+    const userId = getUserId(req);
     const contextRepo = getContextRepository();
     const observationRepo = getObservationRepository();
     const llmAnalyst = getLLMContextAnalyst();
 
-    // Identify UNCERTAIN context attributes
     const allContext = await contextRepo.findByUserId(userId);
     const uncertainAttributes = allContext
-      .filter(attr => attr.source !== 'USER_CONFIRMED' && attr.confidence < 1.0)
+      .filter(attr => attr.source !== ObservationSource.USER_CONFIRMED && attr.confidence < 1.0)
       .sort((a, b) => b.observedAt.getTime() - a.observedAt.getTime())
       .slice(0, 10);
 
@@ -150,8 +160,8 @@ contextRouter.post('/analyze', async (req: Request, res: Response) => {
 // Clarify an uncertain context attribute
 contextRouter.post('/clarify', async (req: Request, res: Response) => {
   try {
-    const body = req.body as { userId?: string; attributeId?: string; answer?: string; questionText?: string };
-    const userId = typeof body.userId === 'string' ? body.userId : 'demo-user';
+    const body = req.body as { attributeId?: string; answer?: string; questionText?: string };
+    const userId = getUserId(req);
     const attributeId = body.attributeId;
     const answer = body.answer;
     const questionText = body.questionText;
@@ -169,8 +179,11 @@ contextRouter.post('/clarify', async (req: Request, res: Response) => {
     const contextRepo = getContextRepository();
     const existingAttr = await contextRepo.findById(attributeId);
     
-    if (!existingAttr || existingAttr.userId !== userId) {
-      return res.status(404).json({ error: 'Attribute not found for this user' });
+    if (!existingAttr) {
+      return res.status(404).json({ error: 'Attribute not found' });
+    }
+    if (existingAttr.userId !== userId) {
+      return res.status(403).json({ error: 'Forbidden' });
     }
 
     const contextEngine = getContextEngine();
