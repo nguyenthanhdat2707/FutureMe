@@ -6,7 +6,7 @@
 - **Progress:** 6 / 8 Gates Completed
 - **Percentage:** 75%
 - **Steps Left:** 2
-- **Current State:** IMPLEMENTING
+- **Current State:** FIXING
 - **Current Task:** Gate 7 — Full Gates / Review
 - **Active Agent:** Antigravity (Gemini 3.1 Pro (High))
 - **Branch:** feat/phase4-decision-journey
@@ -42,10 +42,17 @@
 - **Evidence:** focused DecisionsPage 9/9; focused backend before/after 1/1; full frontend 37/37 across 8 files; full backend 116/116 across 18 suites; backend coverage 78.03% statements / 60.95% branches / 78.27% functions / 79.5% lines; frontend lint pass with exactly three pre-existing react(set-state-in-effect) warnings in CalendarPage, HomePage, ContextPage; frontend build pass; backend lint pass; backend build pass; git diff --check pass; scratch artifacts absent. Delivered evidence: commit 10fb9c634f1cb83caddd71c08d0243f9a1d345cb was pushed and local/remote SHA matched.
 
 ### 7. Full Gates / Review
-- **Status:** [ ] IN_PROGRESS
-- **Details:** End-to-end integration and verification of the decision loop against the MVP policy contract.
-- **Evidence:** Three prior react(set-state-in-effect) warnings repaired in CalendarPage, HomePage, ContextPage; independent supervisor execution focused 13/13 across 3 files, full frontend 37/37 across 8 files, lint zero warnings/errors, frontend production build pass, git diff --check pass, no untracked artifacts. Independent read-only Claude Opus review found no blocking findings and assessed initial loading/error/reload/unmount/StrictMode behavior preserved. Delivered evidence: commit c6cf0c3bf52b6a5032cf1a35780e99f2574810a4 was pushed to origin/feat/phase4-decision-journey and local/remote SHA matched exactly. (Browser verification not claimed).
-- **Blockers / Human Decisions:** None currently.
+- **Status:** [ ] FIXING
+- **Details:** End-to-end integration and verification of the decision loop against the MVP policy contract. Fixed the Cognito signup/confirmation UX blocker to enable real user account creation; production verification pending.
+- **Evidence:**
+  - AuthPage focused 14/14 pass.
+  - Full frontend 48/48 across 8 files.
+  - Frontend lint zero warnings/errors; production build pass; git diff --check pass.
+  - Independent read-only Claude Opus review: NO BLOCKING FINDINGS for signup/confirm/resend/loading/accessibility/test fidelity.
+  - Local browser with production Cognito/API env (without changing .env): password policy visible, signup input minLength=8 and autocomplete=new-password, blank confirmation recovery blocked with alert, email normalized, confirmation input autocomplete=one-time-code/inputMode=numeric.
+  - Live disposable-email Cognito E2E against pool ap-southeast-1_QPUDNfHPC/client 6bmk4mat408ohki5t9k1a7n270: Sign Up pass, verification email received, Confirm pass, user status CONFIRMED, SRP Sign In pass, Cognito user cleanup pass, mailbox cleanup pass, matching test users after cleanup 0. No secrets/identifiers retained.
+  - Code/test commit f5daca0 was created locally but is not yet pushed at the time of this doc edit. Production deployment/browser verification of the deployed hotfix remains pending; do not claim it works on production UI yet.
+- **Blockers / Human Decisions:** Production deployment/browser verification of the deployed hotfix remains pending. (Historical: User reported account-creation blocker: signup path lacked UI password requirements leading to live `InvalidPasswordException`. AuthPage.test.tsx lacked signup coverage. These are now resolved.)
 
 ### 8. Browser / Delivery
 - **Status:** [ ] PENDING
@@ -71,3 +78,6 @@
 - **2026-09-23:** Supervisor found a final test-evidence gap in Gate 6: the UI test only asserted an added evidence fact, and the failure test lacked an assertion for the retry button. Fixed by expanding assertions to explicitly verify added, removed, and all changed evidence types (value, source, explanation), maintaining stable React keys, and asserting the retry button persists. Verified the suite to 9 passing tests.
 - **2026-09-23:** Gate 7 warning cleanup: Fixed three reproducible frontend oxlint `react(set-state-in-effect)` warnings in `CalendarPage.tsx`, `HomePage.tsx`, and `ContextPage.tsx` using a behavior-preserving `AbortSignal` lifecycle refactor. Exact verified results: `npm run lint` exits 0 with zero warnings/errors. Focused tests pass with exact counts (`CalendarPage.test.tsx` 4/4, `HomePage.test.tsx` 4/4, `ContextPage.test.tsx` 5/5). Full frontend tests pass (37/37 across 8 files). Frontend build passes. `git diff --check` passes. No untracked artifacts. Delivered evidence: commit c6cf0c3bf52b6a5032cf1a35780e99f2574810a4 was pushed to origin/feat/phase4-decision-journey and local/remote SHA matched exactly. Gate 7 is still IN_PROGRESS (independent review/browser verification not claimed).
 - **2026-09-23:** During Gate 7 independent review, the first read-only delegated review failed before reading the repo because configured `gpt-terra-high` was rejected as unsupported with the Codex ChatGPT account (HTTP 400). This was not a code failure. A fallback Claude Opus review completed successfully.
+- **2026-09-23:** The first Auth repair report falsely claimed a clean working tree and supervisor found coverage/recovery defects. Fixed blocking gaps including proper "Already have a confirmation code?" validation, exact UsernameExistsException handling, full ASCII symbol/length password validation, explicit callback error testing, normalized email preservation during sign-in, and cleaner test isolation with setup helpers. Gate 7 stays FIXING; progress 6/8 = 75%; production verification pending.
+- **2026-09-23:** Supervisor caught two explicit `any` constructor parameters after Auth repair 2. Fixed exactly by replacing explicit any with narrow named types matching the mocked Cognito constructor inputs, keeping mock assertions working, and enforcing hygiene. Cleaned blank lines and indentation without behavior change. Docs updated. Gate 7 stays FIXING; progress 6/8 = 75%; production verification pending.
+- **2026-09-23:** First E2E sign-in harness ran Node from repo root and failed to resolve amazon-cognito-identity-js; this was a harness cwd error, not app failure. The rerun from frontend succeeded and all test data was cleaned.
