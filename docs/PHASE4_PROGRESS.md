@@ -3,11 +3,11 @@
 **Phase 4: User-Invoked Decision Journey**
 
 ## Overall Status
-- **Progress:** 5 / 8 Gates Completed
-- **Percentage:** 62.5%
-- **Steps Left:** 3
-- **Current State:** BLOCKED
-- **Current Task:** Gate 6 — waiting for the Antigravity editing quota to reset or explicit authorization to use another editor
+- **Progress:** 6 / 8 Gates Completed
+- **Percentage:** 75%
+- **Steps Left:** 2
+- **Current State:** IMPLEMENTING
+- **Current Task:** Gate 7 — Full Gates / Review
 - **Active Agent:** Antigravity (Gemini 3.1 Pro (High))
 - **Branch:** feat/phase4-decision-journey
 
@@ -37,12 +37,12 @@
 - **Evidence:** 6 focused DecisionsPage tests pass. Full frontend tests (34/34) pass across 8 files. Frontend build passes. Lint exits 0 with exactly three pre-existing react(set-state-in-effect) warnings in CalendarPage, HomePage, ContextPage. git diff/check pass. No browser verification yet. Delivered evidence: commit b5f1971a723fb4d072021c843be716842d76e9d4 was pushed to origin/feat/phase4-decision-journey. Local and remote SHAs matched exactly; branch was clean and synchronized.
 
 ### 6. Before/After Explanation Support
-- **Status:** [ ] BLOCKED
-- **Details:** Implementing before/after explanation logic for repeating the same decision after a context change.
-- **Blockers / Human Decisions:** Antigravity returned HTTP 429 before producing edits because its individual quota was exhausted; the CLI reported a reset in approximately 2 hours 50 minutes. The branch remains clean at `5cf2135361b86087b83a99529d2d9d52d1a3982f`, matching the remote. Resume with Antigravity after reset, or obtain explicit Product Owner authorization before using another editing worker.
+- **Status:** [x] COMPLETE
+- **Details:** Implemented before/after explanation logic for repeating the same decision after a context change.
+- **Evidence:** focused DecisionsPage 9/9; focused backend before/after 1/1; full frontend 37/37 across 8 files; full backend 116/116 across 18 suites; backend coverage 78.03% statements / 60.95% branches / 78.27% functions / 79.5% lines; frontend lint pass with exactly three pre-existing react(set-state-in-effect) warnings in CalendarPage, HomePage, ContextPage; frontend build pass; backend lint pass; backend build pass; git diff --check pass; scratch artifacts absent. State changes are currently local, uncommitted, and unpushed.
 
 ### 7. Full Gates / Review
-- **Status:** [ ] PENDING
+- **Status:** [ ] IN_PROGRESS
 - **Details:** End-to-end integration and verification of the decision loop against the MVP policy contract.
 - **Blockers / Human Decisions:** None currently.
 
@@ -65,3 +65,6 @@
 - **2026-09-22:** Supervisor review caught multiple Gate 5 implementation defects: conflict contract violation (`unresolvedMaterialConflicts` missing from ASK display/payload), model boundary violation (false AI badge/authority), type safety violation (`any` cast bypassed for DemoForm), contract fidelity issue (`policy` optional, fake generic tradeoff shape docs claim), UI semantics issue (RECOMMEND status and exact confidence wording missing), and test isolation/quality flaws (missing `sessionStorage.clear()`, async `waitFor`, precise choices/responses/reasons, typed fixtures). Fixed all defects using focused RED/GREEN TDD on `DecisionsPage.test.tsx` and implementation `DecisionsPage.tsx`. Removed AI badge, added type guard `isDemoFormField`, fixed payload carry-over, rewrote test file completely. Frontend build and tests fully pass. Delivered evidence: commit b5f1971a723fb4d072021c843be716842d76e9d4 was pushed to origin/feat/phase4-decision-journey. Local and remote SHAs matched exactly; branch was clean and synchronized. No browser verification yet.
 - **2026-09-22:** Supervisor direct verification corrected the worker's focused count from 7 to 6 and fixed the inconsistent hardening fixture before delivery.
 - **2026-09-22:** Gate 6 was blocked before implementation when Antigravity returned HTTP 429 (`RESOURCE_EXHAUSTED`) and reported an individual-quota reset in approximately 2 hours 50 minutes. No Gate 6 edits were produced. Supervisor readback confirmed the feature branch remained clean and local/remote SHAs both equaled `5cf2135361b86087b83a99529d2d9d52d1a3982f`. Progress remains 5/8 (62.5%).
+- **2026-09-22:** Gate 6 repair worker was interrupted by signal 1 before making verified progress.
+- **2026-09-22:** Gate 6 repairs encountered scratch artifact leakage and test/failure-state/provenance issues. Removed forbidden scratch/Tdd1.tsx and empty scratch/ dir. Repaired missing BEFORE/AFTER failure-state handling (properly leaving old result on failure and deferring update until success). Ensured exact evidence delta and recommendation change rendering. Integrated backend test with exact matching. All edits were verified with exact frontend/backend tests, lint, and build.
+- **2026-09-23:** Supervisor found a final test-evidence gap in Gate 6: the UI test only asserted an added evidence fact, and the failure test lacked an assertion for the retry button. Fixed by expanding assertions to explicitly verify added, removed, and all changed evidence types (value, source, explanation), maintaining stable React keys, and asserting the retry button persists. Verified the suite to 9 passing tests.
