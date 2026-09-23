@@ -1,115 +1,61 @@
-import api from '../api/client';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  DEMO_PERSONAS,
+  clearPersonaSessionState,
+  getSelectedDemoPersonaId,
+  setSelectedDemoPersonaId,
+  type DemoPersonaId,
+} from '../config/demo-personas';
 
-/**
- * DemoPage - Demo Mode Controls
- * Load pre-configured scenarios for demonstration
- */
 function DemoPage() {
-  const handleLoadScenario = async () => {
-    try {
-      await api.demo.loadScenario('hackathon-deadline');
-      window.location.href = '/'; // Navigate to home to show updated data
-    } catch (e) {
-      console.error(e);
-      alert('Failed to load scenario');
-    }
-  };
+  const navigate = useNavigate();
+  const [selectedId, setSelectedId] = useState<DemoPersonaId>(getSelectedDemoPersonaId);
 
-  const handleReset = async () => {
-    try {
-      sessionStorage.removeItem('decisions_form');
-      sessionStorage.removeItem('decisions_observationForm');
-      sessionStorage.removeItem('decisions_result');
-      sessionStorage.removeItem('decisions_beforeResult');
-      sessionStorage.removeItem('decisions_clarificationAnswers');
-
-      await api.demo.reset();
-      window.location.href = '/'; // Navigate to home to show updated data
-    } catch (e) {
-      console.error(e);
-      alert('Failed to reset scenario');
-    }
+  const choosePersona = (personaId: string) => {
+    clearPersonaSessionState();
+    const next = setSelectedDemoPersonaId(personaId);
+    setSelectedId(next);
+    navigate('/');
   };
 
   return (
     <div className="p-8 space-y-8">
       <header>
-        <h1 className="text-4xl font-serif text-text-primary mb-2">Demo Mode</h1>
-        <p className="text-text-secondary">Explore Future Me with pre-loaded scenarios</p>
+        <h1 className="text-4xl font-serif text-text-primary mb-2">Public Demo Personas</h1>
+        <p className="text-text-secondary">
+          Choose a synthetic scenario and explore Future Me immediately. No account or real personal data is used.
+        </p>
       </header>
 
-      {/* Demo Scenarios */}
-      <div className="space-y-4">
-        <h2 className="text-xl font-serif text-text-primary">Available Scenarios</h2>
-
-        <div className="grid gap-4">
-          <div className="card p-6 hover:shadow-md transition-shadow cursor-pointer">
-            <h3 className="font-medium text-text-primary mb-2">Overcommitted Developer</h3>
-            <p className="text-sm text-text-secondary mb-4">
-              A developer juggling too many commitments with an approaching deadline.
-              Demonstrates capacity alerts and schedule optimization.
-            </p>
-            <div className="flex gap-4 text-xs text-text-secondary">
-              <span>Energy: Low</span>
-              <span>Cognitive Load: High</span>
-              <span>Stress: 7/10</span>
-            </div>
-            <button
-              onClick={handleLoadScenario}
-              className="mt-4 px-4 py-2 bg-accent-ai text-white rounded-lg text-sm font-medium hover:bg-opacity-90"
-            >
-              Load Scenario
-            </button>
-          </div>
-
-          <div className="card p-6 hover:shadow-md transition-shadow cursor-pointer opacity-50">
-            <h3 className="font-medium text-text-primary mb-2">Energy-Aware Scheduling</h3>
-            <p className="text-sm text-text-secondary mb-4">
-              Shows how Future Me matches task energy requirements with your daily energy patterns.
-            </p>
-            <div className="flex gap-4 text-xs text-text-secondary">
-              <span>Coming soon</span>
-            </div>
-          </div>
-
-          <div className="card p-6 hover:shadow-md transition-shadow cursor-pointer opacity-50">
-            <h3 className="font-medium text-text-primary mb-2">Goal Drift Alert</h3>
-            <p className="text-sm text-text-secondary mb-4">
-              Demonstrates proactive intervention when daily actions drift from long-term goals.
-            </p>
-            <div className="flex gap-4 text-xs text-text-secondary">
-              <span>Coming soon</span>
-            </div>
-          </div>
-        </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        {DEMO_PERSONAS.map((persona) => {
+          const active = persona.id === selectedId;
+          return (
+            <article key={persona.id} className={`card p-6 space-y-4 ${active ? 'ring-2 ring-accent-ai' : ''}`}>
+              <div>
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="text-xl font-serif text-text-primary">{persona.displayName}</h2>
+                  {active && <span className="text-xs font-medium text-accent-ai">Active</span>}
+                </div>
+                <p className="mt-2 text-sm text-text-secondary">{persona.scenario}</p>
+              </div>
+              <p className="text-sm font-medium text-accent-ai">Expected journey: {persona.expectedJourney}</p>
+              <button
+                type="button"
+                onClick={() => choosePersona(persona.id)}
+                className="px-4 py-2 bg-accent-ai text-white rounded-lg text-sm font-medium hover:bg-opacity-90"
+              >
+                {active ? 'Open this persona' : 'Use this persona'}
+              </button>
+            </article>
+          );
+        })}
       </div>
 
-      {/* Demo Controls */}
-      <div className="card p-6 space-y-4">
-        <h3 className="font-medium text-text-primary">Demo Controls</h3>
-        <div className="flex gap-3">
-          <button
-            onClick={handleReset}
-            className="px-4 py-2 border border-slate-300 text-text-primary rounded-lg text-sm hover:bg-slate-50"
-          >
-            Reset to Default
-          </button>
-          <button className="px-4 py-2 border border-slate-300 text-text-primary rounded-lg text-sm hover:bg-slate-50">
-            Skip to Next Event
-          </button>
-        </div>
-      </div>
-
-      {/* Instructions */}
-      <div className="bg-accent-ai bg-opacity-5 border border-accent-ai rounded-lg p-6">
-        <h3 className="font-medium text-text-primary mb-2">How to use Demo Mode</h3>
-        <ul className="text-sm text-text-secondary space-y-2 list-disc list-inside">
-          <li>Select a scenario above to load pre-configured goals, context, and calendar events</li>
-          <li>Navigate through the app to see how Future Me responds to different situations</li>
-          <li>All changes in demo mode are temporary and won't affect your actual data</li>
-          <li>Use the controls to reset or advance through scenario events</li>
-        </ul>
-      </div>
+      <aside className="bg-amber-50 border border-amber-200 rounded-lg p-5 text-sm text-amber-900">
+        These personas are shared, mutable demo data. They are not authenticated accounts and must never contain private information.
+      </aside>
     </div>
   );
 }

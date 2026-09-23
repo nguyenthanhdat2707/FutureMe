@@ -1,6 +1,8 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { isCognitoMode } from '../../auth/cognito';
+import { isDemoMode } from '../../config/demo-personas';
+import DemoPersonaSelector from '../demo/DemoPersonaSelector';
 
 /**
  * LeftSidebar - Personal Context Anchors
@@ -73,6 +75,8 @@ function LeftSidebar() {
             Demo Mode
           </Link>
         </nav>
+
+        {isDemoMode && <DemoPersonaSelector />}
 
         {/* Context Snapshot */}
         <div className="card p-4 space-y-3">

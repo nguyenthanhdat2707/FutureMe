@@ -220,17 +220,35 @@ export interface Decision {
   createdAt: Date;
 }
 
+
+export type DecisionPolicyOutcome = 'RECOMMEND' | 'ASK' | 'ABSTAIN';
+
+export interface DecisionPolicyResult {
+  outcome: DecisionPolicyOutcome;
+  reason: string;
+  unresolvedMaterialFields?: string[];
+  unresolvedMaterialConflicts?: string[];
+}
+
+export interface DecisionClarificationMetadata {
+  attempted: boolean;
+  unresolvedFields?: string[];
+  unresolvedConflicts?: string[];
+}
+
 export interface DecisionQuery {
   question: string;
   options?: string[];
   context?: Record<string, unknown>;
   impactProfile?: DecisionImpactProfile;
+  clarification?: DecisionClarificationMetadata;
 }
 
 export interface DecisionSupport {
   decision: Decision;
   assessment: DecisionFeasibilityAssessment;
   clarificationNeeded?: string[];
+  policy: DecisionPolicyResult;
   state?: StateEstimate;
 }
 
@@ -406,6 +424,7 @@ export interface RelevantContext {
   commitments: Commitment[];
   constraints: string[];
   recentHistory: string[];
+  unresolvedConflicts?: string[];
   state: StateEstimate;
 }
 

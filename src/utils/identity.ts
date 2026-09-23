@@ -1,4 +1,5 @@
 import { Request } from 'express';
+import { isDemoPersonaId } from '../demo/personas';
 
 const COGNITO_SUB_SYMBOL = Symbol('cognito_sub');
 
@@ -24,6 +25,15 @@ export function getUserId(req: Request): string {
       return sub.trim();
     }
     throw new UnauthorizedError('Unauthorized: missing or invalid sub claim');
+  }
+
+  if (process.env.AUTH_MODE === 'demo') {
+    const header = req.headers['x-demo-user'];
+    const demoUserId = (Array.isArray(header) ? header[0] : header)?.trim();
+    if (demoUserId && isDemoPersonaId(demoUserId)) {
+      return demoUserId;
+    }
+    throw new UnauthorizedError('Unauthorized: missing or invalid demo persona');
   }
 
   // Fallback for local testing if not using cognito

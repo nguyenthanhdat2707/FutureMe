@@ -2,10 +2,10 @@
 
 ## AWS Backend Architecture
 The backend is structured into four main Terraform modules:
-1. `identity`: Manages Amazon Cognito User Pools and User Pool Clients for authenticating API requests.
+1. `identity`: Retains Amazon Cognito User Pool resources for a reversible post-demo authentication path; it is not used by the public demo route.
 2. `storage`: Configures 7 DynamoDB tables using on-demand billing (`PAY_PER_REQUEST`). Includes Global Secondary Indexes configured for query access patterns.
 3. `runtime`: Proposes the main Lambda function on **Node.js 24.x** to serve the Express API along with IAM roles allowing DynamoDB access and Bedrock `InvokeModel`.
-4. `http-api`: Sets up an API Gateway HTTP API (v2) with a JWT Authorizer pointing to the Cognito User Pool, and creates proxy integration with the Lambda function.
+4. `http-api`: Sets up a public API Gateway HTTP API (v2) with bounded CORS/throttling and Lambda proxy integration. Lambda validates the six synthetic `X-Demo-User` persona IDs in demo mode.
 
 ## Status
 **NOT DEPLOYED**. This repository is under a strict no-apply gate. The instructions below outline the required steps for human execution when approved.
@@ -26,7 +26,7 @@ The backend is structured into four main Terraform modules:
    - After a separately approved bootstrap apply, copy `backend.tf.example` to `backend.tf` and run `terraform init -reconfigure -backend-config=backend.hcl.example`. The backend uses native S3 lockfiles; no DynamoDB lock table is used.
    - The bootstrap is now applied. Use **Actions → Terraform Application → Run workflow** on `main`: run `plan` first, then choose `apply` and type `APPLY_APPLICATION` when ready. The workflow uses GitHub OIDC, rejects delete/replacement plans, applies the exact generated plan, and performs a health check.
 4. **Environment Handoff:**
-   - Consume the outputs produced by Terraform (`api_base_url`, `cognito_user_pool_id`, `cognito_user_pool_client_id`) in the existing, externally managed Amplify Frontend application via environment variables.
+   - Set `VITE_API_BASE_URL` from the Terraform `api_base_url` output and set `VITE_AUTH_MODE=demo` in the existing, externally managed Amplify frontend.
 
 ## Rollback Planning
 No rollback action is authorized in this planning unit. Cognito deletion protection and the state bucket's `prevent_destroy` intentionally block casual destruction. Any future rollback or destroy requires a reviewed plan, data-retention decision, and explicit approval.

@@ -30,8 +30,6 @@ module "http-api" {
   environment                = var.environment
   lambda_invoke_arn          = module.runtime.invoke_arn
   lambda_function_name       = module.runtime.function_name
-  user_pool_issuer           = module.identity.issuer
-  user_pool_client_id        = module.identity.client_id
   allowed_origins            = var.allowed_origins
   api_throttling_rate_limit  = var.api_throttling_rate_limit
   api_throttling_burst_limit = var.api_throttling_burst_limit

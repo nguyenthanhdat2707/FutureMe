@@ -29,6 +29,21 @@ describe('HTTP Route Auth', () => {
       
     expect((response.body as Record<string, string>).error).toMatch(/Unauthorized/);
   });
+
+  it('requires an allowlisted persona header in demo mode', async () => {
+    process.env.AUTH_MODE = 'demo';
+    const app = createApp();
+
+    await request(app).get('/api/context').expect(401);
+    await request(app).get('/api/context').set('X-Demo-User', 'arbitrary-user').expect(401);
+
+    const response = await request(app)
+      .get('/api/context')
+      .set('X-Demo-User', 'phase4-eval-v1:focused-builder')
+      .expect(200);
+
+    expect((response.body as Record<string, unknown>).userId).toBe('phase4-eval-v1:focused-builder');
+  });
   
   it('returns 401 when blank subject in cognito mode', async () => {
     process.env.AUTH_MODE = 'cognito';

@@ -10,10 +10,10 @@ This infrastructure code manages the AWS backend for the Future Me application (
 ## Architecture and Module Layout
 The backend infrastructure is split into a bootstrap component and four application modules:
 - **`bootstrap/`**: S3 state bucket with native S3 lockfiles and GitHub OIDC integration. No DynamoDB lock table is used.
-- **`terraform/modules/identity/`**: Cognito User Pool (email-only) and Client.
+- **`terraform/modules/identity/`**: Retained Cognito User Pool and Client for a reversible post-demo auth path; unused by the public demo route.
 - **`terraform/modules/storage/`**: Seven DynamoDB tables (`PAY_PER_REQUEST`).
 - **`terraform/modules/runtime/`**: Node.js 24.x Lambda function, execution role with strict IAM scoping, and Bedrock invocation policies.
-- **`terraform/modules/http-api/`**: API Gateway HTTP API v2 with JWT authorizer and parameterized logging.
+- **`terraform/modules/http-api/`**: Public API Gateway HTTP API v2 with bounded CORS, throttling, and parameterized logging.
 
 ## Planning Instructions (Strict No-Apply Gate)
 This repository is currently under a **HARD GATE** for planning only. Do NOT run `terraform apply`. The infrastructure is NOT YET DEPLOYED OR APPLIED.
@@ -64,11 +64,10 @@ Every run rebuilds and tests the backend, creates a fresh Terraform plan, upload
 ## Frontend Environment Handoff
 Once approved and applied, the infrastructure will output values needed by the frontend. These should be manually added to the frontend environment without mutating the Amplify app via Terraform:
 - `VITE_API_BASE_URL`: The API Gateway endpoint URL (e.g., `https://<id>.execute-api.ap-southeast-1.amazonaws.com/api`)
-- `VITE_COGNITO_USER_POOL_ID`: The Cognito User Pool ID
-- `VITE_COGNITO_USER_POOL_CLIENT_ID`: The Cognito App Client ID
-- `VITE_COGNITO_REGION`: `ap-southeast-1`
+- `VITE_AUTH_MODE`: `demo`
 
 ## Route Auth Model
-- **Public Routes**: `GET /api/health`
-- **Protected Routes**: `$default` route uses a JWT authorizer. API Gateway validates the JWT token against the Cognito User Pool.
-- **Identity Context**: The backend Lambda extracts the verified user identity (`sub`) directly from the API Gateway event (`requestContext.authorizer.jwt.claims.sub`). It passes this securely via a private symbol to ignore any client-supplied `userId` to ensure secure data access in production mode.
+- **Public Routes**: `GET /api/health` and the `$default` application route are public for the hackathon demo.
+- **Demo Identity Context**: The frontend sends `X-Demo-User`; Lambda accepts only the six deterministic synthetic persona IDs and ignores body/query `userId` in `AUTH_MODE=demo`.
+- **Security Boundary**: Demo persona selection is not authentication or tenant isolation. Only synthetic shared data may be stored under these IDs. API Gateway throttling remains enabled to bound accidental/abusive traffic.
+- **Reversibility**: Cognito resources and Cognito-mode application code remain declared so authenticated mode can be restored later through a reviewed change.

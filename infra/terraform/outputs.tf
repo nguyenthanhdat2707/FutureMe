@@ -25,8 +25,6 @@ output "dynamodb_table_names" {
 output "frontend_env_mapping" {
   value = <<EOT
 VITE_API_BASE_URL=${module.http-api.api_endpoint}/api
-VITE_COGNITO_USER_POOL_ID=${module.identity.pool_id}
-VITE_COGNITO_USER_POOL_CLIENT_ID=${module.identity.client_id}
-VITE_COGNITO_REGION=${var.aws_region}
+VITE_AUTH_MODE=demo
 EOT
 }

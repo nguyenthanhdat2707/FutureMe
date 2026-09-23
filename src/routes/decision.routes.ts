@@ -34,6 +34,22 @@ decisionRouter.post('/', async (req: Request, res: Response) => {
         return res.status(400).json({ error: 'Numeric values cannot be negative.' });
       }
     }
+    if (query?.clarification) {
+      const c = query.clarification;
+      if (typeof c.attempted !== 'boolean') {
+        return res.status(400).json({ error: 'clarification.attempted must be a boolean.' });
+      }
+      if (c.unresolvedFields !== undefined) {
+        if (!Array.isArray(c.unresolvedFields) || c.unresolvedFields.length > 20 || c.unresolvedFields.some(f => typeof f !== 'string' || f.trim().length === 0 || f.trim().length > 200)) {
+          return res.status(400).json({ error: 'clarification.unresolvedFields must be a reasonable array of strings.' });
+        }
+      }
+      if (c.unresolvedConflicts !== undefined) {
+        if (!Array.isArray(c.unresolvedConflicts) || c.unresolvedConflicts.length > 20 || c.unresolvedConflicts.some(f => typeof f !== 'string' || f.trim().length === 0 || f.trim().length > 200)) {
+          return res.status(400).json({ error: 'clarification.unresolvedConflicts must be a reasonable array of strings.' });
+        }
+      }
+    }
 
     const engine = getDecisionEngine();
     const support = await engine.supportDecision(userId, query);

@@ -83,4 +83,28 @@ describe('Identity Utils', () => {
       expect(userId).toBe('demo-user');
     });
   });
+
+  describe('Demo Mode', () => {
+    beforeEach(() => {
+      process.env.AUTH_MODE = 'demo';
+    });
+
+    it('accepts an allowlisted demo persona header and ignores body/query identity', () => {
+      const req = {
+        headers: { 'x-demo-user': 'phase4-eval-v1:focused-builder' },
+        body: { userId: 'spoofed-body' },
+        query: { userId: 'spoofed-query' },
+      } as unknown as Request;
+
+      expect(getUserId(req)).toBe('phase4-eval-v1:focused-builder');
+    });
+
+    it('rejects missing and unknown demo persona headers', () => {
+      const missing = { headers: {}, body: { userId: 'phase4-eval-v1:focused-builder' } } as unknown as Request;
+      const unknown = { headers: { 'x-demo-user': 'arbitrary-user' } } as unknown as Request;
+
+      expect(() => getUserId(missing)).toThrow('Unauthorized: missing or invalid demo persona');
+      expect(() => getUserId(unknown)).toThrow(UnauthorizedError);
+    });
+  });
 });
