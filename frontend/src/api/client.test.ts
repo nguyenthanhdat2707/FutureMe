@@ -31,7 +31,7 @@ describe('api/client', () => {
     demoModule.setIsDemoMode(false);
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({}),
+      json: async () => ({ policy: {} }),
       status: 200,
     } as Response);
   });
@@ -83,6 +83,17 @@ describe('api/client', () => {
       expect(options.body).toBe(JSON.stringify({ query: { question: 'test' } }));
       expect((options.headers as Headers).get('X-Demo-User')).toBe('phase4-eval-v1:focused-builder');
       expect((options.headers as Headers).get('Authorization')).toBeNull();
+    });
+
+    it('throws contract violation error if policy is missing from response', async () => {
+      vi.mocked(globalThis.fetch).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ decision: {}, assessment: {} }) // Missing policy
+      } as Response);
+
+      const req: DecisionApiRequest = { query: { question: 'test' } };
+      
+      await expect(api.decisions.query(req)).rejects.toThrow('API contract violation: missing policy in decision response');
     });
   });
 

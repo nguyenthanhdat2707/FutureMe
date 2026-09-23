@@ -4,7 +4,19 @@ resource "aws_apigatewayv2_api" "api" {
   cors_configuration {
     allow_origins = var.allowed_origins
     allow_methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-    allow_headers = ["Authorization", "Content-Type", "X-Demo-User"]
+    allow_headers = ["Authorization", "Content-Type", "x-demo-user"]
+  }
+}
+
+resource "aws_apigatewayv2_authorizer" "jwt" {
+  api_id           = aws_apigatewayv2_api.api.id
+  authorizer_type  = "JWT"
+  identity_sources = ["$request.header.Authorization"]
+  name             = "${var.project}-${var.environment}-jwt-auth"
+
+  jwt_configuration {
+    audience = [var.user_pool_client_id]
+    issuer   = var.user_pool_issuer
   }
 }
 
