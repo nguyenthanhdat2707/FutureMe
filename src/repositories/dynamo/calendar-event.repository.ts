@@ -1,4 +1,4 @@
-import { getRequiredString, getOptionalString, getRequiredDate } from './mapping';
+import { getRequiredString, getOptionalString, getRequiredDate, getOptionalDate } from './mapping';
 import { getDynamoClient } from './client';
 import { DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { ICalendarEventRepository } from "../interfaces";
@@ -96,6 +96,7 @@ export class DynamoCalendarEventRepository implements ICalendarEventRepository {
   async upsert(event: Omit<CalendarEvent, "id" | "createdAt">): Promise<CalendarEvent> {
     const existing = await this.findByExternalId(event.userId, event.externalId);
     const id = existing ? existing.id : uuidv4();
+    const createdAt = existing?.createdAt ?? new Date();
 
     const item: Record<string, unknown> = {
       id,
@@ -106,7 +107,8 @@ export class DynamoCalendarEventRepository implements ICalendarEventRepository {
       end_time: event.endTime.toISOString(),
       status: event.status ?? undefined,
       raw_data: event.rawData ?? undefined,
-      synced_at: event.syncedAt.toISOString()
+      synced_at: event.syncedAt.toISOString(),
+      created_at: createdAt.toISOString()
     };
 
     await this.docClient.send(new PutCommand({
@@ -128,7 +130,7 @@ export class DynamoCalendarEventRepository implements ICalendarEventRepository {
       status: getOptionalString(item, 'status'),
       rawData: getOptionalString(item, 'raw_data'),
       syncedAt: getRequiredDate(item, 'synced_at'),
-      createdAt: getRequiredDate(item, 'created_at')
+      createdAt: getOptionalDate(item, 'created_at') ?? getRequiredDate(item, 'synced_at')
     };
   }
 }
