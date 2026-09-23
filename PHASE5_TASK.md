@@ -157,8 +157,10 @@ Per `docs/MVP_SCOPE_UPDATED.md`:
 
 Updates will be recorded here as implementation proceeds:
 
-- [ ] Task contract written and approved
-- [ ] Antigravity worker started
+- [x] Task contract written and approved
+- [x] DECISION_POLICY.md updated with Phase 5 intervention policy
+- [x] PHASE5_ANTIGRAVITY_CONTRACT.md created with detailed implementation spec
+- [x] Antigravity worker started (session proc_557664303565, Gemini 3.8 Flash High, 30min timeout)
 - [ ] Backend: staleness detection implemented
 - [ ] Backend: disruption detection implemented
 - [ ] Backend: intervention API created
