@@ -21,11 +21,17 @@ export function createApp() {
 
   // CORS Middleware
   app.use((req: Request, res: Response, next: NextFunction) => {
-    // API Gateway handles production CORS. We only emit bounded localhost CORS locally.
+    // API Gateway handles production CORS. We only emit bounded CORS locally for testing.
     if (process.env.NODE_ENV !== 'production') {
-      res.header('Access-Control-Allow-Origin', 'http://localhost:5173');
+      const allowedOrigins = ['http://localhost:5173', 'http://localhost:3000', 'https://main.d6nuwvgegqhns.amplifyapp.com'];
+      const origin = req.headers.origin as string;
+      if (allowedOrigins.includes(origin)) {
+        res.header('Access-Control-Allow-Origin', origin);
+      } else {
+        res.header('Access-Control-Allow-Origin', 'http://localhost:5173');
+      }
       res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-      res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Demo-User');
+      res.header('Access-Control-Allow-Headers', 'origin, x-requested-with, content-type, accept, authorization, x-demo-user');
     }
 
     if (req.method === 'OPTIONS') {

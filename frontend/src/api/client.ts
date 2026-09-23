@@ -377,7 +377,11 @@ export const decisionsApi = {
       throw new Error(message);
     }
 
-    return response.json() as Promise<DecisionApiResponse>;
+    const data = await response.json();
+    if (typeof data === 'object' && data !== null && !('policy' in data)) {
+      throw new Error('API contract violation: missing policy in decision response');
+    }
+    return data as DecisionApiResponse;
   },
 
   async getHistory(): Promise<DecisionQuery[]> {
