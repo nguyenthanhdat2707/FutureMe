@@ -2,9 +2,9 @@
 
 Snapshot: 2026-09-23T10:20:00+07:00
 
-Status update: a valid independent Antigravity/Gemini review subsequently inspected an exact temporary copy of the eight-file code/test diff. Actual and reviewed binary diffs shared SHA-256 `381da3027b5c790a01fde4b847e6fc6871c2a121c382bf8f4fcc418b76a8df72`; the reviewer reported `NO BLOCKING FINDINGS` and `SHIP`. Gate 7 is complete locally. Gate 8 browser validation and delivery are now the active work.
+Status update: a valid independent Antigravity/Gemini review inspected an exact temporary copy of the eight-file code/test diff. Actual and reviewed binary diffs shared SHA-256 `381da3027b5c790a01fde4b847e6fc6871c2a121c382bf8f4fcc418b76a8df72`; the reviewer reported `NO BLOCKING FINDINGS` and `SHIP`. Commit `f593a365a808d8ef2e6a7f9a7283160acdaeb6b9` was pushed with matching local/remote SHAs. Gate 8 browser proof subsequently passed RECOMMEND, canonical ASK, unresolved ABSTAIN, clarification-to-RECOMMEND, stale-context signaling, and context-change before/after reassessment. Phase 4 is 8/8 (100%) and READY_FOR_USER_TEST. The remaining active work is the separate local demo-persona/evaluation-data unit; production mutation is still unauthorized.
 
-This file is the execution handoff for continuing Phase 4 after switching the Codex account. The new account uses the same local filesystem and Git working tree. Do not restart the phase or discard the existing changes.
+This file preserves the complete Phase 4 execution handoff after switching the Codex account. The new account uses the same local filesystem and Git working tree. Phase 4 itself is now technically complete; sections describing the unstaged Gate 7 diff are historical snapshot evidence. Do not restart or rewrite that completed unit. Continue only from the current status update and the demo-persona/evaluation-data section.
 
 ## Required Reading Order
 
@@ -170,9 +170,9 @@ These are local automated gates only. They do not complete Gate 7 or Gate 8 by t
 - Its entity-ID fallback concern conflicts with the approved invariant: conflict identity must be a stable parsed domain entity ID; falling back to a row ID would hide genuine versions rather than group them.
 - It correctly noticed that `getRelevantContext` currently calls `findByUserId` after `getCurrentContext` already fetched the same attributes. Treat this as a bounded performance/cleanliness observation. Repair it only if the refactor preserves behavior and is covered by tests; do not broaden the unit.
 
-A valid independent review is still required. The reviewer must inspect the actual path shown above and must not edit files.
+Historical result: the valid independent review was completed against an exact temporary copy of the actual diff, as recorded in the status update above.
 
-## Immediate Codex Task Contract
+## Completed Gate 7 Task Contract (Historical)
 
 ### GOAL
 
@@ -269,20 +269,20 @@ Implementation must first define exact persona names, record schemas/counts, IDs
 
 ## Remaining Phase Sequence
 
-1. Valid independent review of the actual Gate 7 diff.
-2. Resolve only demonstrated blocking findings.
-3. Rerun focused and full gates.
-4. Update Phase 4 trackers with exact evidence.
-5. Commit and push the verified Gate 7 unit; confirm local and remote SHAs match.
-6. Implement and locally verify the six-persona seed/rollback and quick-login unit without touching production.
-7. Request explicit production-write authorization before Cognito/DynamoDB/deployment mutation.
-8. Perform exact production readback and browser verification if authorized.
-9. Complete Gate 8 browser/delivery evidence and prepare merge.
+1. COMPLETE — valid independent review of the exact Gate 7 diff.
+2. COMPLETE — no blocking findings remained.
+3. COMPLETE — focused/full test, lint, and build gates.
+4. COMPLETE — Phase 4 trackers updated with exact evidence.
+5. COMPLETE — Gate 7 commit `f593a365a808d8ef2e6a7f9a7283160acdaeb6b9` pushed with matching local/remote SHAs.
+6. COMPLETE — Gate 8 local browser/delivery evidence; Phase 4 is 8/8 and READY_FOR_USER_TEST.
+7. ACTIVE — implement and locally verify the six-persona seed/rollback and quick-login unit without touching production.
+8. PENDING HUMAN AUTHORIZATION — production Cognito/DynamoDB/deployment mutation.
+9. If authorized, perform exact production readback, rollback safety proof, and browser verification.
 
 ## Suggested First Prompt After Codex Account Switch
 
-Use the following prompt from the repository root:
+Use the following prompt from the repository root for the remaining evaluation-data unit:
 
-`Read docs/PHASE4_CODEX_HANDOFF.md, docs/PHASE4_PROGRESS.md, PROJECT_STATUS.md, PHASE4_TASK.md, and docs/DECISION_POLICY.md in that order. Then inspect the actual branch, git status, and full unstaged diff at /home/tdat/Documents/Learn/Code/HackathonIdea-VKU-09-2026/Future-Me. Do not reset or discard existing edits. Independently review the current Gate 7 repair against the frozen decision policy, fix only evidence-backed blocking defects using tests, rerun the required gates, and report exact files/commands/results. Do not commit, push, deploy, touch AWS, change credentials, or alter the frozen policy unless explicitly authorized.`
+`Read docs/PHASE4_CODEX_HANDOFF.md, docs/PHASE4_PROGRESS.md, PROJECT_STATUS.md, PHASE4_TASK.md, and docs/DECISION_POLICY.md in that order. Confirm Phase 4 is 8/8 and inspect the current branch/worktree at /home/tdat/Documents/Learn/Code/HackathonIdea-VKU-09-2026/Future-Me. Work only on the separate six-persona quick-login and deterministic phase4-eval-v1 seed/manifest/rollback unit described in the handoff. Preserve JWT claims.sub isolation and the real Cognito policy; do not embed credentials or touch real-user data. Implement and test locally only. Do not create Cognito users, write DynamoDB, change Amplify, deploy, commit, or push unless explicitly authorized.`
 
 After that worker exits, the supervising agent must inspect the worktree and rerun verification before accepting any claim.
