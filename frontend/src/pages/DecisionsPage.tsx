@@ -205,9 +205,7 @@ function DecisionsPage() {
       },
     };
 
-    if (form.userId.trim()) {
-      request.userId = form.userId.trim();
-    }
+
 
     const prevResult = result;
     setIsLoading(true);
@@ -248,7 +246,7 @@ function DecisionsPage() {
     setError(null);
 
     try {
-      await contextApi.update(observation, form.userId);
+      await contextApi.update(observation);
       setShowObservationForm(false);
       setObservationForm(INITIAL_OBSERVATION);
       if (result) {
@@ -266,7 +264,7 @@ function DecisionsPage() {
     if (!result) return;
 
     const request: DecisionApiRequest = {
-      userId: form.userId.trim() || undefined,
+      
       query: {
         question: form.question.trim(),
         impactProfile: {
@@ -355,9 +353,6 @@ function DecisionsPage() {
       },
     };
 
-    if (form.userId.trim()) {
-      request.userId = form.userId.trim();
-    }
 
     setIsLoading(true);
     setError(null);
@@ -432,15 +427,6 @@ function DecisionsPage() {
             Advanced Inputs
           </summary>
           <div className="grid gap-4 md:grid-cols-2">
-            <label className="text-sm text-text-secondary">
-              User ID <span className="text-xs">(optional)</span>
-              <input
-                value={form.userId}
-                onChange={(event) => updateField('userId', event.target.value)}
-                className={inputClassName + ' mt-1'}
-              />
-            </label>
-
             <label className="text-sm text-text-secondary">
               Decision target
               <input

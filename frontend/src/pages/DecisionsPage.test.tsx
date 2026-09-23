@@ -381,8 +381,7 @@ describe('DecisionsPage - RECOMMEND', () => {
           data: { description: 'Urgent production task', severity: 'high' },
           source: 'USER_CONFIRMED',
           confidence: 1.0
-        }),
-        expect.any(String)
+        })
       );
     });
 
