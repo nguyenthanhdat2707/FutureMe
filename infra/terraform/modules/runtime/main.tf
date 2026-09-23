@@ -75,7 +75,7 @@ resource "aws_lambda_function" "api" {
       CALENDAR_TABLE       = var.table_names["calendar_events"]
       OUTCOMES_TABLE       = var.table_names["outcomes"]
       FEEDBACK_TABLE       = var.table_names["feedback"]
-      AUTH_MODE            = "cognito"
+      AUTH_MODE            = "demo"
     }
   }
 

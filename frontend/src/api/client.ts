@@ -53,6 +53,9 @@ export const API_BASE_URL = resolveApiBaseUrl(import.meta.env.VITE_API_BASE_URL,
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 import { getAuthToken, isCognitoMode } from '../auth/cognito';
+import { getSelectedDemoPersonaId, isDemoMode } from '../config/demo-personas';
+
+const usesClientSuppliedUserId = () => !isCognitoMode && !isDemoMode;
 
 async function authFetch(url: string, options: RequestInit = {}) {
   const headers = new Headers(options.headers || {});
@@ -64,11 +67,13 @@ async function authFetch(url: string, options: RequestInit = {}) {
     } else {
       throw new Error('Authentication required');
     }
+  } else if (isDemoMode) {
+    headers.set('X-Demo-User', getSelectedDemoPersonaId());
   }
 
   const response = await fetch(url, { ...options, headers });
   if (response.status === 401) {
-    throw new Error('Unauthorized session. Please sign in again.');
+    throw new Error(isDemoMode ? 'Invalid demo persona selection.' : 'Unauthorized session. Please sign in again.');
   }
   return response;
 }
@@ -80,7 +85,7 @@ async function authFetch(url: string, options: RequestInit = {}) {
 
 export const contextApi = {
   async getCurrent(userId: string = 'demo-user'): Promise<PersonalContext> {
-    const response = await authFetch(isCognitoMode ? `${API_BASE_URL}/context` : `${API_BASE_URL}/context?userId=${encodeURIComponent(userId)}`);
+    const response = await authFetch(usesClientSuppliedUserId() ? `${API_BASE_URL}/context?userId=${encodeURIComponent(userId)}` : `${API_BASE_URL}/context`);
 
     if (!response.ok) {
       throw new Error(`Failed to fetch context: ${response.status}`);
@@ -95,10 +100,10 @@ export const contextApi = {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(isCognitoMode ? { observation } : {
+      body: JSON.stringify(usesClientSuppliedUserId() ? {
         userId,
         observation,
-      }),
+      } : { observation }),
     });
 
     if (!response.ok) {
@@ -114,10 +119,10 @@ export const contextApi = {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(isCognitoMode ? { attributeId } : {
+      body: JSON.stringify(usesClientSuppliedUserId() ? {
         userId,
         attributeId,
-      }),
+      } : { attributeId }),
     });
 
     if (!response.ok) {
@@ -131,10 +136,10 @@ export const contextApi = {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(isCognitoMode ? { correction } : {
+      body: JSON.stringify(usesClientSuppliedUserId() ? {
         userId,
         correction,
-      }),
+      } : { correction }),
     });
 
     if (!response.ok) {
@@ -149,7 +154,7 @@ export const contextApi = {
       .filter(([, text]) => text && text.trim().length > 0)
       .map(([questionId, text]) => ({ questionId, text }));
 
-    const body = isCognitoMode ? { answers: formattedAnswers } : { answers: formattedAnswers, userId };
+    const body = usesClientSuppliedUserId() ? { answers: formattedAnswers, userId } : { answers: formattedAnswers };
 
     const response = await authFetch(`${API_BASE_URL}/context/setup`, {
       method: 'POST',
@@ -307,7 +312,7 @@ export const calendarApi = {
     const response = await authFetch(`${API_BASE_URL}/calendar/sync`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(isCognitoMode ? {} : { userId }),
+      body: JSON.stringify(usesClientSuppliedUserId() ? { userId } : {}),
     });
     if (!response.ok) {
       throw new Error(`Failed to sync calendar: ${response.status}`);
@@ -316,7 +321,7 @@ export const calendarApi = {
   },
 
   async getStatus(userId: string = 'demo-user'): Promise<CalendarStatusResponse> {
-    const url = isCognitoMode ? `${API_BASE_URL}/calendar/status` : `${API_BASE_URL}/calendar/status?userId=${encodeURIComponent(userId)}`;
+    const url = usesClientSuppliedUserId() ? `${API_BASE_URL}/calendar/status?userId=${encodeURIComponent(userId)}` : `${API_BASE_URL}/calendar/status`;
     const response = await authFetch(url);
     if (!response.ok) {
       throw new Error(`Failed to fetch calendar status: ${response.status}`);
@@ -325,7 +330,7 @@ export const calendarApi = {
   },
 
   async getEvents(userId: string = 'demo-user'): Promise<CalendarEvent[]> {
-    const url = isCognitoMode ? `${API_BASE_URL}/calendar/events` : `${API_BASE_URL}/calendar/events?userId=${encodeURIComponent(userId)}`;
+    const url = usesClientSuppliedUserId() ? `${API_BASE_URL}/calendar/events?userId=${encodeURIComponent(userId)}` : `${API_BASE_URL}/calendar/events`;
     const response = await authFetch(url);
     if (!response.ok) {
       throw new Error(`Failed to fetch calendar events: ${response.status}`);
@@ -342,7 +347,7 @@ export const calendarApi = {
 export const decisionsApi = {
   async query(request: DecisionApiRequest): Promise<DecisionApiResponse> {
     const requestBody = (() => {
-      if (isCognitoMode) {
+      if (!usesClientSuppliedUserId()) {
         const { userId: _userId, ...rest } = request;
         return rest;
       }

@@ -13,11 +13,22 @@ vi.mock('../auth/cognito', () => {
   };
 });
 
+vi.mock('../config/demo-personas', () => {
+  let isDemoMode = false;
+  return {
+    get isDemoMode() { return isDemoMode; },
+    setIsDemoMode: (value: boolean) => { isDemoMode = value; },
+    getSelectedDemoPersonaId: () => 'phase4-eval-v1:focused-builder',
+  };
+});
+
 describe('api/client', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     const cognitoModule = await import('../auth/cognito') as unknown as { setIsCognitoMode: (val: boolean) => void };
     cognitoModule.setIsCognitoMode(false);
+    const demoModule = await import('../config/demo-personas') as unknown as { setIsDemoMode: (val: boolean) => void };
+    demoModule.setIsDemoMode(false);
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({}),
@@ -59,6 +70,19 @@ describe('api/client', () => {
       const fetchCall = vi.mocked(globalThis.fetch).mock.calls[0];
       const headers = fetchCall[1]?.headers as Headers;
       expect(headers.get('Authorization')).toBe('Bearer mock-token');
+    });
+
+    it('uses the selected persona header and strips body userId in demo mode', async () => {
+      const { setIsDemoMode } = await import('../config/demo-personas') as unknown as { setIsDemoMode: (val: boolean) => void };
+      setIsDemoMode(true);
+
+      await api.decisions.query({ userId: 'spoofed-user', query: { question: 'test' } });
+
+      const fetchCall = vi.mocked(globalThis.fetch).mock.calls[0];
+      const options = fetchCall[1] as RequestInit;
+      expect(options.body).toBe(JSON.stringify({ query: { question: 'test' } }));
+      expect((options.headers as Headers).get('X-Demo-User')).toBe('phase4-eval-v1:focused-builder');
+      expect((options.headers as Headers).get('Authorization')).toBeNull();
     });
   });
 

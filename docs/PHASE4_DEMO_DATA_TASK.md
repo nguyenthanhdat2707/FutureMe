@@ -1,5 +1,7 @@
 # Phase 4 Public Demo Personas and Evaluation Data Task Contract
 
+> **Superseded identity model:** `docs/DEMO_MODE_WITHOUT_COGNITO_TASK.md` replaces the Cognito account/password and quick-login requirements below. The six-persona dataset and exact record-count contract remain authoritative, but personas now use deterministic public demo IDs, the seed CLI is DynamoDB-only, and the frontend switches personas without authentication.
+
 ## GOAL
 
 Provide six isolated synthetic Cognito demo identities, deterministic DynamoDB datasets covering good and bad Phase 4 decision cases, and an optional quick-login chooser for public evaluation. The implementation must be safe to plan and test locally before any production mutation.
@@ -27,7 +29,7 @@ Provide six isolated synthetic Cognito demo identities, deterministic DynamoDB d
 ## DATASET VERSION AND IDENTIFIERS
 
 - Seed version: `phase4-eval-v1`.
-- All DynamoDB primary keys begin with `phase4-eval-v1:` and are deterministic from persona slug, table kind, and record purpose.
+- Every non-users-table DynamoDB primary key begins with `phase4-eval-v1:` and is deterministic from persona slug, table kind, and record purpose. The users-table primary key is the persona's actual Cognito `sub`, as required by the JWT identity boundary.
 - All seeded DynamoDB records include `seed_version`, `persona`, and `seeded_at` metadata.
 - Relative timestamps are derived from one manifest `seededAt` value.
 - Re-applying with the same manifest rewrites the exact same keys and must not create duplicates.

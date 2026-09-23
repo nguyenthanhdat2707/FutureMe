@@ -4,19 +4,7 @@ resource "aws_apigatewayv2_api" "api" {
   cors_configuration {
     allow_origins = var.allowed_origins
     allow_methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-    allow_headers = ["Authorization", "Content-Type"]
-  }
-}
-
-resource "aws_apigatewayv2_authorizer" "jwt" {
-  api_id           = aws_apigatewayv2_api.api.id
-  authorizer_type  = "JWT"
-  identity_sources = ["$request.header.Authorization"]
-  name             = "${var.project}-${var.environment}-jwt-auth"
-
-  jwt_configuration {
-    audience = [var.user_pool_client_id]
-    issuer   = var.user_pool_issuer
+    allow_headers = ["Authorization", "Content-Type", "X-Demo-User"]
   }
 }
 
@@ -38,8 +26,7 @@ resource "aws_apigatewayv2_route" "default" {
   api_id             = aws_apigatewayv2_api.api.id
   route_key          = "$default"
   target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
-  authorization_type = "JWT"
-  authorizer_id      = aws_apigatewayv2_authorizer.jwt.id
+  authorization_type = "NONE"
 }
 
 resource "aws_apigatewayv2_route" "options_preflight" {
