@@ -3,11 +3,11 @@
 **Phase 4: User-Invoked Decision Journey**
 
 ## Overall Status
-- **Progress:** 7 / 8 Gates Completed
-- **Percentage:** 87.5%
-- **Steps Left:** 1
-- **Current State:** TESTING
-- **Current Task:** Gate 8 — Browser validation and delivery
+- **Progress:** 8 / 8 Gates Completed
+- **Percentage:** 100%
+- **Steps Left:** 0
+- **Current State:** READY_FOR_USER_TEST
+- **Current Task:** Phase 4 technical completion; branch ready for Product Owner acceptance and merge preparation
 - **Active Agent:** Strategic Supervisor
 - **Branch:** feat/phase4-decision-journey
 
@@ -71,16 +71,25 @@
   - PR #22 https://github.com/nguyenthanhdat2707/FutureMe/pull/22 merged to main at faeda8785ff68d22e5239bffbce643f57b994cc4. CI 35806963807 passed all four jobs.
   - Plan workflow 35807138945 reported 21 no-op resources plus exactly one in-place Lambda update, with zero create/delete/replace actions. Apply workflow 35807288772 passed all gates and health verification.
   - The first production harness ran from the wrong working directory and could not resolve the frontend Cognito package; it was a harness-only failure and cleanup reported zero. The correct rerun passed SRP sign-in, sync (`200`, synced 3), events (`200`, count 3), status (`200`, synced), context (`200`, commitments 3), and ACAO equal to the production origin. Cleanup removed 3 calendar rows, 1 context row, and the Cognito user; residuals were zero.
-  - Current local Gate 7 repair covers canonical availability clarification, optional-energy semantics, evidence authority/freshness/expiry, stable-entity conflict detection, and repository-to-policy ASK/ABSTAIN propagation. The working tree contains eight intentional modified code/test files and is not yet committed.
+  - The Gate 7 repair covers canonical availability clarification, optional-energy semantics, evidence authority/freshness/expiry, stable-entity conflict detection, and repository-to-policy ASK/ABSTAIN propagation.
   - Fresh local verification on 2026-09-23: backend 18/18 suites and 122/122 tests pass with 77.93% statements / 60.55% branches / 79.07% functions / 79.45% lines; backend lint/build pass; frontend 8/8 files and 48/48 tests pass; frontend lint/build pass; `git diff --check` passes.
   - A resumable Codex account handoff is recorded in `docs/PHASE4_CODEX_HANDOFF.md`, including the exact branch/worktree state, frozen invariants, changed files, verification commands/results, review caveats, immediate task contract, demo-persona direction, and stop conditions.
   - Independent Antigravity review used a temporary repository containing the exact eight-file code/test diff. The actual and reviewed binary diffs had identical SHA-256 `381da3027b5c790a01fde4b847e6fc6871c2a121c382bf8f4fcc418b76a8df72`. Gemini 3.1 Pro (High) verified the required file list, reported `NO BLOCKING FINDINGS`, and recommended `SHIP`.
-- **Blockers / Human Decisions:** No Gate 7 blocker remains. Real Google Calendar OAuth/integration remains unimplemented and unconfigured as a separate product limitation. Gate 8 browser/delivery evidence is still required before Phase 4 completion.
+  - Delivered in commit `f593a365a808d8ef2e6a7f9a7283160acdaeb6b9`; local and `origin/feat/phase4-decision-journey` SHAs matched exactly after push.
+- **Blockers / Human Decisions:** No Gate 7 blocker remains. Real Google Calendar OAuth/integration remains unimplemented and unconfigured as a separate product limitation. Gate 8 browser/delivery evidence is recorded below and is complete.
 
 ### 8. Browser / Delivery
-- **Status:** [ ] IN PROGRESS
-- **Details:** Final browser validation of the hero scenario for Phase 4 and merge preparation.
-- **Blockers / Human Decisions:** None currently.
+- **Status:** [x] COMPLETE
+- **Details:** Final browser validation exercised the Phase 4 policy states, canonical clarification, before/after explanation, and context-change reassessment against the local backend.
+- **Evidence:**
+  - Local browser environment used `http://localhost:5173/decisions` with local auth and `http://localhost:3001/api`; health returned `200`.
+  - Complete time/workload inputs with both optional energy fields omitted produced `RECOMMEND - Proceed`, `Feasible`, 90% input-completeness confidence, `Energy: Unknown`, and no missing data.
+  - Missing availability/deadline produced `Needs your input` with the canonical `Available time before deadline (hours)` control; energy was not requested.
+  - Choosing `I'm not sure / continue without resolving` changed the same decision from `ASK - Clarify` to `ABSTAIN - Clarify` and displayed the explicit inability to recommend.
+  - Supplying `20` through the canonical clarification control changed `ASK - Clarify` to `RECOMMEND - Proceed`, with an evidence delta for availability and projected remaining capacity.
+  - Adding a high-severity workload change marked the result stale and exposed `Re-assess same decision`; reassessment changed `RECOMMEND - Proceed` to `RECOMMEND - Proceed With Caution`, changed feasibility from `Feasible` to `At Risk`, and displayed `+4h workload` with remaining capacity changing from 8 to 4.
+  - Gate 7 implementation/review commit `f593a365a808d8ef2e6a7f9a7283160acdaeb6b9` was pushed and local/remote SHAs matched before final browser validation.
+- **Blockers / Human Decisions:** No Phase 4 technical blocker remains. Product Owner acceptance and merge are separate gates. Public demo-persona/DynamoDB seeding is a separately tracked evaluation-data unit and still requires explicit production-write authorization.
 
 ---
 
@@ -113,3 +122,5 @@
 - **2026-09-23:** The first post-deploy calendar production harness ran from the wrong working directory and failed to resolve the frontend Cognito package. This was harness-only, with cleanup zero. The corrected rerun passed the authenticated calendar/context checks and cleanup removed 3 calendar rows, 1 context row, and the Cognito user with zero residuals.
 - **2026-09-23:** Codex planning/review became quota-blocked on the current account. Delegated review attempts using `gpt-terra-high` failed before reading the repository because that model name is unsupported for the Codex ChatGPT account. A fallback Antigravity/Claude review timed out and inspected an Antigravity scratch copy rather than the actual repository, so it is not accepted as independent review evidence. The actual worktree was re-read and all automated gates were rerun successfully. A complete account-switch handoff was written to `docs/PHASE4_CODEX_HANDOFF.md`; Gate 7 remains REVIEWING pending a valid review of the actual diff.
 - **2026-09-23:** A replacement independent review was run against a temporary repository built from the exact actual eight-file diff. Actual/review diff SHA-256 values matched (`381da3027b5c790a01fde4b847e6fc6871c2a121c382bf8f4fcc418b76a8df72`). Gemini 3.1 Pro (High) reported `NO BLOCKING FINDINGS` and `SHIP`. Gate 7 advanced to COMPLETE; progress is 7/8 (87.5%), with Gate 8 browser/delivery remaining.
+- **2026-09-23:** The first local Gate 8 browser attempt used `127.0.0.1:5180`, which did not match the backend's bounded development CORS origin (`http://localhost:5173`) and correctly failed fetch. The harness was restarted at the contracted localhost origin without changing application code; health and the full decision journey then passed.
+- **2026-09-23:** Gate 8 browser proof passed RECOMMEND with optional energy omitted, canonical availability ASK, unresolved clarification ABSTAIN, clarification-to-RECOMMEND, stale-context signaling, and before/after reassessment from proceed/feasible to proceed-with-caution/at-risk. Phase 4 reached 8/8 gates (100%) and READY_FOR_USER_TEST.
