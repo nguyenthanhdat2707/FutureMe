@@ -1,5 +1,5 @@
 import { SimpleContextEngine } from '../intelligence/simple-context-engine';
-import { ObservationType, ObservationSource, PersonalState } from '../domain/types';
+import { ContextAttribute, ObservationType, ObservationSource, PersonalState } from '../domain/types';
 import { IPersonalContextRepository, IDecisionRepository, ICalendarEventRepository, IObservationRepository } from '../repositories/interfaces';
 import { IStateEstimator } from '../intelligence/interfaces';
 
@@ -86,6 +86,25 @@ describe('SimpleContextEngine - getRelevantContext Relevance Logic', () => {
     confidence: 1,
     observedAt: new Date(),
     createdAt: new Date(),
+  });
+
+  const createVersionedGoalAttr = (
+    attrId: string,
+    entityId: string,
+    description: string,
+    source: ObservationSource,
+    observedAt: Date,
+    validUntil?: Date
+  ): ContextAttribute => ({
+    id: attrId,
+    userId: 'user1',
+    attribute: 'goal',
+    value: JSON.stringify({ id: entityId, description, priority: 'high' }),
+    source,
+    confidence: 1,
+    observedAt,
+    validUntil,
+    createdAt: observedAt,
   });
 
   it('exact token relevance: selects AWS goal and excludes unrelated entities based on substrings or stop words', async () => {
@@ -212,5 +231,57 @@ describe('SimpleContextEngine - getRelevantContext Relevance Logic', () => {
     // calledObs should have the full obs
     expect(calledObs).toHaveLength(1);
     expect(calledObs[0].data.info).toBe('cooking book');
+  });
+
+  it('resolves relevant entity versions by source authority before freshness and ignores expired evidence', async () => {
+    const fixedNow = new Date('2026-09-22T10:00:00Z');
+    jest.useFakeTimers();
+    jest.setSystemTime(fixedNow);
+
+    mockContextRepo.findByUserId.mockResolvedValue([
+      createVersionedGoalAttr('confirmed-old', 'aws-goal', 'Pass the AWS exam this month', ObservationSource.USER_CONFIRMED, new Date('2026-09-20T10:00:00Z')),
+      createVersionedGoalAttr('inferred-new', 'aws-goal', 'Postpone the AWS exam until next year', ObservationSource.SYSTEM_INFERRED, new Date('2026-09-22T09:00:00Z')),
+      createVersionedGoalAttr('confirmed-expired', 'aws-goal', 'Cancel the AWS exam', ObservationSource.USER_CONFIRMED, new Date('2026-09-22T09:30:00Z'), new Date('2026-09-22T09:59:00Z'))
+    ]);
+
+    const result = await engine.getRelevantContext('user1', {
+      question: 'Should I schedule time for the AWS exam?'
+    });
+
+    expect(result.goals).toHaveLength(1);
+    expect(result.goals[0].description).toBe('Pass the AWS exam this month');
+    expect(result.unresolvedConflicts).toEqual([]);
+  });
+
+  it('reports only a relevant equal-authority equal-freshness value tie as unresolved', async () => {
+    const tiedAt = new Date('2026-09-22T09:00:00Z');
+    mockContextRepo.findByUserId.mockResolvedValue([
+      createVersionedGoalAttr('aws-a', 'aws-goal', 'Pass the AWS exam this month', ObservationSource.USER_CONFIRMED, tiedAt),
+      createVersionedGoalAttr('aws-b', 'aws-goal', 'Postpone the AWS exam until next year', ObservationSource.USER_CONFIRMED, tiedAt),
+      createVersionedGoalAttr('marathon-a', 'marathon-goal', 'Run the marathon this month', ObservationSource.USER_CONFIRMED, tiedAt),
+      createVersionedGoalAttr('marathon-b', 'marathon-goal', 'Skip the marathon this year', ObservationSource.USER_CONFIRMED, tiedAt),
+      createVersionedGoalAttr('unrelated-id', 'other-aws-goal', 'Study AWS networking', ObservationSource.USER_CONFIRMED, tiedAt)
+    ]);
+
+    const result = await engine.getRelevantContext('user1', {
+      question: 'Should I schedule time for the AWS exam?'
+    });
+
+    expect(result.unresolvedConflicts).toEqual(['Conflicting goal evidence for aws-goal.']);
+  });
+
+  it('uses freshness within the same authority without reporting a conflict', async () => {
+    mockContextRepo.findByUserId.mockResolvedValue([
+      createVersionedGoalAttr('older', 'aws-goal', 'Postpone the AWS exam', ObservationSource.USER_CONFIRMED, new Date('2026-09-21T09:00:00Z')),
+      createVersionedGoalAttr('newer', 'aws-goal', 'Pass the AWS exam this month', ObservationSource.USER_CONFIRMED, new Date('2026-09-22T09:00:00Z'))
+    ]);
+
+    const result = await engine.getRelevantContext('user1', {
+      question: 'Should I schedule time for the AWS exam?'
+    });
+
+    expect(result.goals).toHaveLength(1);
+    expect(result.goals[0].description).toBe('Pass the AWS exam this month');
+    expect(result.unresolvedConflicts).toEqual([]);
   });
 });

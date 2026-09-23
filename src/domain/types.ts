@@ -424,6 +424,7 @@ export interface RelevantContext {
   commitments: Commitment[];
   constraints: string[];
   recentHistory: string[];
+  unresolvedConflicts?: string[];
   state: StateEstimate;
 }
 
