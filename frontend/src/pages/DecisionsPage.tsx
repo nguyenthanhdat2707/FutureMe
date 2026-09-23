@@ -647,11 +647,11 @@ function DecisionsPage() {
         </form>
       )}
 
-      {result && result.policy.outcome === 'ASK' && (
+      {result?.policy?.outcome === 'ASK' && (
         <form className="card border-l-4 border-accent-warning p-6 space-y-4" onSubmit={handleClarificationSubmit}>
           <h2 className="text-xl font-medium text-text-primary">Needs your input</h2>
           <p className="text-sm text-text-secondary">
-            {result.policy.reason || 'The following information is needed to improve the assessment:'}
+            {result.policy?.reason || 'The following information is needed to improve the assessment:'}
           </p>
 
           {result.policy.unresolvedMaterialFields && result.policy.unresolvedMaterialFields.length > 0 && (
@@ -711,11 +711,11 @@ function DecisionsPage() {
         </form>
       )}
 
-      {result && result.policy.outcome === 'ABSTAIN' && (
+      {result?.policy?.outcome === 'ABSTAIN' && (
         <article className="card border-l-4 border-slate-400 p-6 space-y-4 bg-slate-50">
           <h2 className="text-xl font-medium text-text-primary">Cannot recommend yet</h2>
           <p className="text-sm text-text-secondary">
-            {result.policy.reason}
+            {result.policy?.reason}
           </p>
         </article>
       )}
@@ -743,10 +743,10 @@ function DecisionsPage() {
             <div className={`rounded-lg border p-4 ${hasChangedRecommendation ? 'border-green-500 bg-green-50' : 'border-blue-500 bg-blue-50'}`}>
               <p className={`text-xs font-medium uppercase tracking-wide mb-2 ${hasChangedRecommendation ? 'text-green-700' : 'text-blue-700'}`}>After</p>
               <p className={`text-lg font-medium ${hasChangedRecommendation ? 'text-green-900' : 'text-blue-900'}`}>
-                {titleCase(result.policy.outcome)} - {titleCase(recommendation?.option || 'No recommendation')}
+                {titleCase(result.policy?.outcome)} - {titleCase(recommendation?.option || 'No recommendation')}
               </p>
               <p className={`mt-2 text-sm ${hasChangedRecommendation ? 'text-green-800' : 'text-blue-800'}`}>
-                {recommendation?.reasoning || result.policy.reason}
+                {recommendation?.reasoning || result.policy?.reason}
               </p>
               <div className={`mt-2 text-xs flex gap-2 ${hasChangedRecommendation ? 'text-green-800' : 'text-blue-800'}`}>
                 <span>Feasibility: {titleCase(assessment?.feasibility || '')}</span>
@@ -783,7 +783,7 @@ function DecisionsPage() {
         </article>
       )}
 
-      {result && result.policy.outcome === 'RECOMMEND' && recommendation && assessment && (
+      {result?.policy?.outcome === 'RECOMMEND' && recommendation && assessment && (
         <section className="space-y-6" aria-live="polite">
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800" role="alert">
             <p className="font-medium">Decision guidance</p>
@@ -802,7 +802,7 @@ function DecisionsPage() {
                   <h2 className="text-xl font-medium text-text-primary">
                     Recommendation
                     <span className="ml-2 rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800 uppercase tracking-wide">
-                      {result.policy.outcome}
+                      {result.policy?.outcome}
                     </span>
                   </h2>
                   <span className="rounded-full bg-violet-100 px-3 py-1 text-sm font-medium text-accent-ai">
@@ -824,7 +824,7 @@ function DecisionsPage() {
             </div>
           </article>
 
-          {result.decision.tradeoffs && result.decision.tradeoffs.length > 0 && (
+          {result?.decision?.tradeoffs && result.decision.tradeoffs.length > 0 && (
             <article className="card p-6 space-y-4">
               <h2 className="text-xl font-medium text-text-primary">Trade-offs</h2>
               <div className="grid gap-4 sm:grid-cols-2">
