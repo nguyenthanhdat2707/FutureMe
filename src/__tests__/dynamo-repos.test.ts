@@ -106,6 +106,147 @@ describe('DynamoDB Repositories', () => {
   });
 
   describe('DynamoCalendarEventRepository', () => {
+    it('upserts a new event with a valid created_at', async () => {
+      const repo = new DynamoCalendarEventRepository();
+      const startTime = new Date('2026-09-23T01:00:00.000Z');
+      const endTime = new Date('2026-09-23T02:00:00.000Z');
+      const syncedAt = new Date('2026-09-23T00:30:00.000Z');
+      mockSend
+        .mockResolvedValueOnce({ Items: [] })
+        .mockResolvedValueOnce({});
+
+      const event = await repo.upsert({
+        userId: 'u1',
+        externalId: 'ext-new',
+        title: 'New event',
+        startTime,
+        endTime,
+        syncedAt
+      });
+
+      expect(mockSend).toHaveBeenNthCalledWith(1, expect.any(QueryCommand));
+      expect(mockSend.mock.calls[0][0].input).toEqual({
+        TableName: 'test-calendar',
+        IndexName: 'userId-externalId-index',
+        KeyConditionExpression: 'user_id = :userId AND external_id = :externalId',
+        ExpressionAttributeValues: {
+          ':userId': 'u1',
+          ':externalId': 'ext-new'
+        }
+      });
+
+      expect(mockSend).toHaveBeenNthCalledWith(2, expect.any(PutCommand));
+      const putInput = mockSend.mock.calls[1][0].input;
+      expect(putInput).toEqual({
+        TableName: 'test-calendar',
+        Item: {
+          id: event.id,
+          user_id: 'u1',
+          external_id: 'ext-new',
+          title: 'New event',
+          start_time: startTime.toISOString(),
+          end_time: endTime.toISOString(),
+          status: undefined,
+          raw_data: undefined,
+          synced_at: syncedAt.toISOString(),
+          created_at: event.createdAt.toISOString()
+        }
+      });
+      expect(Number.isNaN(event.createdAt.getTime())).toBe(false);
+      expect(event.createdAt.toISOString()).toBe(putInput.Item.created_at);
+    });
+
+    it('uses synced_at as createdAt for a legacy event without created_at', async () => {
+      const repo = new DynamoCalendarEventRepository();
+      const syncedAt = new Date('2026-09-20T04:30:00.000Z');
+      mockSend.mockResolvedValueOnce({
+        Items: [{
+          id: 'legacy-event',
+          user_id: 'u1',
+          external_id: 'ext-legacy',
+          title: 'Legacy event',
+          start_time: '2026-09-20T05:00:00.000Z',
+          end_time: '2026-09-20T06:00:00.000Z',
+          synced_at: syncedAt.toISOString()
+        }]
+      });
+
+      const event = await repo.findByExternalId('u1', 'ext-legacy');
+
+      expect(mockSend).toHaveBeenCalledWith(expect.any(QueryCommand));
+      expect(mockSend.mock.calls[0][0].input).toEqual({
+        TableName: 'test-calendar',
+        IndexName: 'userId-externalId-index',
+        KeyConditionExpression: 'user_id = :userId AND external_id = :externalId',
+        ExpressionAttributeValues: {
+          ':userId': 'u1',
+          ':externalId': 'ext-legacy'
+        }
+      });
+      expect(event?.createdAt.toISOString()).toBe(syncedAt.toISOString());
+      expect(event?.syncedAt.toISOString()).toBe(syncedAt.toISOString());
+    });
+
+    it('preserves created_at when upserting an existing event', async () => {
+      const repo = new DynamoCalendarEventRepository();
+      const createdAt = new Date('2026-08-01T02:00:00.000Z');
+      const startTime = new Date('2026-09-24T01:00:00.000Z');
+      const endTime = new Date('2026-09-24T02:00:00.000Z');
+      const syncedAt = new Date('2026-09-23T23:30:00.000Z');
+      mockSend
+        .mockResolvedValueOnce({
+          Items: [{
+            id: 'existing-event',
+            user_id: 'u1',
+            external_id: 'ext-existing',
+            title: 'Original title',
+            start_time: '2026-09-22T01:00:00.000Z',
+            end_time: '2026-09-22T02:00:00.000Z',
+            synced_at: '2026-09-22T00:30:00.000Z',
+            created_at: createdAt.toISOString()
+          }]
+        })
+        .mockResolvedValueOnce({});
+
+      const event = await repo.upsert({
+        userId: 'u1',
+        externalId: 'ext-existing',
+        title: 'Updated title',
+        startTime,
+        endTime,
+        syncedAt
+      });
+
+      expect(mockSend).toHaveBeenNthCalledWith(1, expect.any(QueryCommand));
+      expect(mockSend.mock.calls[0][0].input).toEqual({
+        TableName: 'test-calendar',
+        IndexName: 'userId-externalId-index',
+        KeyConditionExpression: 'user_id = :userId AND external_id = :externalId',
+        ExpressionAttributeValues: {
+          ':userId': 'u1',
+          ':externalId': 'ext-existing'
+        }
+      });
+
+      expect(mockSend).toHaveBeenNthCalledWith(2, expect.any(PutCommand));
+      expect(mockSend.mock.calls[1][0].input).toEqual({
+        TableName: 'test-calendar',
+        Item: {
+          id: 'existing-event',
+          user_id: 'u1',
+          external_id: 'ext-existing',
+          title: 'Updated title',
+          start_time: startTime.toISOString(),
+          end_time: endTime.toISOString(),
+          status: undefined,
+          raw_data: undefined,
+          synced_at: syncedAt.toISOString(),
+          created_at: createdAt.toISOString()
+        }
+      });
+      expect(event.createdAt.toISOString()).toBe(createdAt.toISOString());
+    });
+
     it('creates and finds by time range', async () => {
       const repo = new DynamoCalendarEventRepository();
       mockSend.mockResolvedValueOnce({ Item: { id: 'test', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), status: DecisionStatus.PENDING, title: 't', external_id: 'ext', start_time: new Date().toISOString(), end_time: new Date().toISOString(), type: 'T', source: 'S', target_type: 'T', target_id: 'T' } });
