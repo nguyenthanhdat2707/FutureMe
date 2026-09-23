@@ -146,7 +146,7 @@ describe('deterministic decision feasibility assessment', () => {
     });
     expect(support.assessment.missingData).toEqual(expect.arrayContaining([
       'timeCostHours',
-      'availableHoursBeforeDeadline or deadline'
+      'availableHoursBeforeDeadline'
     ]));
     expect(support.clarificationNeeded).toEqual(expect.arrayContaining([
       expect.stringMatching(/time|hours/i),
@@ -286,5 +286,18 @@ describe('deterministic decision feasibility assessment', () => {
     }));
 
     expect(support.assessment.feasibility).toBe('not-feasible');
+  });
+  it('does not require energy inputs to produce a feasible recommendation', async () => {
+    const support = await assess(queryWithImpact('Should I do this?', {
+      timeCostHours: 4,
+      availableHoursBeforeDeadline: 20,
+      workloadHoursBeforeDeadline: 8
+    }));
+
+    expect(support.assessment.missingData).not.toContain('energyCost');
+    expect(support.assessment.missingData).not.toContain('availableEnergy');
+    expect(support.assessment.feasibility).toBe('feasible');
+    expect(support.decision.recommendation.option).toBe('proceed');
+    expect(support.policy.outcome).toBe('RECOMMEND');
   });
 });

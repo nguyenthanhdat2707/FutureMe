@@ -170,10 +170,10 @@ export function assessDecisionFeasibility(
       });
       assumptions.push('Deadline-derived time is elapsed clock time, not guaranteed schedulable work time.');
     } else {
-      missingData.push('availableHoursBeforeDeadline or deadline');
+      missingData.push('availableHoursBeforeDeadline');
     }
   } else {
-    missingData.push('availableHoursBeforeDeadline or deadline');
+    missingData.push('availableHoursBeforeDeadline');
   }
 
   const suppliedWorkloadHours = profile?.workloadHoursBeforeDeadline;
@@ -233,9 +233,7 @@ export function assessDecisionFeasibility(
     }
   } else {
     if (isNegativeNumber(energyCost)) invalidInputs.push('energyCost');
-    else if (!isNonNegativeNumber(energyCost)) missingData.push('energyCost');
     if (isNegativeNumber(suppliedAvailableEnergy)) invalidInputs.push('availableEnergy');
-    else if (!isNonNegativeNumber(availableEnergy)) missingData.push('availableEnergy');
   }
 
   if (profile?.target) evidence.push(inputEvidence('Decision target', profile.target, source));

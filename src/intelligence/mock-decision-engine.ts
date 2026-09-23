@@ -34,7 +34,11 @@ export class MockDecisionEngine implements IDecisionEngine {
     const assessment = assessDecisionFeasibility(query.impactProfile, new Date(), relevantContext);
 
     // Evaluate policy
-    const policyResult = evaluateDecisionPolicy(assessment, query.clarification);
+    const policyResult = evaluateDecisionPolicy(
+      assessment,
+      query.clarification,
+      relevantContext.unresolvedConflicts ?? []
+    );
 
     let tradeoffs: Tradeoff[] = [];
 
@@ -130,6 +134,7 @@ function clarificationQuestions(missingData: string[]): string[] {
     switch (field) {
       case 'timeCostHours':
         return 'How many hours will this candidate commitment require?';
+      case 'availableHoursBeforeDeadline':
       case 'availableHoursBeforeDeadline or deadline':
         return 'What is the deadline, or how many hours are available before it?';
       case 'workloadHoursBeforeDeadline':

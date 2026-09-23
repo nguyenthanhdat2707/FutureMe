@@ -5,6 +5,8 @@ import path from 'path';
 import request from 'supertest';
 import { createApp } from '../app';
 import { closeDatabase, initDatabase } from '../database/connection';
+import { ObservationSource } from '../domain/types';
+import { getContextRepository } from '../services/service-container';
 
 describe('Decision Routes Integration', () => {
   const app = createApp();
@@ -118,5 +120,56 @@ describe('Decision Routes Integration', () => {
     expect(response.status).toBe(200);
     expect(response.body.policy.outcome).toBe('ABSTAIN');
     expect(response.body.policy.unresolvedMaterialFields).toContain('timeCostHours');
+  });
+
+  it('propagates a repository context conflict through ASK to ABSTAIN', async () => {
+    const contextRepo = getContextRepository();
+    const observedAt = new Date('2026-09-22T09:00:00Z');
+    const common = {
+      userId: 'demo-user',
+      attribute: 'goal',
+      source: ObservationSource.USER_CONFIRMED,
+      confidence: 1,
+      observedAt
+    };
+
+    await contextRepo.create({
+      ...common,
+      value: JSON.stringify({ id: 'aws-goal', description: 'Pass the AWS exam this month', priority: 'high' })
+    });
+    await contextRepo.create({
+      ...common,
+      value: JSON.stringify({ id: 'aws-goal', description: 'Postpone the AWS exam until next year', priority: 'high' })
+    });
+
+    const query = {
+      question: 'Should I schedule time for the AWS exam?',
+      impactProfile: {
+        timeCostHours: 4,
+        availableHoursBeforeDeadline: 20,
+        workloadHoursBeforeDeadline: 8
+      }
+    };
+
+    const first = await request(app).post('/api/decisions').send({ query });
+    expect(first.status).toBe(200);
+    expect(first.body.policy.outcome).toBe('ASK');
+    expect(first.body.policy.unresolvedMaterialConflicts).toEqual([
+      'Conflicting goal evidence for aws-goal.'
+    ]);
+    expect(first.body.decision.tradeoffs).toEqual([]);
+
+    const second = await request(app).post('/api/decisions').send({
+      query: {
+        ...query,
+        clarification: { attempted: true }
+      }
+    });
+    expect(second.status).toBe(200);
+    expect(second.body.policy.outcome).toBe('ABSTAIN');
+    expect(second.body.policy.unresolvedMaterialConflicts).toEqual([
+      'Conflicting goal evidence for aws-goal.'
+    ]);
+    expect(second.body.decision.tradeoffs).toEqual([]);
   });
 });

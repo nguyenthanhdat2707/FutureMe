@@ -179,6 +179,41 @@ describe('MockDecisionEngine Integration', () => {
     expect(result2.clarificationNeeded).toBeUndefined();
   });
 
+  it('threads a conflict detected by the context engine into ASK then ABSTAIN without calling the LLM', async () => {
+    class ConflictingContextEngine extends FakeContextEngine {
+      // eslint-disable-next-line @typescript-eslint/require-await
+      async getRelevantContext(): Promise<RelevantContext> {
+        return {
+          goals: [],
+          commitments: [],
+          constraints: [],
+          recentHistory: [],
+          unresolvedConflicts: ['Conflicting goal evidence for aws-goal.'],
+          state: { state: PersonalState.FLOW, timestamp: new Date(), confidence: 1, evidence: [] }
+        };
+      }
+    }
+
+    const conflictLlm = new CountingFakeLLM();
+    const conflictEngine = new MockDecisionEngine(conflictLlm, new ConflictingContextEngine());
+    const first = await conflictEngine.supportDecision('user1', baseQuery);
+
+    expect(first.policy.outcome).toBe('ASK');
+    expect(first.policy.unresolvedMaterialConflicts).toEqual(['Conflicting goal evidence for aws-goal.']);
+    expect(first.decision.tradeoffs).toEqual([]);
+    expect(conflictLlm.callCount).toBe(0);
+
+    const second = await conflictEngine.supportDecision('user1', {
+      ...baseQuery,
+      clarification: { attempted: true }
+    });
+
+    expect(second.policy.outcome).toBe('ABSTAIN');
+    expect(second.policy.unresolvedMaterialConflicts).toEqual(['Conflicting goal evidence for aws-goal.']);
+    expect(second.decision.tradeoffs).toEqual([]);
+    expect(conflictLlm.callCount).toBe(0);
+  });
+
   it('Invalid inputs at engine boundary ABSTAIN and skip LLM', async () => {
     const query: DecisionQuery = {
       ...baseQuery,
