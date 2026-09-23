@@ -43,7 +43,7 @@
 
 ### 7. Full Gates / Review
 - **Status:** [ ] REVIEWING
-- **Details:** End-to-end integration and verification of the decision loop against the MVP policy contract. The production auth/network blocker is resolved; the full Phase 4 browser decision journey is not yet complete.
+- **Details:** End-to-end integration and verification of the decision loop against the MVP policy contract. The production auth/network blocker and production calendar sync 500 blocker are resolved; the full Phase 4 browser decision journey is not yet complete.
 - **Evidence:**
   - AuthPage focused 14/14 pass.
   - Full frontend 48/48 across 8 files.
@@ -64,7 +64,14 @@
   - RED: `OPTIONS /api/context` and `OPTIONS /api/health` returned `401`.
   - GREEN production: both `OPTIONS` calls return `204` with correct CORS; unauthenticated `GET /api/context` remains `401`; `GET /api/health` remains `200`.
   - Authenticated disposable-user proof: SRP Sign In passed; `GET /api/context` with JWT returned `200` and ACAO equaled the production origin; cleanup passed with zero residual probe users.
-- **Blockers / Human Decisions:** The production auth/network blocker is RESOLVED. Gate 7 remains REVIEWING at 6/8 (75%) with 2 gates left; do not treat this resolution as completion of Gate 7 or the full Phase 4 browser decision journey.
+  - Production logs proved the reported calendar `Failed to fetch` 500 was not Google Calendar connectivity: `MockCalendarAdapter` is always used and the Lambda has no `GOOGLE_*` environment keys.
+  - Calendar 500 root cause: the Dynamo calendar upsert omitted `created_at`; `Put` succeeded, then the mapper threw. The partial row caused later calendar read/context 500s.
+  - Strict TDD RED reproduced the exact missing-`created_at` error with 1 failed/8 passed. GREEN focused verification passed 11/11; full backend passed 90/90 across 13 suites with coverage of 77.13% statements / 59.74% branches / 77.95% functions / 78.67% lines; lint and build passed.
+  - The fix persists and preserves `created_at` and reads legacy rows using `synced_at` as a fallback. Independent Claude review recommended ship as-is with no blockers; low-risk caveats were documented.
+  - PR #22 https://github.com/nguyenthanhdat2707/FutureMe/pull/22 merged to main at faeda8785ff68d22e5239bffbce643f57b994cc4. CI 35806963807 passed all four jobs.
+  - Plan workflow 35807138945 reported 21 no-op resources plus exactly one in-place Lambda update, with zero create/delete/replace actions. Apply workflow 35807288772 passed all gates and health verification.
+  - The first production harness ran from the wrong working directory and could not resolve the frontend Cognito package; it was a harness-only failure and cleanup reported zero. The correct rerun passed SRP sign-in, sync (`200`, synced 3), events (`200`, count 3), status (`200`, synced), context (`200`, commitments 3), and ACAO equal to the production origin. Cleanup removed 3 calendar rows, 1 context row, and the Cognito user; residuals were zero.
+- **Blockers / Human Decisions:** The production auth/network blocker and calendar 500 blocker are RESOLVED. Real Google Calendar OAuth/integration remains unimplemented and unconfigured; current production calendar behavior is seeded/mock demo behavior and this is an explicit separate limitation/handoff. Gate 7 remains REVIEWING at 6/8 (75%) with 2 gates left; do not treat these resolutions as completion of Gate 7 or the full Phase 4 browser decision journey.
 
 ### 8. Browser / Delivery
 - **Status:** [ ] PENDING
@@ -95,3 +102,8 @@
 - **2026-09-23:** First E2E sign-in harness ran Node from repo root and failed to resolve amazon-cognito-identity-js; this was a harness cwd error, not app failure. The rerun from frontend succeeded and all test data was cleaned.
 - **2026-09-23:** Delivered Auth fix via a dedicated main-based hotfix PR (#18) so unfinished Phase 4 work was not merged to main.
 - **2026-09-23:** Production auth/network delivery was harder than the initial route-only change suggested. Plan workflow 35800583812 exposed an unrelated Lambda hash update, and the first targeted Terraform plan still retained the Lambda dependency. The exact-change safety assertion prevented apply, so no plan was applied. Exact-scope delivery required creating route `7wuizoq` through the AWS API and importing it into the existing S3 Terraform state as `module.http-api.aws_apigatewayv2_route.options_preflight`; Lambda was not updated. RED/GREEN production checks and authenticated disposable-user proof then resolved the blocker without claiming Gate 7 or the full browser journey complete.
+- **2026-09-23:** Calendar repair Codex attempt 1 stopped on a malformed `PROJECT_CONTEXT` presence check and made no edits.
+- **2026-09-23:** Calendar repair Codex attempt 2 added only the first strict RED test, then stopped because dependencies were absent.
+- **2026-09-23:** The supervisor installed dependencies and captured the strict RED evidence: the exact missing-`created_at` error with 1 failed/8 passed.
+- **2026-09-23:** A final bounded calendar repair attempt completed the persistence/legacy-read fix and verification; independent Claude review recommended ship as-is with no blockers and documented low-risk caveats.
+- **2026-09-23:** The first post-deploy calendar production harness ran from the wrong working directory and failed to resolve the frontend Cognito package. This was harness-only, with cleanup zero. The corrected rerun passed the authenticated calendar/context checks and cleanup removed 3 calendar rows, 1 context row, and the Cognito user with zero residuals.
