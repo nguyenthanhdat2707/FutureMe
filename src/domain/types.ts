@@ -203,6 +203,7 @@ export interface ContextSnapshot {
   commitments: Commitment[];
   constraints: string[];
   relevantHistory: string[];
+  query?: DecisionQuery;
 }
 
 export interface Decision {
@@ -218,7 +219,9 @@ export interface Decision {
   userChoice?: string;
   status: DecisionStatus;
   createdAt: Date;
+  query?: DecisionQuery;
 }
+
 
 
 export type DecisionPolicyOutcome = 'RECOMMEND' | 'ASK' | 'ABSTAIN';
@@ -263,23 +266,42 @@ export enum InterventionLevel {
   PROACTIVE = 'PROACTIVE'
 }
 
+export type InterventionType = 'CONTEXT_CHECK' | 'CONSEQUENTIAL_DISRUPTION' | 'NONE';
+export type InterventionStatus = 'ACTIVE' | 'DISMISSED' | 'RESPONDED';
+
 export interface Intervention {
   id: string;
   userId: string;
+  decisionId?: string;
+  issueKey: string;
+  type: InterventionType;
   level: InterventionLevel;
+  status: InterventionStatus;
   reason: string;
   prompt?: string;
   suggestedAction?: string;
+  suggestedActions?: string[];
+  severity?: 'low' | 'medium' | 'high';
+  dismissedAt?: Date;
+  lastMaterialChangeAt?: Date;
   createdAt: Date;
 }
 
 export interface InterventionDecision {
   shouldIntervene: boolean;
   level: InterventionLevel;
+  interventionType: InterventionType;
   reason: string;
   prompt?: string;
   suggestedAction?: string;
+  suggestedActions?: string[];
+  interventionId?: string;
+  decisionId?: string;
+  issueKey?: string;
+  severity?: 'low' | 'medium' | 'high';
+  timestamp?: Date;
 }
+
 
 // ========================================
 // Outcome

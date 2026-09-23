@@ -71,9 +71,11 @@ export interface IDecisionEngine {
 export interface IInterventionPolicy {
   shouldIntervene(
     state: StateEstimate,
-    context: PersonalContext
+    context: PersonalContext,
+    options?: Record<string, unknown>
   ): Promise<InterventionDecision>;
 }
+
 
 // ========================================
 // LLM Context Analyst Interface

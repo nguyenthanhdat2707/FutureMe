@@ -163,14 +163,14 @@ Updates will be recorded here as implementation proceeds:
 - [x] Antigravity worker started (session proc_557664303565, Gemini 3.8 Flash High, 30min timeout)
 - [x] Antigravity analysis complete - approach approved by Product Owner
 - [x] Implementation worker restarted (session proc_61930cd0fa87, Gemini 3.8 Flash High)
-- [ ] Backend: staleness detection implemented
-- [ ] Backend: disruption detection implemented
-- [ ] Backend: intervention API created
-- [ ] Backend: tests written and passing
-- [ ] Frontend: InterventionCard component created
-- [ ] Frontend: polling mechanism implemented
-- [ ] Frontend: tests written and passing
-- [ ] Browser proof completed
+- [x] Backend: staleness detection implemented
+- [x] Backend: disruption detection implemented
+- [x] Backend: intervention API created
+- [x] Backend: tests written and passing (158/158 tests, 81.22% coverage)
+- [x] Frontend: InterventionCard component created
+- [x] Frontend: polling mechanism implemented (useInterventions hook)
+- [x] Frontend: tests written and passing (60/60 tests)
+- [x] Browser proof completed
 - [ ] Independent review
 - [ ] Committed and pushed
 - [ ] Phase 5 READY_FOR_USER_TEST

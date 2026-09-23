@@ -434,6 +434,35 @@ export enum InterventionIntensity {
   PROACTIVE = 'PROACTIVE', // Requires action
 }
 
+// Phase 5 Proactive Interventions
+export type ProactiveInterventionType = 'CONTEXT_CHECK' | 'CONSEQUENTIAL_DISRUPTION' | 'NONE';
+export type ProactiveInterventionStatus = 'ACTIVE' | 'DISMISSED' | 'RESPONDED';
+
+export interface ProactiveIntervention {
+  id?: string;
+  interventionId?: string;
+  userId?: string;
+  decisionId?: string;
+  issueKey?: string;
+  interventionType?: ProactiveInterventionType;
+  type?: ProactiveInterventionType;
+  level?: string;
+  status?: ProactiveInterventionStatus;
+  reason: string;
+  prompt?: string;
+  suggestedAction?: string;
+  suggestedActions?: string[];
+  severity?: 'low' | 'medium' | 'high';
+  timestamp?: string;
+  createdAt?: string;
+  dismissedAt?: string;
+}
+
+export interface InterventionCheckResponse {
+  interventions: ProactiveIntervention[];
+  hasInterventions: boolean;
+}
+
 export interface Action {
   id: string;
   label: string;

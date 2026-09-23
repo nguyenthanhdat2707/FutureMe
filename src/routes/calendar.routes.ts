@@ -3,7 +3,8 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { getCalendarAdapter, getCalendarEventRepository, getContextRepository } from '../services/service-container';
+import { getCalendarAdapter, getCalendarEventRepository, getContextRepository, getContextEngine, getStateEstimator, getInterventionPolicy } from '../services/service-container';
+
 import { ObservationSource } from '../domain/types';
 import { getUserId } from '../utils/identity';
 
@@ -49,11 +50,23 @@ calendarRouter.post('/sync', async (req: Request, res: Response) => {
       observedAt: now
     });
 
+    try {
+      const contextEngine = getContextEngine();
+      const stateEstimator = getStateEstimator();
+      const policy = getInterventionPolicy();
+      const context = await contextEngine.getCurrentContext(userId);
+      const state = await stateEstimator.estimateCurrentState(context, []);
+      await policy.shouldIntervene(state, context, { userId, now });
+    } catch {
+      // Non-blocking catch-up evaluation
+    }
+
     res.json({
       success: true,
       synced: events.length,
       timestamp: now.toISOString()
     });
+
   } catch (error: unknown) {
     res.status(500).json({ error: getErrorMessage(error) });
   }

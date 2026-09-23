@@ -18,7 +18,8 @@ import {
   ICalendarEventRepository,
   IUserRepository,
   IOutcomeRepository,
-  IFeedbackRepository
+  IFeedbackRepository,
+  IInterventionRepository
 } from '../repositories/interfaces';
 
 import { SqlitePersonalContextRepository } from '../repositories/personal-context.repository';
@@ -28,6 +29,7 @@ import { SqliteObservationRepository } from '../repositories/observation.reposit
 import { SqliteUserRepository } from '../repositories/user.repository';
 import { SqliteOutcomeRepository } from '../repositories/outcome.repository';
 import { SqliteFeedbackRepository } from '../repositories/feedback.repository';
+import { SqliteInterventionRepository } from '../repositories/intervention.repository';
 
 import { DynamoPersonalContextRepository } from '../repositories/dynamo/personal-context.repository';
 import { DynamoDecisionRepository } from '../repositories/dynamo/decision.repository';
@@ -36,6 +38,7 @@ import { DynamoObservationRepository } from '../repositories/dynamo/observation.
 import { DynamoUserRepository } from '../repositories/dynamo/user.repository';
 import { DynamoOutcomeRepository } from '../repositories/dynamo/outcome.repository';
 import { DynamoFeedbackRepository } from '../repositories/dynamo/feedback.repository';
+import { DynamoInterventionRepository } from '../repositories/dynamo/intervention.repository';
 
 // Singleton instances
 let contextEngine: IContextEngine | null = null;
@@ -53,6 +56,8 @@ let calendarRepo: ICalendarEventRepository | null = null;
 let userRepo: IUserRepository | null = null;
 let outcomeRepo: IOutcomeRepository | null = null;
 let feedbackRepo: IFeedbackRepository | null = null;
+let interventionRepo: IInterventionRepository | null = null;
+
 
 const isDynamo = process.env.PERSISTENCE_PROVIDER === 'dynamodb';
 
@@ -90,6 +95,12 @@ export function getFeedbackRepository(): IFeedbackRepository {
   if (!feedbackRepo) feedbackRepo = isDynamo ? new DynamoFeedbackRepository() : new SqliteFeedbackRepository();
   return feedbackRepo;
 }
+
+export function getInterventionRepository(): IInterventionRepository {
+  if (!interventionRepo) interventionRepo = isDynamo ? new DynamoInterventionRepository() : new SqliteInterventionRepository();
+  return interventionRepo;
+}
+
 
 export function getContextEngine(): IContextEngine {
   if (!contextEngine) {

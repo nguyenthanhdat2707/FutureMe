@@ -1,6 +1,8 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { decisionsApi, contextApi } from '../api/client';
 import type { DecisionApiRequest, DecisionApiResponse, ContextUpdateObservation, ObservationSource } from '../types/domain';
+import { useInterventions } from '../hooks/useInterventions';
+import { InterventionCard } from '../components/InterventionCard';
 
 interface DemoForm {
   userId: string;
@@ -136,6 +138,7 @@ function DecisionsPage() {
   const [clarificationAnswers, setClarificationAnswers] = useState<Record<string, string>>(() => readSessionValue('decisions_clarificationAnswers', {}));
   const [showObservationForm, setShowObservationForm] = useState(false);
   const [hasStaleContext, setHasStaleContext] = useState(() => readSessionValue('decisions_hasStaleContext', false));
+  const { intervention, refresh: refreshInterventions, respond, dismiss } = useInterventions();
 
   useEffect(() => sessionStorage.setItem('decisions_form', JSON.stringify(form)), [form]);
   useEffect(() => sessionStorage.setItem('decisions_observationForm', JSON.stringify(observationForm)), [observationForm]);
@@ -252,6 +255,7 @@ function DecisionsPage() {
       if (result) {
         setHasStaleContext(true);
       }
+      await refreshInterventions();
       setError(null);
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : 'Unable to submit observation.');
@@ -406,6 +410,14 @@ function DecisionsPage() {
           Test a decision against your available time, workload, and energy.
         </p>
       </header>
+
+      {intervention && (
+        <InterventionCard
+          intervention={intervention}
+          onRespond={respond}
+          onDismiss={dismiss}
+        />
+      )}
 
       <form className="card p-6 space-y-6" onSubmit={handleSubmit}>
         <div>

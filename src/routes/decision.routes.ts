@@ -54,10 +54,13 @@ decisionRouter.post('/', async (req: Request, res: Response) => {
     const engine = getDecisionEngine();
     const support = await engine.supportDecision(userId, query);
 
-    // Save decision to database
+    // Save decision to database with query attached
+    support.decision.relevantContext.query = query;
+    support.decision.query = query;
     await decisionRepo.create(support.decision);
 
     res.json(support);
+
   } catch (error: unknown) {
     res.status(500).json({ error: getErrorMessage(error) });
   }

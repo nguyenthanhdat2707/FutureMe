@@ -28,7 +28,7 @@ export function getUserId(req: Request): string {
   }
 
   if (process.env.AUTH_MODE === 'demo') {
-    const header = req.headers['x-demo-user'];
+    const header = req.headers?.['x-demo-user'];
     const demoUserId = (Array.isArray(header) ? header[0] : header)?.trim();
     if (demoUserId && isDemoPersonaId(demoUserId)) {
       return demoUserId;
@@ -37,11 +37,14 @@ export function getUserId(req: Request): string {
   }
 
   // Fallback for local testing if not using cognito
+  const header = req.headers?.['x-demo-user'];
+  const demoUserId = (Array.isArray(header) ? header[0] : header)?.trim();
   const body = req.body as Record<string, unknown> | undefined;
   const query = req.query as Record<string, unknown> | undefined;
   
   const bodyUserId = typeof body?.userId === 'string' ? body.userId : undefined;
   const queryUserId = typeof query?.userId === 'string' ? query.userId : undefined;
   
-  return bodyUserId || queryUserId || 'demo-user';
+  return demoUserId || bodyUserId || queryUserId || 'demo-user';
 }
+

@@ -1,6 +1,17 @@
-import { User, Decision, Observation, CalendarEvent, Outcome, Feedback, DecisionStatus, ContextAttribute } from '../domain/types';
+import { User, Decision, Observation, CalendarEvent, Outcome, Feedback, DecisionStatus, ContextAttribute, Intervention, InterventionStatus } from '../domain/types';
 
 export type Awaitable<T> = T | Promise<T>;
+
+export interface IInterventionRepository {
+  findById(id: string): Awaitable<Intervention | null>;
+  findByUserId(userId: string, limit?: number): Awaitable<Intervention[]>;
+  findActiveByUserId(userId: string): Awaitable<Intervention[]>;
+  findByIssueKey(userId: string, issueKey: string): Awaitable<Intervention | null>;
+  create(intervention: Omit<Intervention, 'createdAt'>): Awaitable<Intervention>;
+  updateStatus(id: string, status: InterventionStatus, updates?: Partial<Intervention>): Awaitable<Intervention | null>;
+  dismiss(id: string, dismissedAt?: Date): Awaitable<Intervention | null>;
+}
+
 
 export interface ICalendarEventRepository {
   findById(id: string): Awaitable<CalendarEvent | null>;

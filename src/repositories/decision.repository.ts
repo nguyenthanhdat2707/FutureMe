@@ -93,7 +93,9 @@ export class SqliteDecisionRepository extends BaseRepository implements IDecisio
       confidence: typeof recommendation.confidence === 'number' ? recommendation.confidence : 0,
       userChoice: typeof r.user_choice === 'string' && r.user_choice ? safeJsonParse(r.user_choice) as string : undefined,
       status: (typeof r.status === 'string' ? r.status : DecisionStatus.PENDING) as DecisionStatus,
-      createdAt: new Date(typeof r.created_at === 'string' ? r.created_at : 0)
+      createdAt: new Date(typeof r.created_at === 'string' ? r.created_at : 0),
+      query: parsedContext?.query
     };
+
   }
 }

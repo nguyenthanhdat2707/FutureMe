@@ -3,7 +3,7 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { getObservationRepository } from '../services/service-container';
+import { getObservationRepository, getContextEngine, getStateEstimator, getInterventionPolicy } from '../services/service-container';
 import { getUserId } from '../utils/identity';
 
 import { getErrorMessage } from '../utils/error';
@@ -36,7 +36,19 @@ observationRouter.post('/', async (req: Request, res: Response) => {
     
     const created = await observationRepo.create(observation);
     
+    try {
+      const contextEngine = getContextEngine();
+      const stateEstimator = getStateEstimator();
+      const policy = getInterventionPolicy();
+      const context = await contextEngine.getCurrentContext(userId);
+      const state = await stateEstimator.estimateCurrentState(context, []);
+      await policy.shouldIntervene(state, context, { userId, now: new Date() });
+    } catch {
+      // Non-blocking catch-up evaluation
+    }
+
     res.json(created);
+
   } catch (error: unknown) {
     res.status(500).json({ error: getErrorMessage(error) });
   }

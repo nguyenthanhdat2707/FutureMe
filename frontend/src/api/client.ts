@@ -13,7 +13,6 @@ import type {
   DecisionQuery,
   DecisionApiRequest,
   DecisionApiResponse,
-  Intervention,
   ClarificationRequest,
   DemoScenario,
   SetupAnswers,
@@ -21,6 +20,8 @@ import type {
   CalendarStatusResponse,
   CalendarSyncResponse,
   CalendarEvent,
+  ProactiveIntervention,
+  InterventionCheckResponse,
 } from '../types/domain';
 
 import {
@@ -30,8 +31,6 @@ import {
   TimeBlockType,
   TimeBlockStatus,
   FlexibilityLevel,
-  InterventionType,
-  InterventionIntensity,
 } from '../types/domain';
 
 export function resolveApiBaseUrl(envBaseUrl?: string, mode?: string): string {
@@ -395,41 +394,37 @@ export const decisionsApi = {
 // ============================================================================
 
 export const interventionsApi = {
-  async getActive(): Promise<Intervention[]> {
-    await delay(300);
-    return [
-      {
-        id: 'int-1',
-        userId: 'user-1',
-        type: InterventionType.OVERCOMMITMENT_WARNING,
-        intensity: InterventionIntensity.SUGGESTION,
-        title: 'Schedule Capacity Alert',
-        message: 'You have 8 hours of planned work but only 5 hours of available time today.',
-        reasoning: 'Your fixed commitments leave limited capacity. Consider moving lower-priority tasks to tomorrow.',
-        suggestedActions: [
-          {
-            id: 'action-1',
-            label: 'Review schedule',
-            type: 'RESCHEDULE',
-            impact: 'Rebalance workload across next 2 days',
-          },
-          {
-            id: 'action-2',
-            label: 'Dismiss for today',
-            type: 'DISMISS',
-          },
-        ],
-        triggeredBy: 'Calendar capacity analysis',
-        timestamp: new Date().toISOString(),
-      },
-    ];
+  async check(): Promise<InterventionCheckResponse> {
+    const response = await authFetch(`${API_BASE_URL}/interventions/check`);
+    if (!response.ok) {
+      throw new Error(`Failed to check interventions: ${response.status}`);
+    }
+    return response.json();
   },
 
-  async respond(interventionId: string, action: string, feedback?: string): Promise<void> {
-    await delay(200);
-    void interventionId;
-    void action;
-    void feedback;
+  async getActive(): Promise<ProactiveIntervention[]> {
+    const response = await authFetch(`${API_BASE_URL}/interventions/active`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch active interventions: ${response.status}`);
+    }
+    const data = await response.json();
+    return data.interventions || [];
+  },
+
+  async respond(interventionId: string, responseAction: string): Promise<void> {
+    const response = await authFetch(`${API_BASE_URL}/interventions/respond`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        interventionId,
+        response: responseAction,
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to respond to intervention: ${response.status}`);
+    }
   },
 };
 
