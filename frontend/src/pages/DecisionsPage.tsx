@@ -206,6 +206,7 @@ function DecisionsPage() {
     };
 
 
+
     const prevResult = result;
     setIsLoading(true);
     setError(null);
