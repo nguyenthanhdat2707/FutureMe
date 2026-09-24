@@ -1,523 +1,212 @@
-/**
- * ContextPage - What Future Me Understands
- * Display all context AI has about the user
- */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../api/client';
-import type { PersonalContext, Goal, Commitment, Preference, ObservationSource } from '../types/domain';
+import type { PersonalContext, UnderstandingHistoryResponse } from '../types/domain';
+import { UnderstandingHeader } from '../features/understanding/UnderstandingHeader';
+import { UnderstandingKpiCards } from '../features/understanding/UnderstandingKpiCards';
+import { UnderstandingEvolutionChart } from '../features/understanding/UnderstandingEvolutionChart';
+import { ContextByCategory } from '../features/understanding/ContextByCategory';
+import { WhatFutureMeLearned } from '../features/understanding/WhatFutureMeLearned';
+import { FocusPatternsCard } from '../features/understanding/FocusPatternsCard';
+import { PersonalContextSection } from '../features/understanding/PersonalContextSection';
+import { CalendarDataSourcesCard } from '../features/understanding/CalendarDataSourcesCard';
+import { UnderstandingFooter } from '../features/understanding/UnderstandingFooter';
+import { UnderstandingSkeleton } from '../features/understanding/UnderstandingSkeleton';
+import { UnderstandingErrorState } from '../features/understanding/UnderstandingErrorState';
 
-function ContextPage() {
+export function ContextPage() {
   const [context, setContext] = useState<PersonalContext | null>(null);
+  const [history, setHistory] = useState<UnderstandingHistoryResponse | null>(null);
+  const [selectedDays, setSelectedDays] = useState<7 | 30 | 90>(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 480) {
+      return 7;
+    }
+    return 30;
+  });
   const [loading, setLoading] = useState(true);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [editingItem, setEditingItem] = useState<{ type: string; id: string; value: string } | null>(null);
-  const [actionInProgress, setActionInProgress] = useState<string | null>(null);
+  const [historyError, setHistoryError] = useState<string | null>(null);
 
-  const loadContext = useCallback(async (isInitial = false, signal?: AbortSignal) => {
+  const requestSeqRef = useRef(0);
+  const lastRequestedDaysRef = useRef<7 | 30 | 90>(30);
+
+  // Main data loader for retry
+  const reloadData = useCallback(async (days: 7 | 30 | 90) => {
     try {
-      if (isInitial) setLoading(true);
-      const data = await api.context.getCurrent();
-      if (signal?.aborted) return;
-      setContext(data);
+      const [contextData, historyData] = await Promise.all([
+        api.context.getCurrent(),
+        api.context.getHistory(days),
+      ]);
+      setContext(contextData);
+      setHistory(historyData);
+      setSelectedDays(historyData.days);
       setError(null);
     } catch (err) {
-      if (signal?.aborted) return;
-      setError(err instanceof Error ? err.message : 'Failed to load context');
+      setError(err instanceof Error ? err.message : 'Failed to load understanding data');
     } finally {
-      if (!signal?.aborted) {
-        setLoading(false);
-      }
+      setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    const init = async () => {
-      await loadContext(false, controller.signal);
-    };
-    void init();
-    return () => controller.abort();
-  }, [loadContext]);
+  // History range switch loader with request sequence to prevent stale/out-of-order responses
+  const handleRangeChange = async (days: 7 | 30 | 90) => {
+    lastRequestedDaysRef.current = days;
+    const currentSeq = ++requestSeqRef.current;
+    setHistoryLoading(true);
+    setHistoryError(null);
 
+    // Never relabel old data as the new range ahead of time!
+    try {
+      const updatedHistory = await api.context.getHistory(days);
+      if (currentSeq !== requestSeqRef.current) return;
+      setHistory(updatedHistory);
+      setSelectedDays(updatedHistory.days);
+    } catch (err) {
+      if (currentSeq !== requestSeqRef.current) return;
+      setHistoryError(err instanceof Error ? err.message : `Failed to load ${days}d history`);
+    } finally {
+      if (currentSeq === requestSeqRef.current) {
+        setHistoryLoading(false);
+      }
+    }
+  };
+
+  const handleRetryRange = () => {
+    void handleRangeChange(lastRequestedDaysRef.current);
+  };
+
+  useEffect(() => {
+    let ignore = false;
+    const controller = new AbortController();
+    const daysToLoad = typeof window !== 'undefined' && window.innerWidth < 480 ? 7 : 30;
+    lastRequestedDaysRef.current = daysToLoad;
+
+    async function init() {
+      try {
+        const [contextData, historyData] = await Promise.all([
+          api.context.getCurrent(),
+          api.context.getHistory(daysToLoad),
+        ]);
+        if (ignore || controller.signal.aborted) return;
+        setContext(contextData);
+        setHistory(historyData);
+        setSelectedDays(historyData.days);
+        setError(null);
+      } catch (err) {
+        if (ignore || controller.signal.aborted) return;
+        setError(err instanceof Error ? err.message : 'Failed to load understanding data');
+      } finally {
+        if (!ignore && !controller.signal.aborted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void init();
+    return () => {
+      ignore = true;
+      controller.abort();
+    };
+  }, []);
+
+  // Actions
   const handleConfirm = async (attributeId: string) => {
     if (!attributeId) return;
-    
-    try {
-      setActionInProgress(attributeId);
-      await api.context.confirm(attributeId);
-      await loadContext(); // Reload to show updated source
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to confirm attribute');
-    } finally {
-      setActionInProgress(null);
-    }
+    await api.context.confirm(attributeId);
+    // Reload active context to reflect updated source
+    const updated = await api.context.getCurrent();
+    setContext(updated);
   };
 
-  const handleStartEdit = (type: string, id: string, currentValue: string) => {
-    setEditingItem({ type, id, value: currentValue });
-  };
+  const handleCorrect = async ({
+    attributeId,
+    type,
+    rawValue,
+  }: {
+    attributeId: string;
+    type: 'goal' | 'commitment' | 'preference';
+    rawValue: string;
+  }) => {
+    if (!attributeId) return;
 
-  const handleCancelEdit = () => {
-    setEditingItem(null);
-  };
+    const correctedValue =
+      type === 'preference'
+        ? JSON.stringify({ value: rawValue })
+        : rawValue;
 
-  const handleSaveEdit = async () => {
-    if (!editingItem || !editingItem.id) return;
+    await api.context.correct({
+      attributeId,
+      correctedValue,
+      reason: 'User correction',
+    });
 
-    try {
-      setActionInProgress(editingItem.id);
-      const correctedValue = editingItem.type === 'preference'
-        ? JSON.stringify({ value: editingItem.value })
-        : editingItem.value;
-
-      await api.context.correct({
-        attributeId: editingItem.id,
-        correctedValue,
-        reason: 'User correction'
-      });
-      await loadContext();
-      setEditingItem(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save correction');
-    } finally {
-      setActionInProgress(null);
-    }
-  };
-
-  const getSourceBadge = (source?: ObservationSource, confidence?: number) => {
-    if (!source) return null;
-
-    const badges: Record<string, { label: string; color: string; bgColor: string }> = {
-      USER_CONFIRMED: { label: 'Confirmed', color: 'text-green-600', bgColor: 'bg-green-50' },
-      SYSTEM_INFERRED: { label: 'AI Inferred', color: 'text-accent-ai', bgColor: 'bg-accent-ai/10' },
-      SYSTEM_OBSERVED: { label: 'Observed', color: 'text-blue-600', bgColor: 'bg-blue-50' },
-      CALENDAR: { label: 'From Calendar', color: 'text-purple-600', bgColor: 'bg-purple-50' },
-      HISTORICAL_PATTERN: { label: 'From Pattern', color: 'text-amber-600', bgColor: 'bg-amber-50' },
-      EXTERNAL_SOURCE: { label: 'External', color: 'text-gray-600', bgColor: 'bg-gray-50' },
-    };
-
-    const badge = badges[source] || { label: source, color: 'text-gray-600', bgColor: 'bg-gray-50' };
-    const confidenceText = confidence !== undefined && confidence < 1 ? ` (${Math.round(confidence * 100)}%)` : '';
-
-    return (
-      <span className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded ${badge.color} ${badge.bgColor}`}>
-        {badge.label}{confidenceText}
-      </span>
-    );
-  };
-
-  const isInferred = (source?: ObservationSource) => {
-    return source === 'SYSTEM_INFERRED' || source === 'HISTORICAL_PATTERN';
-  };
-
-  const isUserConfirmed = (source?: ObservationSource) => {
-    return source === 'USER_CONFIRMED';
-  };
-
-  const formatDateTime = (dateStr: string): string => {
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
+    // Reload active context to reflect corrected value
+    const updated = await api.context.getCurrent();
+    setContext(updated);
   };
 
   if (loading) {
-    return (
-      <div className="p-8">
-        <p className="text-text-secondary">Loading context...</p>
-      </div>
-    );
+    return <UnderstandingSkeleton />;
   }
 
   if (error) {
     return (
-      <div className="p-8">
-        <p className="text-accent-warning">Error: {error}</p>
-        <button
-          onClick={() => loadContext()}
-          className="mt-4 px-4 py-2 bg-accent-ai text-white rounded hover:opacity-90"
-        >
-          Retry
-        </button>
-      </div>
-    );
-  }
-
-  if (!context) {
-    return (
-      <div className="p-8">
-        <p className="text-text-secondary">No context available</p>
-      </div>
+      <UnderstandingErrorState
+        error={error}
+        onRetry={() => {
+          setLoading(true);
+          setError(null);
+          void reloadData(lastRequestedDaysRef.current);
+        }}
+      />
     );
   }
 
   return (
-    <div className="p-8 space-y-8">
-      <header>
-        <h1 className="text-4xl font-serif text-text-primary mb-2">What Future Me Understands</h1>
-        <p className="text-text-secondary">Your goals, commitments, and preferences</p>
-        <p className="text-xs text-text-secondary mt-1">
-          Last updated: {formatDateTime(context.lastUpdated)}
-        </p>
-      </header>
+    <div className="mx-auto min-w-0 max-w-[1440px] px-4 py-6 sm:px-6 sm:py-8 lg:px-10 lg:py-10 space-y-7 text-stone-900">
+      {/* 1. Header first: title, one-line description, sync status, last updated */}
+      <UnderstandingHeader
+        calendar={context?.calendar}
+        lastUpdated={context?.lastUpdated}
+      />
 
-      {/* Goals */}
-      <section className="space-y-4">
-        <h2 className="text-xl font-serif text-text-primary">Active Goals</h2>
-        
-        {context.goals.length === 0 ? (
-          <div className="card p-6">
-            <p className="text-text-secondary text-sm">No goals found. Add your first goal to get started.</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {context.goals.map((goal: Goal) => (
-              <div key={goal.id} className="card p-6">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    {editingItem?.type === 'goal' && editingItem.id === goal.attributeId ? (
-                      <div className="space-y-2">
-                        <input
-                          type="text"
-                          value={editingItem.value}
-                          onChange={(e) => setEditingItem({ ...editingItem, value: e.target.value })}
-                          className="w-full px-3 py-2 border border-surface-border rounded bg-surface-card text-text-primary"
-                          autoFocus
-                        />
-                        <div className="flex gap-2">
-                          <button
-                            onClick={handleSaveEdit}
-                            disabled={actionInProgress === goal.attributeId}
-                            className="px-3 py-1 text-sm bg-accent-ai text-white rounded hover:opacity-90 disabled:opacity-50"
-                          >
-                            {actionInProgress === goal.attributeId ? 'Saving...' : 'Save'}
-                          </button>
-                          <button
-                            onClick={handleCancelEdit}
-                            className="px-3 py-1 text-sm bg-surface-hover text-text-primary rounded hover:opacity-90"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="flex items-start gap-2 mb-1">
-                          <h3 className="font-medium text-text-primary flex-1">
-                            {isInferred(goal.source) && (
-                              <span className="text-text-secondary text-sm mr-2">AI believes:</span>
-                            )}
-                            {goal.description}
-                          </h3>
-                        </div>
-                        {goal.deadline && (
-                          <p className="text-xs text-text-secondary">
-                            Deadline: {new Date(goal.deadline).toLocaleDateString()}
-                          </p>
-                        )}
-                      </>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 ml-4">
-                    <span className={`px-2 py-1 text-xs font-medium rounded ${
-                      goal.priority === 'high' ? 'bg-accent-warning text-accent-warning' :
-                      goal.priority === 'medium' ? 'bg-accent-intention text-accent-intention' :
-                      'bg-slate-200 text-text-secondary'
-                    }`}>
-                      {goal.priority.toUpperCase()}
-                    </span>
-                  </div>
-                </div>
-                
-                <div className="flex items-center justify-between mt-3 pt-3 border-t border-surface-border">
-                  <div className="flex items-center gap-2">
-                    {getSourceBadge(goal.source, goal.confidence)}
-                    {goal.observedAt && (
-                      <span className="text-xs text-text-secondary ml-2">
-                        Observed: {new Date(goal.observedAt).toLocaleDateString()}
-                      </span>
-                    )}
-                    {goal.validUntil && (
-                      <span className="text-xs text-text-secondary ml-2">
-                        Valid until: {new Date(goal.validUntil).toLocaleDateString()}
-                      </span>
-                    )}
-                  </div>
-                  {goal.attributeId && !isUserConfirmed(goal.source) && goal.source !== 'CALENDAR' && editingItem?.id !== goal.attributeId && (
-                    <div className="flex gap-2">
-                      {isInferred(goal.source) && (
-                        <button
-                          onClick={() => handleConfirm(goal.attributeId!)}
-                          disabled={actionInProgress === goal.attributeId}
-                          className="px-3 py-1 text-xs bg-green-50 text-green-700 rounded hover:bg-green-100 disabled:opacity-50"
-                        >
-                          {actionInProgress === goal.attributeId ? '...' : '✓ Confirm'}
-                        </button>
-                      )}
-                      <button
-                        onClick={() => handleStartEdit('goal', goal.attributeId!, goal.description)}
-                        className="px-3 py-1 text-xs bg-surface-hover text-text-primary rounded hover:opacity-90"
-                      >
-                        Edit
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+      {/* 2. Exactly THREE KPI cards: Active Goals, Commitments, Preferences. No Decisions KPI. */}
+      <UnderstandingKpiCards context={context} />
 
-      {/* Commitments */}
-      <section className="space-y-4">
-        <h2 className="text-xl font-serif text-text-primary">Active Commitments</h2>
-        
-        {context.commitments.length === 0 ? (
-          <div className="card p-6">
-            <p className="text-text-secondary text-sm">No commitments tracked yet.</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {context.commitments.map((commitment: Commitment) => (
-              <div key={commitment.id} className="card p-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    {editingItem?.type === 'commitment' && editingItem.id === commitment.attributeId ? (
-                      <div className="space-y-2">
-                        <input
-                          type="text"
-                          value={editingItem.value}
-                          onChange={(e) => setEditingItem({ ...editingItem, value: e.target.value })}
-                          className="w-full px-3 py-2 border border-surface-border rounded bg-surface-card text-text-primary"
-                          autoFocus
-                        />
-                        <div className="flex gap-2">
-                          <button
-                            onClick={handleSaveEdit}
-                            disabled={actionInProgress === commitment.attributeId}
-                            className="px-3 py-1 text-sm bg-accent-ai text-white rounded hover:opacity-90 disabled:opacity-50"
-                          >
-                            {actionInProgress === commitment.attributeId ? 'Saving...' : 'Save'}
-                          </button>
-                          <button
-                            onClick={handleCancelEdit}
-                            className="px-3 py-1 text-sm bg-surface-hover text-text-primary rounded hover:opacity-90"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <h3 className="font-medium text-text-primary mb-1">
-                          {isInferred(commitment.source) && (
-                            <span className="text-text-secondary text-sm mr-2">AI believes:</span>
-                          )}
-                          {commitment.description}
-                        </h3>
-                        <p className="text-xs text-text-secondary">
-                          {new Date(commitment.startTime).toLocaleString()} - {new Date(commitment.endTime).toLocaleString()}
-                        </p>
-                        {commitment.recurring && (
-                          <span className="inline-block mt-2 px-2 py-1 bg-accent-intention/10 text-accent-intention text-xs font-medium rounded">
-                            RECURRING
-                          </span>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </div>
+      {/* 3. Understanding Evolution full width */}
+      <UnderstandingEvolutionChart
+        history={history}
+        selectedDays={selectedDays}
+        onRangeChange={handleRangeChange}
+        isLoading={historyLoading}
+        rangeError={historyError}
+        onRetryRange={handleRetryRange}
+      />
 
-                <div className="flex items-center justify-between mt-3 pt-3 border-t border-surface-border">
-                  <div className="flex items-center gap-2">
-                    {getSourceBadge(commitment.source, commitment.confidence)}
-                    {commitment.observedAt && (
-                      <span className="text-xs text-text-secondary ml-2">
-                        Observed: {new Date(commitment.observedAt).toLocaleDateString()}
-                      </span>
-                    )}
-                    {commitment.validUntil && (
-                      <span className="text-xs text-text-secondary ml-2">
-                        Valid until: {new Date(commitment.validUntil).toLocaleDateString()}
-                      </span>
-                    )}
-                  </div>
-                  {commitment.attributeId && !isUserConfirmed(commitment.source) && commitment.source !== 'CALENDAR' && editingItem?.id !== commitment.attributeId && (
-                    <div className="flex gap-2">
-                      {isInferred(commitment.source) && (
-                        <button
-                          onClick={() => handleConfirm(commitment.attributeId!)}
-                          disabled={actionInProgress === commitment.attributeId}
-                          className="px-3 py-1 text-xs bg-green-50 text-green-700 rounded hover:bg-green-100 disabled:opacity-50"
-                        >
-                          {actionInProgress === commitment.attributeId ? '...' : '✓ Confirm'}
-                        </button>
-                      )}
-                      <button
-                        onClick={() => handleStartEdit('commitment', commitment.attributeId!, commitment.description)}
-                        className="px-3 py-1 text-xs bg-surface-hover text-text-primary rounded hover:opacity-90"
-                      >
-                        Edit
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+      {/* 4. A two-card row: LEFT Context by Category, RIGHT What Future Me Learned */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-7">
+        <ContextByCategory context={context} history={history} />
+        <WhatFutureMeLearned context={context} history={history} />
+      </div>
 
-      {/* Preferences */}
-      <section className="space-y-4">
-        <h2 className="text-xl font-serif text-text-primary">Your Preferences</h2>
-        
-        {context.preferences.length === 0 ? (
-          <div className="card p-6">
-            <p className="text-text-secondary text-sm">No preferences learned yet.</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {context.preferences.map((pref: Preference) => (
-              <div key={pref.id} className="card p-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    {editingItem?.type === 'preference' && editingItem.id === pref.attributeId ? (
-                      <div className="space-y-2">
-                        <input
-                          type="text"
-                          value={editingItem.value}
-                          onChange={(e) => setEditingItem({ ...editingItem, value: e.target.value })}
-                          className="w-full px-3 py-2 border border-surface-border rounded bg-surface-card text-text-primary"
-                          autoFocus
-                        />
-                        <div className="flex gap-2">
-                          <button
-                            onClick={handleSaveEdit}
-                            disabled={actionInProgress === pref.attributeId}
-                            className="px-3 py-1 text-sm bg-accent-ai text-white rounded hover:opacity-90 disabled:opacity-50"
-                          >
-                            {actionInProgress === pref.attributeId ? 'Saving...' : 'Save'}
-                          </button>
-                          <button
-                            onClick={handleCancelEdit}
-                            className="px-3 py-1 text-sm bg-surface-hover text-text-primary rounded hover:opacity-90"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-medium text-text-primary">{pref.category}</h3>
-                        </div>
-                        <p className="text-sm text-text-secondary mb-1">
-                          {isInferred(pref.source) && (
-                            <span className="text-text-secondary text-xs mr-1">AI believes: </span>
-                          )}
-                          {pref.description}
-                        </p>
-                        <p className="font-mono text-sm text-text-primary">{pref.value}</p>
-                      </>
-                    )}
-                  </div>
-                </div>
+      {/* 5. Your Focus Patterns full width after that row */}
+      <FocusPatternsCard />
 
-                <div className="flex items-center justify-between mt-3 pt-3 border-t border-surface-border">
-                  <div className="flex items-center gap-2">
-                    {getSourceBadge(pref.source, pref.confidence)}
-                    {pref.observedAt && (
-                      <span className="text-xs text-text-secondary ml-2">
-                        Observed: {new Date(pref.observedAt).toLocaleDateString()}
-                      </span>
-                    )}
-                    {pref.validUntil && (
-                      <span className="text-xs text-text-secondary ml-2">
-                        Valid until: {new Date(pref.validUntil).toLocaleDateString()}
-                      </span>
-                    )}
-                  </div>
-                  {pref.attributeId && !isUserConfirmed(pref.source) && pref.source !== 'CALENDAR' && editingItem?.id !== pref.attributeId && (
-                    <div className="flex gap-2">
-                      {isInferred(pref.source) && (
-                        <button
-                          onClick={() => handleConfirm(pref.attributeId!)}
-                          disabled={actionInProgress === pref.attributeId}
-                          className="px-3 py-1 text-xs bg-green-50 text-green-700 rounded hover:bg-green-100 disabled:opacity-50"
-                        >
-                          {actionInProgress === pref.attributeId ? '...' : '✓ Confirm'}
-                        </button>
-                      )}
-                      <button
-                        onClick={() => handleStartEdit('preference', pref.attributeId!, pref.value)}
-                        className="px-3 py-1 text-xs bg-surface-hover text-text-primary rounded hover:opacity-90"
-                      >
-                        Edit
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+      {/* 6. Your Personal Context after Focus (onboarding guidance inside if all context empty) */}
+      <PersonalContextSection
+        goals={context?.goals ?? []}
+        commitments={context?.commitments ?? []}
+        preferences={context?.preferences ?? []}
+        recentDecisions={context?.recentDecisions ?? []}
+        onConfirm={handleConfirm}
+        onCorrect={handleCorrect}
+      />
 
-      {/* Calendar Summary */}
-      <section className="space-y-4">
-        <h2 className="text-xl font-serif text-text-primary">Calendar Overview</h2>
-        
-        <div className="card p-6 space-y-4">
-                    <div className="grid grid-cols-3 gap-4 mb-4">
-            <div>
-              <p className="text-sm text-text-secondary mb-1">Status</p>
-              <p className="font-mono text-lg text-text-primary capitalize">{context.calendar.status.replace('_', ' ')}</p>
-            </div>
-            <div>
-              <p className="text-sm text-text-secondary mb-1">Last Sync</p>
-              <p className="font-mono text-lg text-text-primary">
-                {context.calendar.lastSync ? new Date(context.calendar.lastSync).toLocaleString() : 'Never'}
-              </p>
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <p className="text-sm text-text-secondary mb-1">Upcoming Events</p>
-              <p className="font-mono text-2xl text-text-primary">{context.calendar.upcomingEvents}</p>
-            </div>
-            <div>
-              <p className="text-sm text-text-secondary mb-1">Busy Hours Today</p>
-              <p className="font-mono text-2xl text-text-primary">{context.calendar.busyHoursToday === null ? 'Unknown' : `${context.calendar.busyHoursToday.toFixed(1)}h`}</p>
-            </div>
-            <div>
-              <p className="text-sm text-text-secondary mb-1">Busy Hours This Week</p>
-              <p className="font-mono text-2xl text-text-primary">{context.calendar.busyHoursThisWeek === null ? 'Unknown' : `${context.calendar.busyHoursThisWeek.toFixed(1)}h`}</p>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* 7. Calendar Overview / Data Sources last before footer */}
+      <CalendarDataSourcesCard calendar={context?.calendar} />
 
-      {/* Recent Decisions */}
-      {context.recentDecisions.length > 0 && (
-        <section className="space-y-4">
-          <h2 className="text-xl font-serif text-text-primary">Recent Decisions</h2>
-          
-          <div className="card p-6">
-            <p className="text-sm text-text-secondary">
-              {context.recentDecisions.length} decision{context.recentDecisions.length !== 1 ? 's' : ''} in recent history
-            </p>
-          </div>
-        </section>
-      )}
+      {/* 8. Restrained warm footer */}
+      <UnderstandingFooter />
     </div>
   );
 }

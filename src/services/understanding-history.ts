@@ -74,6 +74,28 @@ function extractLabel(attr: ContextAttribute): string {
   return attr.attribute;
 }
 
+function extractEntityId(attr: ContextAttribute): string {
+  try {
+    const parsed = typeof attr.value === 'string' ? safeJsonParse(attr.value) : attr.value;
+    if (parsed && typeof parsed === 'object') {
+      const id = (parsed as Record<string, unknown>).id;
+      if (typeof id === 'string' || typeof id === 'number') return String(id);
+    }
+  } catch {
+    // Fall back to the immutable context-row ID when the value is not structured.
+  }
+  return attr.id;
+}
+
+function sourceAuthority(source: string): number {
+  switch (source) {
+    case 'USER_CONFIRMED': return 4;
+    case 'CALENDAR': return 3;
+    case 'SYSTEM_OBSERVED': return 2;
+    default: return 1;
+  }
+}
+
 function toDate(d: Date | string | number | undefined): Date | undefined {
   if (d === undefined || d === null) return undefined;
   if (d instanceof Date) return Number.isNaN(d.getTime()) ? undefined : d;
@@ -99,13 +121,13 @@ export function deriveUnderstandingHistory(
   // Normalize attributes
   interface NormalizedAttribute {
     id: string;
+    entityKey: string;
     category: 'goals' | 'commitments' | 'preferences';
     label: string;
     source: string;
     observedAt: Date;
+    createdAt: Date;
     validUntil?: Date;
-    observedDateStr: string;
-    validUntilDateStr?: string;
   }
 
   const normalizedAttrs: NormalizedAttribute[] = [];
@@ -116,17 +138,75 @@ export function deriveUnderstandingHistory(
     const observedAt = toDate(attr.observedAt);
     if (!observedAt) continue;
 
+    const createdAt = toDate(attr.createdAt) ?? observedAt;
     const validUntil = toDate(attr.validUntil);
+    const entityId = extractEntityId(attr);
     normalizedAttrs.push({
       id: attr.id,
+      entityKey: `${category}_${entityId}`,
       category,
       label: extractLabel(attr),
       source: String(attr.source || 'USER_CONFIRMED'),
       observedAt,
+      createdAt,
       validUntil,
-      observedDateStr: toIsoDateStr(observedAt),
-      validUntilDateStr: validUntil ? toIsoDateStr(validUntil) : undefined,
     });
+  }
+
+  const attributesByEntity = new Map<string, NormalizedAttribute[]>();
+  for (const attr of normalizedAttrs) {
+    const versions = attributesByEntity.get(attr.entityKey) ?? [];
+    versions.push(attr);
+    attributesByEntity.set(attr.entityKey, versions);
+  }
+
+  function compareAuthority(candidate: NormalizedAttribute, current: NormalizedAttribute): number {
+    const authorityDifference = sourceAuthority(candidate.source) - sourceAuthority(current.source);
+    if (authorityDifference !== 0) return authorityDifference;
+    const observedDifference = candidate.observedAt.getTime() - current.observedAt.getTime();
+    if (observedDifference !== 0) return observedDifference;
+    const createdDifference = candidate.createdAt.getTime() - current.createdAt.getTime();
+    if (createdDifference !== 0) return createdDifference;
+    return candidate.id.localeCompare(current.id);
+  }
+
+  function selectedVersionAt(versions: NormalizedAttribute[], timestamp: number): NormalizedAttribute | undefined {
+    let selected: NormalizedAttribute | undefined;
+    for (const version of versions) {
+      if (version.observedAt.getTime() > timestamp) continue;
+      if (version.validUntil && version.validUntil.getTime() <= timestamp) continue;
+      if (!selected || compareAuthority(version, selected) > 0) selected = version;
+    }
+    return selected;
+  }
+
+  const attributeEvents = new Map<string, HistoryChange[]>();
+  for (const versions of attributesByEntity.values()) {
+    const eventTimestamps = new Set<number>();
+    for (const version of versions) {
+      eventTimestamps.add(version.observedAt.getTime());
+      if (version.validUntil) eventTimestamps.add(version.validUntil.getTime());
+    }
+
+    for (const timestamp of [...eventTimestamps].sort((left, right) => left - right)) {
+      if (timestamp > now.getTime()) continue;
+      const before = selectedVersionAt(versions, timestamp - 1);
+      const after = selectedVersionAt(versions, timestamp);
+      if ((!before && !after) || (before && after)) continue;
+
+      const changedVersion = after ?? before;
+      if (!changedVersion) continue;
+      const dateStr = toIsoDateStr(new Date(timestamp));
+      const changes = attributeEvents.get(dateStr) ?? [];
+      changes.push({
+        id: changedVersion.id,
+        category: changedVersion.category,
+        direction: after ? 'added' : 'expired',
+        label: changedVersion.label,
+        source: changedVersion.source,
+      });
+      attributeEvents.set(dateStr, changes);
+    }
   }
 
   // Normalize decisions
@@ -178,14 +258,11 @@ export function deriveUnderstandingHistory(
     let commitmentsCount = 0;
     let preferencesCount = 0;
 
-    for (const attr of normalizedAttrs) {
-      if (attr.observedAt.getTime() <= sampleTimestamp) {
-        if (!attr.validUntil || attr.validUntil.getTime() > sampleTimestamp) {
-          if (attr.category === 'goals') goalsCount++;
-          else if (attr.category === 'commitments') commitmentsCount++;
-          else if (attr.category === 'preferences') preferencesCount++;
-        }
-      }
+    for (const versions of attributesByEntity.values()) {
+      const selected = selectedVersionAt(versions, sampleTimestamp);
+      if (selected?.category === 'goals') goalsCount++;
+      else if (selected?.category === 'commitments') commitmentsCount++;
+      else if (selected?.category === 'preferences') preferencesCount++;
     }
 
     // Count decisions at sampleTimestamp
@@ -196,40 +273,11 @@ export function deriveUnderstandingHistory(
       }
     }
 
-    // Determine changes on this day
-    const dayChanges: HistoryChange[] = [];
+    // Determine changes on this day. Entity-version replacements (confirm/correct)
+    // do not create false additions or expirations.
+    const dayChanges: HistoryChange[] = [...(attributeEvents.get(dateStr) ?? [])];
 
-    // 1. Attributes added on this date
-    for (const attr of normalizedAttrs) {
-      if (attr.observedDateStr === dateStr && attr.observedAt.getTime() <= now.getTime()) {
-        dayChanges.push({
-          id: attr.id,
-          category: attr.category,
-          direction: 'added',
-          label: attr.label,
-          source: attr.source,
-        });
-      }
-    }
-
-    // 2. Attributes expired on this date
-    for (const attr of normalizedAttrs) {
-      if (
-        attr.validUntilDateStr === dateStr &&
-        attr.validUntil &&
-        attr.validUntil.getTime() <= now.getTime()
-      ) {
-        dayChanges.push({
-          id: attr.id,
-          category: attr.category,
-          direction: 'expired',
-          label: attr.label,
-          source: attr.source,
-        });
-      }
-    }
-
-    // 3. Decisions added on this date
+    // Decisions added on this date
     for (const dec of normalizedDecisions) {
       if (dec.createdDateStr === dateStr && dec.createdAt.getTime() <= now.getTime()) {
         dayChanges.push({

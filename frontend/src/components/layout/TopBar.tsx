@@ -12,10 +12,10 @@ import {
 } from '../../config/demo-personas';
 
 const NAV_ITEMS = [
-  { label: 'Dashboard', to: '/dashboard' },
-  { label: 'Ask Future Me', to: '/ask-future-me' },
-  { label: 'Decisions', to: '/decisions' },
-  { label: 'Understanding', to: '/understanding' },
+  { label: 'Dashboard', compactLabel: 'Home', to: '/dashboard' },
+  { label: 'Ask Future Me', compactLabel: 'Ask', to: '/ask-future-me' },
+  { label: 'Decisions', compactLabel: 'Decisions', to: '/decisions' },
+  { label: 'Understanding', compactLabel: 'Context', to: '/understanding' },
 ] as const;
 
 function initials(value: string): string {
@@ -74,13 +74,15 @@ export function TopBar() {
             <NavLink
               key={item.to}
               to={item.to}
+              aria-label={item.label}
               className={({ isActive }) => `rounded-lg px-2 py-2 text-center text-[11px] font-semibold transition-colors sm:px-3 sm:text-sm ${
                 isActive
                   ? 'bg-primary/10 text-primary'
                   : 'text-text-secondary hover:bg-surface-hover hover:text-text-primary'
               }`}
             >
-              {item.label}
+              <span className="sm:hidden">{item.compactLabel}</span>
+              <span className="hidden sm:inline">{item.label}</span>
             </NavLink>
           ))}
         </nav>

@@ -121,6 +121,40 @@ describe('api/client', () => {
         })
       );
     });
+
+    it('getHistory includes days and userId in local mode', async () => {
+      const { setIsCognitoMode } = await import('../auth/cognito') as unknown as { setIsCognitoMode: (val: boolean) => void };
+      setIsCognitoMode(false);
+      await api.context.getHistory(30, 'test-user');
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/context/history?days=30&userId=test-user'),
+        expect.any(Object)
+      );
+    });
+
+    it('getHistory strips userId and adds token in cognito mode', async () => {
+      const { setIsCognitoMode } = await import('../auth/cognito') as unknown as { setIsCognitoMode: (val: boolean) => void };
+      setIsCognitoMode(true);
+      await api.context.getHistory(90, 'test-user');
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/context/history?days=90'),
+        expect.objectContaining({
+          headers: expect.any(Headers)
+        })
+      );
+      const call = vi.mocked(globalThis.fetch).mock.calls[0];
+      expect(call[0]).not.toContain('userId=');
+    });
+
+    it('getHistory passes X-Demo-User in demo mode', async () => {
+      const { setIsDemoMode } = await import('../config/demo-personas') as unknown as { setIsDemoMode: (val: boolean) => void };
+      setIsDemoMode(true);
+      await api.context.getHistory(7);
+      const call = vi.mocked(globalThis.fetch).mock.calls[0];
+      const headers = call[1]?.headers as Headers;
+      expect(headers.get('X-Demo-User')).toBe('phase4-eval-v3:focused-builder');
+      expect(call[0]).toContain('/context/history?days=7');
+    });
   });
 
   describe('calendarApi', () => {

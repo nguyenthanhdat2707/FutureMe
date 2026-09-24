@@ -142,11 +142,35 @@
 
 ---
 
+### Phase 3: Understanding Page Rebuild
+**Status:** READY_FOR_USER_TEST
+**Branch:** feat/understanding (from origin/main a5487ad)
+**Commits:** 6bad5cf (history datasource + persona timelines), HEAD (entity-dedup fix + full UI)
+
+**Completed:**
+- Rebuilt `ContextPage.tsx` from scratch — new 7-block spec layout: header → 3 KPIs → Understanding Evolution chart → Context by Category bars → Focus Patterns empty state → Personal Context section → Calendar Overview card
+- New `frontend/src/features/understanding/` component tree (14 components): UnderstandingHeader, UnderstandingKpiCards, UnderstandingEvolutionChart, ContextByCategory, FocusPatternsCard, PersonalContextSection, CalendarDataSourcesCard, WhatFutureMeLearned, UnderstandingFooter, UnderstandingSkeleton, UnderstandingErrorState, AllContextEmptyState, understanding-utils
+- Backend `GET /api/context/history?days=N` route (additive, read-only over existing `personal_context.observed_at` + `valid_until`)
+- `src/services/understanding-history.ts`: entity-dedup via `extractEntityId` + `sourceAuthority` — confirm/correct no longer creates false count inflation; history chart series are truthful
+- Seed: DEMO_SEED_VERSION bumped to phase4-eval-v3; 6 persona context timelines with backdated `observed_at` so evolution chart has visible shape
+- Focus Patterns: required empty state (no fabricated data, no new table)
+- Existing confirm/correct/update UI preserved and wired to new presentation layer
+- `frontend/src/api/client.ts` extended with `context.getHistory()` client
+
+**Verification:**
+- Backend: 15/15 understanding-history tests pass (entity-dedup, expiry dip, decisions series, empty, API route, six-persona differentiation); tsc build clean
+- Frontend: 100/100 vitest tests pass (13 suites); Vite production build clean (440 kB JS, 75 kB CSS); oxlint exit 0
+- `git diff --check` exit 0
+
+**Blockers:** None
+
+---
+
 ## Current Status
 
-**DASHBOARD CHECKPOINT COMPLETE; ASK FUTURE ME IS NEXT**
+**UNDERSTANDING PAGE COMPLETE; READY FOR USER TEST**
 
-Phase 0 and the Phase 1 Dashboard checkpoint are complete on `feat/mvp-refactor`. The Dashboard implementation is committed at `23291da`; the next implementation phase is Ask Future Me after this branch is merged and a fresh feature branch is created from updated `main`.
+Phase 3 (Understanding) is complete on `feat/understanding`. All 15 backend tests and 100 frontend tests pass; both builds are clean. The branch is ready for user browser test before merge to main.
 
 **Approved Decisions (2026-09-24):**
 1. Ask Future Me: Conversation Facade (frontend-only state, preserve Decision Engine)

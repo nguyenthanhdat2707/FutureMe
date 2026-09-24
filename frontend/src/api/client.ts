@@ -25,6 +25,7 @@ import type {
   DecisionChoice,
   Outcome,
   CheckInSchedule,
+  UnderstandingHistoryResponse,
 } from '../types/domain';
 
 import {
@@ -91,6 +92,19 @@ export const contextApi = {
 
     if (!response.ok) {
       throw new Error(`Failed to fetch context: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  async getHistory(days: 7 | 30 | 90 = 30, userId: string = 'demo-user'): Promise<UnderstandingHistoryResponse> {
+    const url = usesClientSuppliedUserId()
+      ? `${API_BASE_URL}/context/history?days=${days}&userId=${encodeURIComponent(userId)}`
+      : `${API_BASE_URL}/context/history?days=${days}`;
+    const response = await authFetch(url);
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch understanding history: ${response.status}`);
     }
 
     return response.json();

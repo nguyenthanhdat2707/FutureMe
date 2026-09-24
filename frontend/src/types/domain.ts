@@ -129,6 +129,32 @@ export interface ContextCorrection {
   reason?: string;
 }
 
+export type HistoryChangeCategory = 'goals' | 'commitments' | 'preferences' | 'decisions';
+export type HistoryChangeDirection = 'added' | 'expired';
+
+export interface HistoryChange {
+  id: string;
+  category: HistoryChangeCategory;
+  direction: HistoryChangeDirection;
+  label: string;
+  source: string;
+}
+
+export interface UnderstandingHistoryPoint {
+  date: string; // YYYY-MM-DD
+  goals: number;
+  commitments: number;
+  preferences: number;
+  decisions: number;
+  changes: HistoryChange[];
+}
+
+export interface UnderstandingHistoryResponse {
+  days: 7 | 30 | 90;
+  points: UnderstandingHistoryPoint[];
+  hasHistory: boolean;
+}
+
 export enum EnergyLevel {
   VERY_LOW = 'VERY_LOW',
   LOW = 'LOW',

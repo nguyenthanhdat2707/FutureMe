@@ -180,6 +180,41 @@ describe('Understanding Evolution History Derivation (Pure Helper)', () => {
       expect(pt20.preferences).toBe(2);
       expect(pt20.decisions).toBe(0);
     });
+
+    it('counts one active entity across confirm and correct versions without false additions or expirations', () => {
+      const original: ContextAttribute = {
+        id: 'goal-version-1',
+        userId: 'u1',
+        attribute: 'goal',
+        value: JSON.stringify({ id: 'ship-demo', description: 'Ship the first demo' }),
+        source: ObservationSource.SYSTEM_INFERRED,
+        confidence: 0.72,
+        observedAt: new Date('2026-09-20T10:00:00.000Z'),
+        validUntil: new Date('2026-09-23T09:00:00.000Z'),
+        createdAt: new Date('2026-09-20T10:00:00.000Z'),
+      };
+      const corrected: ContextAttribute = {
+        id: 'goal-version-2',
+        userId: 'u1',
+        attribute: 'goal',
+        value: JSON.stringify({ id: 'ship-demo', description: 'Ship the polished demo' }),
+        source: ObservationSource.USER_CONFIRMED,
+        confidence: 1,
+        observedAt: new Date('2026-09-22T10:00:00.000Z'),
+        createdAt: new Date('2026-09-22T10:00:00.000Z'),
+      };
+
+      const result = deriveUnderstandingHistory([original, corrected], [], { days: 7, now: baseNow });
+
+      expect(result.points.find((point) => point.date === '2026-09-21')?.goals).toBe(1);
+      expect(result.points.find((point) => point.date === '2026-09-22')?.goals).toBe(1);
+      expect(result.points.find((point) => point.date === '2026-09-23')?.goals).toBe(1);
+      expect(result.points.find((point) => point.date === '2026-09-20')?.changes).toEqual([
+        expect.objectContaining({ id: 'goal-version-1', direction: 'added' }),
+      ]);
+      expect(result.points.find((point) => point.date === '2026-09-22')?.changes).toEqual([]);
+      expect(result.points.find((point) => point.date === '2026-09-23')?.changes).toEqual([]);
+    });
   });
 
   describe('2. Expiration dip', () => {
