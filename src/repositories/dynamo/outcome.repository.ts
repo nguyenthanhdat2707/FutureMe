@@ -29,7 +29,7 @@ export class DynamoOutcomeRepository implements IOutcomeRepository {
   async findByDecisionId(decisionId: string): Promise<Outcome | null> {
     const response = await this.docClient.send(new QueryCommand({
       TableName: this.tableName,
-      IndexName: "decisionId-recordedAt-index",
+      IndexName: "decisionId-observedAt-index",
       KeyConditionExpression: "decision_id = :decisionId",
       ExpressionAttributeValues: {
         ":decisionId": decisionId
@@ -44,7 +44,7 @@ export class DynamoOutcomeRepository implements IOutcomeRepository {
   async findByUserId(userId: string, limit: number = 50): Promise<Outcome[]> {
     const response = await this.docClient.send(new QueryCommand({
       TableName: this.tableName,
-      IndexName: "userId-recordedAt-index",
+      IndexName: "userId-observedAt-index",
       KeyConditionExpression: "user_id = :userId",
       ExpressionAttributeValues: {
         ":userId": userId

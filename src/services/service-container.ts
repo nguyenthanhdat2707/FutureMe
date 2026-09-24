@@ -43,6 +43,8 @@ import { DynamoUserRepository } from '../repositories/dynamo/user.repository';
 import { DynamoOutcomeRepository } from '../repositories/dynamo/outcome.repository';
 import { DynamoFeedbackRepository } from '../repositories/dynamo/feedback.repository';
 import { DynamoInterventionRepository } from '../repositories/dynamo/intervention.repository';
+import { DynamoDecisionChoiceRepository } from '../repositories/dynamo/decision-choice.repository';
+import { DynamoCheckInScheduleRepository } from '../repositories/dynamo/check-in-schedule.repository';
 
 // Singleton instances
 let contextEngine: IContextEngine | null = null;
@@ -108,12 +110,12 @@ export function getInterventionRepository(): IInterventionRepository {
 }
 
 export function getDecisionChoiceRepository(): IDecisionChoiceRepository {
-  if (!decisionChoiceRepo) decisionChoiceRepo = new SqliteDecisionChoiceRepository();
+  if (!decisionChoiceRepo) decisionChoiceRepo = isDynamo ? new DynamoDecisionChoiceRepository() : new SqliteDecisionChoiceRepository();
   return decisionChoiceRepo;
 }
 
 export function getCheckInScheduleRepository(): ICheckInScheduleRepository {
-  if (!checkInScheduleRepo) checkInScheduleRepo = new SqliteCheckInScheduleRepository();
+  if (!checkInScheduleRepo) checkInScheduleRepo = isDynamo ? new DynamoCheckInScheduleRepository() : new SqliteCheckInScheduleRepository();
   return checkInScheduleRepo;
 }
 
