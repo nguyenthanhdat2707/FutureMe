@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '../api/client';
 import type { CalendarStatusResponse, CalendarEvent } from '../types/domain';
+import { useInterventions } from '../hooks/useInterventions';
+import { InterventionCard } from '../components/InterventionCard';
 
 function CalendarPage() {
   const [status, setStatus] = useState<CalendarStatusResponse | null>(null);
@@ -8,6 +10,7 @@ function CalendarPage() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { intervention, refresh: refreshInterventions, respond, dismiss } = useInterventions();
 
   const loadData = useCallback(async (signal?: AbortSignal) => {
     try {
@@ -44,6 +47,7 @@ function CalendarPage() {
     try {
       await api.calendar.sync();
       await loadData();
+      await refreshInterventions();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to sync calendar');
     } finally {
@@ -70,6 +74,14 @@ function CalendarPage() {
           {syncing ? 'Syncing...' : 'Sync Now'}
         </button>
       </div>
+
+      {intervention && (
+        <InterventionCard
+          intervention={intervention}
+          onRespond={respond}
+          onDismiss={dismiss}
+        />
+      )}
 
       {error && (
         <div className="p-4 bg-error/10 text-error rounded border border-error/20">

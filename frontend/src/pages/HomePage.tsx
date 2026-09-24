@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import type { PersonalContext, SetupAnswers } from '../types/domain';
+import { useInterventions } from '../hooks/useInterventions';
+import { InterventionCard } from '../components/InterventionCard';
 
 function HomePage() {
   const [context, setContext] = useState<PersonalContext | null>(null);
@@ -10,6 +12,7 @@ function HomePage() {
 
   const [setupAnswers, setSetupAnswers] = useState<SetupAnswers>({});
   const [submitting, setSubmitting] = useState(false);
+  const { intervention, respond, dismiss } = useInterventions();
 
   const loadContext = useCallback(async (signal?: AbortSignal) => {
     try {
@@ -170,6 +173,14 @@ function HomePage() {
         <h1 className="text-4xl font-serif text-text-primary mb-2">Dashboard</h1>
         <p className="text-text-secondary">Here's your current context summary.</p>
       </header>
+
+      {intervention && (
+        <InterventionCard
+          intervention={intervention}
+          onRespond={respond}
+          onDismiss={dismiss}
+        />
+      )}
 
       {/* Quick Stats */}
       <section className="grid grid-cols-3 gap-4">

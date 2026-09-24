@@ -10,7 +10,9 @@ import { calendarRouter } from './routes/calendar.routes';
 import { observationRouter } from './routes/observation.routes';
 import { outcomeRouter } from './routes/outcome.routes';
 import { demoRouter } from './routes/demo.routes';
+import { interventionRouter } from './routes/intervention.routes';
 import { UnauthorizedError, getUserId } from './utils/identity';
+
 
 export function createApp() {
   const app = express();
@@ -64,7 +66,9 @@ export function createApp() {
   app.use('/api/calendar', calendarRouter);
   app.use('/api/observations', observationRouter);
   app.use('/api/outcomes', outcomeRouter);
+  app.use('/api/interventions', interventionRouter);
   app.use('/api/demo', demoRouter);
+
 
   // 404 handler
   app.use((req: Request, res: Response) => {

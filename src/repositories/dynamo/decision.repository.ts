@@ -127,7 +127,9 @@ export class DynamoDecisionRepository implements IDecisionRepository {
       confidence: getOptionalNumber(item, 'confidence') || 0,
       userChoice: getOptionalString(item, 'user_choice'),
       status: (getRequiredString(item, 'status') as DecisionStatus) || 'pending',
-      createdAt: getRequiredDate(item, 'created_at')
+      createdAt: getRequiredDate(item, 'created_at'),
+      query: (getOptionalObject<ContextSnapshot>(item, 'context_snapshot') || { capturedAt: new Date(), goals: [], commitments: [], constraints: [], relevantHistory: [] }).query
     };
   }
 }
+

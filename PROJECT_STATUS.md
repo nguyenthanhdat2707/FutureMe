@@ -14,16 +14,18 @@ This document tracks the verified completion of the Future Me MVP roadmap. It se
 | AWS Deployment / Platform Enablement | DEPLOYED AND VERIFIED |
 | Phase 3 | COMPLETE |
 | Phase 4 | READY_FOR_USER_TEST |
-| Phase 5 | NOT STARTED |
-| Phase 6 | NOT STARTED |
+| Phase 5 | TESTING |
+| Phase 6 | PLANNED |
 | Phase 7 | NOT STARTED |
 | Phase 8 | NOT STARTED |
 
 ## Current Execution / Next Prioritized Work
-- **Current State:** COMMITTED (public demo mode without Cognito implementation pushed to `feat/phase4-demo-personas`; Phase 4 remains READY_FOR_USER_TEST)
+- **Current State:** TESTING (Phase 5 implementation complete, awaiting Product Owner browser verification)
+- **Current Branch:** `feat/phase5-proactive-interventions` (pushed to origin)
+- **Latest Commit:** 71d9237 - Phase 5 bounded proactive interventions implemented
+- **Phase 5 Status:** IMPLEMENTATION COMPLETE - 158/158 backend tests pass (81.22% coverage), 60/60 frontend tests pass, all builds/lints pass
+- **Next Steps:** Product Owner browser proof of 5 demo scenarios, then merge decision
 - **Completed AWS Evidence:** Backend AWS deployment applied and verified (no-drift); Health returns 200; Bedrock Haiku smoke invocation returned ok (11 input/4 output tokens). AWS Marketplace note: CloudTrail showed no aws-marketplace Subscribe or Marketplace event; Cost Explorer currently shows estimated `$0.00` (caveat: billing may lag).
-- **Current Task:** Demo mode implementation is complete and pushed. Awaiting Product Owner authorization for Terraform/app deployment and synthetic DynamoDB seed apply.
-- **Next Steps:** Product Owner reviews the implementation on branch `feat/phase4-demo-personas` (commit 9b41b28), then explicitly authorizes AWS Terraform apply, Amplify deployment, and DynamoDB seed execution.
 - **Demo Mode Implementation Evidence (2026-09-23):** Backend 137/137 tests pass; frontend 53/53 tests pass; lint/build pass for both; Terraform fmt/validate pass; `git diff --check` pass. Implementation adds demo auth mode with `X-Demo-User` header, six deterministic personas, DynamoDB-only seed tooling, frontend persona selector, and Terraform wiring for `AUTH_MODE=demo`. Cognito resources retained for reversible restoration. Committed as 9b41b28 and pushed to `origin/feat/phase4-demo-personas` with 31 files changed (1768 insertions, 281 deletions).
 - **Production auth/network resolution:** The user reported `Network error` on all pages after the auth hotfix. Investigation proved the account had been created and was `CONFIRMED`; the failure occurred after sign-in, not during signup. The root cause was the API Gateway HTTP API JWT-authorized `$default` route catching browser `OPTIONS` preflight: live `OPTIONS` returned `401` with `WWW-Authenticate: Bearer` before Lambda. Terraform fix PR [#20](https://github.com/nguyenthanhdat2707/FutureMe/pull/20) merged to `main` at `9a605717cd2ee624a574d8696da674ae9aa1eec6`, adding only `OPTIONS /{proxy+}` with authorization `NONE`; actual methods remain JWT-protected. CI run [35800331255](https://github.com/nguyenthanhdat2707/FutureMe/actions/runs/35800331255) passed Lint, Unit Tests, Build & Scan, and Trivy.
 - **Exact-scope production delivery:** Plan workflow [35800583812](https://github.com/nguyenthanhdat2707/FutureMe/actions/runs/35800583812) passed but showed the intended `+1` route plus an unrelated Lambda hash update. The Product Owner explicitly selected exact-scope targeted delivery, so the broad workflow apply was not run. A targeted Terraform plan safety assertion then stopped because Terraform still pulled the Lambda dependency; no plan was applied. Route ID `7wuizoq` was created through the AWS API and imported into the existing S3 Terraform state as `module.http-api.aws_apigatewayv2_route.options_preflight`; Lambda was not updated. RED evidence was `401` from `OPTIONS /api/context` and `OPTIONS /api/health`. GREEN production evidence is `204` with correct CORS from both `OPTIONS` calls, while unauthenticated `GET /api/context` remains `401` and `GET /api/health` remains `200`. Disposable authenticated proof passed SRP Sign In and returned `200` from `GET /api/context` with ACAO equal to the production origin; cleanup passed with zero residual probe users.
@@ -112,7 +114,7 @@ The following are explicitly deferred or non-goals for this MVP:
 - **Explicitly not part of this phase:** Native notifications, advanced JITAI, autonomous action, or custom ML/model training.
 
 ### Phase 6: User choice, outcomes, feedback, and reusable history
-- **Status:** NOT STARTED
+- **Status:** PLANNED
 - **Goal:** Capture actual user decisions and real-world outcomes to provide relevant history for future decisions.
 - **Capability boundary:** Choice is separate from recommendation; outcome is separate from feedback. Future decision retrieval uses relevant stored history.
 - **Main deliverables:** Recent decision/history surfaces, choice persistence flow, outcome and feedback capture flows, historical context retrieval.

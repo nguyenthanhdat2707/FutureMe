@@ -17,18 +17,7 @@ resource "aws_apigatewayv2_authorizer" "jwt" {
   jwt_configuration {
     audience = [var.user_pool_client_id]
     issuer   = var.user_pool_issuer
-  }
-}
 
-resource "aws_apigatewayv2_authorizer" "jwt" {
-  api_id           = aws_apigatewayv2_api.api.id
-  authorizer_type  = "JWT"
-  identity_sources = ["$request.header.Authorization"]
-  name             = "${var.project}-${var.environment}-jwt-auth"
-
-  jwt_configuration {
-    audience = [var.user_pool_client_id]
-    issuer   = var.user_pool_issuer
   }
 }
 

@@ -91,4 +91,25 @@ CREATE TABLE IF NOT EXISTS feedback (
   feedback_text TEXT NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Interventions table
+CREATE TABLE IF NOT EXISTS interventions (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id),
+  decision_id TEXT REFERENCES decisions(id),
+  issue_key TEXT NOT NULL,
+  type TEXT NOT NULL,
+  level TEXT NOT NULL,
+  status TEXT DEFAULT 'ACTIVE',
+  reason TEXT NOT NULL,
+  prompt TEXT,
+  suggested_actions TEXT,
+  severity TEXT,
+  dismissed_at TIMESTAMP,
+  last_material_change_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_interventions_user_issue ON interventions(user_id, issue_key);
+CREATE INDEX IF NOT EXISTS idx_interventions_user_status ON interventions(user_id, status);
 `;
+
