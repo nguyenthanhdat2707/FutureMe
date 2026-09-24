@@ -22,6 +22,9 @@ import type {
   CalendarEvent,
   ProactiveIntervention,
   InterventionCheckResponse,
+  DecisionChoice,
+  Outcome,
+  CheckInSchedule,
 } from '../types/domain';
 
 import {
@@ -387,6 +390,35 @@ export const decisionsApi = {
     await delay(300);
     return [];
   },
+
+  async recordChoice(decisionId: string, chosenAction: string, chosenActionDisplay: string, customNotes?: string): Promise<{ choice: DecisionChoice; checkInScheduledAt: string | null }> {
+    const response = await authFetch(`${API_BASE_URL}/choices`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ decisionId, chosenAction, chosenActionDisplay, customNotes }),
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to record choice: ${response.status}`);
+    }
+    return response.json();
+  },
+
+  async getChoice(decisionId: string): Promise<DecisionChoice> {
+    const response = await authFetch(`${API_BASE_URL}/choices/decision/${decisionId}`);
+    if (!response.ok) {
+      throw new Error(`Failed to get choice: ${response.status}`);
+    }
+    return response.json();
+  },
+
+  async listChoices(limit?: number): Promise<{ choices: DecisionChoice[] }> {
+    const url = limit ? `${API_BASE_URL}/choices?limit=${limit}` : `${API_BASE_URL}/choices`;
+    const response = await authFetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to list choices: ${response.status}`);
+    }
+    return response.json();
+  },
 };
 
 // ============================================================================
@@ -456,6 +488,67 @@ export const clarificationsApi = {
 };
 
 // ============================================================================
+// Outcomes API (Phase 6)
+// ============================================================================
+
+export const outcomesApi = {
+  async recordOutcome(decisionId: string, outcomeStatus: string, wouldRepeat?: boolean | null, outcomeNotes?: string): Promise<Outcome> {
+    const response = await authFetch(`${API_BASE_URL}/outcomes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ decisionId, outcomeStatus, wouldRepeat, outcomeNotes }),
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to record outcome: ${response.status}`);
+    }
+    return response.json();
+  },
+
+  async getOutcome(decisionId: string): Promise<Outcome> {
+    const response = await authFetch(`${API_BASE_URL}/outcomes/decision/${decisionId}`);
+    if (!response.ok) {
+      throw new Error(`Failed to get outcome: ${response.status}`);
+    }
+    return response.json();
+  },
+
+  async listOutcomes(limit?: number): Promise<{ outcomes: Outcome[] }> {
+    const url = limit ? `${API_BASE_URL}/outcomes?limit=${limit}` : `${API_BASE_URL}/outcomes`;
+    const response = await authFetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to list outcomes: ${response.status}`);
+    }
+    return response.json();
+  },
+};
+
+// ============================================================================
+// Check-in API (Phase 6)
+// ============================================================================
+
+export const checkInsApi = {
+  async getDueCheckIns(): Promise<{ checkIns: CheckInSchedule[] }> {
+    const response = await authFetch(`${API_BASE_URL}/check-ins/due`);
+    if (!response.ok) {
+      throw new Error(`Failed to get due check-ins: ${response.status}`);
+    }
+    return response.json();
+  },
+
+  async triggerCheckIn(decisionId: string): Promise<{ triggered: boolean; scheduledAt: string | null }> {
+    const response = await authFetch(`${API_BASE_URL}/check-ins/trigger`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ decisionId }),
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to trigger check-in: ${response.status}`);
+    }
+    return response.json();
+  },
+};
+
+// ============================================================================
 // Demo API
 // ============================================================================
 
@@ -509,6 +602,8 @@ export const api = {
   decisions: decisionsApi,
   interventions: interventionsApi,
   clarifications: clarificationsApi,
+  outcomes: outcomesApi,
+  checkIns: checkInsApi,
   demo: demoApi,
 };
 

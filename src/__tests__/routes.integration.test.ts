@@ -208,13 +208,13 @@ describe('API route integration', () => {
   });
 
   it('creates and persists an outcome and feedback for the decision', async () => {
-    const observedAt = new Date().toISOString();
     const outcomeResponse = await request(app)
       .post('/api/outcomes')
       .send({
         decisionId,
-        description: 'The generic task was completed.',
-        observedAt,
+        outcomeStatus: 'positive',
+        wouldRepeat: true,
+        outcomeNotes: 'The generic task was completed.',
       });
 
     expect(outcomeResponse.status).toBe(200);
@@ -222,15 +222,17 @@ describe('API route integration', () => {
       expect.objectContaining({
         id: expect.any(String),
         decisionId,
-        description: 'The generic task was completed.',
-        observedAt,
+        outcomeStatus: 'positive',
+        wouldRepeat: true,
+        outcomeNotes: 'The generic task was completed.',
         createdAt: expect.any(String),
       })
     );
     expect(await new SqliteOutcomeRepository().findById(outcomeResponse.body.id)).toEqual(
       expect.objectContaining({
         decisionId,
-        description: 'The generic task was completed.',
+        outcomeStatus: 'positive',
+        outcomeNotes: 'The generic task was completed.',
       })
     );
 
