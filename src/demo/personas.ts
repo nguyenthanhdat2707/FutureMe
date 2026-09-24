@@ -1,4 +1,4 @@
-export const DEMO_SEED_VERSION = 'phase4-eval-v1';
+export const DEMO_SEED_VERSION = 'phase4-eval-v2';
 
 export const DEMO_PERSONAS = [
   {

@@ -91,12 +91,12 @@ describe('Identity Utils', () => {
 
     it('accepts an allowlisted demo persona header and ignores body/query identity', () => {
       const req = {
-        headers: { 'x-demo-user': 'phase4-eval-v1:focused-builder' },
+        headers: { 'x-demo-user': 'phase4-eval-v2:focused-builder' },
         body: { userId: 'spoofed-body' },
         query: { userId: 'spoofed-query' },
       } as unknown as Request;
 
-      expect(getUserId(req)).toBe('phase4-eval-v1:focused-builder');
+      expect(getUserId(req)).toBe('phase4-eval-v2:focused-builder');
     });
 
     it('rejects missing and unknown demo persona headers', () => {

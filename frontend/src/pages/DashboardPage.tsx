@@ -48,12 +48,16 @@ export function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const { intervention, error: interventionError, refresh: refreshInterventions, respond, dismiss } = useInterventions();
 
-  const loadData = useCallback(async (signal?: AbortSignal) => {
+  const loadData = useCallback(async (weekStart: Date, signal?: AbortSignal) => {
     setLoading(true);
     try {
+      const weekEnd = addDays(weekStart, 7);
       const [statusData, eventsData, contextData] = await Promise.all([
         api.calendar.getStatus(),
-        api.calendar.getEvents(),
+        api.calendar.getEvents({
+          start: weekStart.toISOString(),
+          end: weekEnd.toISOString(),
+        }),
         api.context.getCurrent(),
       ]);
       if (signal?.aborted) return;
@@ -71,19 +75,16 @@ export function DashboardPage() {
 
   useEffect(() => {
     const controller = new AbortController();
-    const initializeDashboard = async () => {
-      await loadData(controller.signal);
-    };
-    void initializeDashboard();
+    void loadData(rangeStart, controller.signal);
     return () => controller.abort();
-  }, [loadData]);
+  }, [loadData, rangeStart]);
 
   const handleSync = async () => {
     setSyncing(true);
     setError(null);
     try {
       await api.calendar.sync();
-      await loadData();
+      await loadData(rangeStart);
       await refreshInterventions();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Failed to sync calendar');
@@ -167,13 +168,13 @@ export function DashboardPage() {
           onEventOpen={setSelectedEvent}
           loading={loading}
           error={Boolean(error)}
-          onRetry={() => void loadData()}
+          onRetry={() => void loadData(rangeStart)}
         />
       </div>
 
       <div className="mt-5">
         <DashboardInsightGrid>
-          <DeadlinesCard deadlines={deadlines} loading={loading} error={Boolean(error)} onRetry={() => void loadData()} />
+          <DeadlinesCard deadlines={deadlines} loading={loading} error={Boolean(error)} onRetry={() => void loadData(rangeStart)} />
           <TaskTypeBubbleCard
             allocation={allocation}
             range={allocationRange}
@@ -182,7 +183,7 @@ export function DashboardPage() {
             onCategoryOpen={(category) => setSelectedCategory((current) => current === category ? null : category)}
             loading={loading}
             error={Boolean(error)}
-            onRetry={() => void loadData()}
+            onRetry={() => void loadData(rangeStart)}
           />
           <UpcomingAndSuggestionsCard
             upcomingMeeting={upcomingMeeting}
@@ -190,7 +191,7 @@ export function DashboardPage() {
             now={suggestionNow}
             loading={loading}
             error={Boolean(error)}
-            onRetry={() => void loadData()}
+            onRetry={() => void loadData(rangeStart)}
           />
         </DashboardInsightGrid>
       </div>

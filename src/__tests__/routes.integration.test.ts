@@ -77,9 +77,19 @@ describe('API route integration', () => {
     });
     expect(syncResponse.body.synced).toBeGreaterThan(0);
 
+    const now = new Date();
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+    weekStart.setHours(0, 0, 0, 0);
+    const weekEnd = new Date(weekStart.getTime() + 7 * 86_400_000);
+
     const eventsResponse = await request(app)
       .get('/api/calendar/events')
-      .query({ userId: 'demo-user' });
+      .query({
+        userId: 'demo-user',
+        start: weekStart.toISOString(),
+        end: weekEnd.toISOString(),
+      });
 
     expect(eventsResponse.status).toBe(200);
     expect(eventsResponse.body.events).toHaveLength(syncResponse.body.synced);

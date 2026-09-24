@@ -76,9 +76,9 @@ export const EXPECTED_COUNTS: ExpectedCounts = {
   users: 6,
   personalContext: 28,
   observations: 8,
-  calendarEvents: 16,
+  calendarEvents: 94,
   decisions: 6,
-  total: 64,
+  total: 142,
 };
 
 const MAX_BATCH_SIZE = 25;
@@ -147,18 +147,33 @@ export function generatePhase4Dataset(seededAt: Date): GeneratedDataset {
     const addCalendar = (
       purpose: string,
       title: string,
-      startOffset: number,
-      endOffset: number,
+      absoluteStart: Date,
+      absoluteEnd: Date,
       category: 'deep_work' | 'meeting' | 'deadline' | 'recovery' | 'other',
       meetingLink?: string,
+      status = 'CONFIRMED',
     ) => records.calendarEvents.push({
       ...base, id: generatePhase4Id('calendar-events', persona.slug, purpose), user_id: owner,
       external_id: `phase4-${persona.slug}-${purpose}`, title,
-      start_time: new Date(seededAt.getTime() + startOffset).toISOString(),
-      end_time: new Date(seededAt.getTime() + endOffset).toISOString(), status: 'CONFIRMED',
+      start_time: absoluteStart.toISOString(),
+      end_time: absoluteEnd.toISOString(), status,
       raw_data: JSON.stringify({ summary: title, category, ...(meetingLink ? { meetingLink } : {}) }),
       synced_at: timestamp, created_at: timestamp,
     });
+
+    // Week anchor: Monday 00:00 UTC of the seeded week
+    const weekStart = ((): Date => {
+      const d = new Date(seededAt);
+      const dow = (d.getUTCDay() + 6) % 7; // 0=Mon
+      d.setUTCDate(d.getUTCDate() - dow);
+      d.setUTCHours(0, 0, 0, 0);
+      return d;
+    })();
+    // Helper: day D at UTC hour H minute M
+    // Vietnam UTC+7: store UTC hour = local_hour - 7
+    // e.g. 09:00 VN = 02:00 UTC, 14:00 VN = 07:00 UTC
+    const wd = (day: number, utcH: number, utcM = 0): Date =>
+      new Date(weekStart.getTime() + day * 86_400_000 + utcH * 3_600_000 + utcM * 60_000);
 
     const old = new Date(seededAt.getTime() - 86_400_000);
     const recent = new Date(seededAt.getTime() - 3_600_000);
@@ -172,34 +187,146 @@ export function generatePhase4Dataset(seededAt: Date): GeneratedDataset {
       addContext('preference', 'preference:work', { id: 'deep-work', value: 'morning' }, ObservationSource.USER_CONFIRMED, 1, old);
       addContext('commitment', 'commitment:launch', { id: 'launch', value: 'v1' }, ObservationSource.USER_CONFIRMED, 1, old);
       addObservation('focus', 'Started deep work focus.', recent);
-      addCalendar('deep-work', 'Deep Work', 3_600_000, 7_200_000, 'deep_work');
-      addCalendar('sync', 'Sync', 7_200_000, 10_800_000, 'meeting', 'https://meet.example.com/phase4-focused-builder-sync');
+      // Mon – 12 events
+      addCalendar('mon-dw1', 'Deep Work', wd(0,2), wd(0,4), 'deep_work');                          // 09-11 VN
+      addCalendar('mon-sync', 'Team Sync', wd(0,4), wd(0,4,30), 'meeting', 'https://meet.example.com/phase4-focused-builder-sync'); // 11-11:30 VN
+      addCalendar('mon-cr', 'Code Review', wd(0,7), wd(0,8), 'meeting');                           // 14-15 VN
+      // Tue
+      addCalendar('tue-dw', 'Deep Work', wd(1,2), wd(1,5), 'deep_work');                          // 09-12 VN
+      addCalendar('tue-1on1', '1:1 with Manager', wd(1,7), wd(1,8), 'meeting', 'https://meet.example.com/phase4-focused-builder-1on1');
+      // Wed
+      addCalendar('wed-arch', 'Focus: Architecture Planning', wd(2,2), wd(2,4), 'deep_work');     // 09-11 VN
+      addCalendar('wed-sprint', 'Sprint Planning', wd(2,7), wd(2,9), 'meeting', 'https://meet.example.com/phase4-focused-builder-sprint');
+      // Thu
+      addCalendar('thu-dw', 'Deep Work', wd(3,2), wd(3,4), 'deep_work');                         // 09-11 VN
+      addCalendar('thu-demo', 'Feature Demo', wd(3,8), wd(3,9), 'meeting', 'https://meet.example.com/phase4-focused-builder-demo');
+      addCalendar('thu-run', 'Evening Run', wd(3,11), wd(3,12), 'recovery');                      // 18-19 VN
+      // Fri
+      addCalendar('fri-review', 'Weekly Review', wd(4,2), wd(4,3), 'meeting');                   // 09-10 VN
+      addCalendar('fri-dw', 'Deep Work', wd(4,3), wd(4,5), 'deep_work');                         // 10-12 VN
     } else if (persona.slug === 'busy-balancer') {
       addContext('goal-health', 'goal:health', { id: 'health', priority: 'high' }, ObservationSource.USER_CONFIRMED, 1, old);
       addContext('goal-balance', 'goal:balance', { id: 'balance', priority: 'medium' }, ObservationSource.USER_CONFIRMED, 1, old);
       addContext('preference', 'preference:work', { id: 'pace', value: 'steady' }, ObservationSource.USER_CONFIRMED, 1, old);
       addObservation('meetings', 'Meeting volume increased.', old);
       addObservation('capacity', 'Capacity constrained.', recent);
-      for (let index = 0; index < 4; index += 1) addCalendar(`meeting-${index}`, `Meeting ${index + 1}`, (index * 3 + 1) * 3_600_000, (index * 3 + 2) * 3_600_000, 'meeting');
+      // Mon – 18 events total
+      addCalendar('mon-standup', 'Daily Standup', wd(0,2), wd(0,2,30), 'meeting', 'https://meet.example.com/phase4-busy-standup');
+      addCalendar('mon-dw', 'Deep Work', wd(0,3), wd(0,5), 'deep_work');
+      addCalendar('mon-1on1', '1:1 with Lead', wd(0,4), wd(0,4,30), 'meeting');                  // overlaps DW intentionally
+      addCalendar('mon-client', 'Client Call', wd(0,7), wd(0,8), 'meeting', 'https://meet.example.com/phase4-busy-client');
+      addCalendar('mon-gym', 'Gym', wd(0,11), wd(0,12), 'recovery');                             // 18-19 VN
+      // Tue
+      addCalendar('tue-standup', 'Daily Standup', wd(1,2), wd(1,2,30), 'meeting', 'https://meet.example.com/phase4-busy-standup');
+      addCalendar('tue-planning', 'Planning Session', wd(1,3), wd(1,5), 'meeting');
+      addCalendar('tue-lunchl', 'Lunch & Learn', wd(1,5,30), wd(1,6,30), 'meeting');
+      addCalendar('tue-cr', 'Code Review', wd(1,7), wd(1,8,30), 'meeting');
+      addCalendar('tue-reading', 'Reading Time', wd(1,14), wd(1,15), 'recovery');                // 21-22 VN
+      // Wed
+      addCalendar('wed-standup', 'Daily Standup', wd(2,2), wd(2,2,30), 'meeting', 'https://meet.example.com/phase4-busy-standup');
+      addCalendar('wed-dw', 'Deep Work', wd(2,3), wd(2,5), 'deep_work');
+      addCalendar('wed-allhands', 'All-hands', wd(2,6), wd(2,7), 'meeting', 'https://meet.example.com/phase4-busy-allhands');
+      addCalendar('wed-budget', 'Budget Review', wd(2,8), wd(2,9), 'meeting');
+      // Thu
+      addCalendar('thu-standup', 'Daily Standup', wd(3,2), wd(3,2,30), 'meeting', 'https://meet.example.com/phase4-busy-standup');
+      addCalendar('thu-interview', 'Customer Interview', wd(3,3), wd(3,4), 'meeting');
+      addCalendar('thu-dw', 'Deep Work', wd(3,6), wd(3,8), 'deep_work');
+      addCalendar('thu-doctor', 'Doctor Appointment', wd(3,10), wd(3,11), 'other');              // 17-18 VN
     } else if (persona.slug === 'overloaded-lead') {
       addContext('goal-delivery', 'goal:delivery', { id: 'delivery', priority: 'high' }, ObservationSource.USER_CONFIRMED, 1, old);
       addContext('preference', 'preference:work', { id: 'pace', value: 'fast' }, ObservationSource.USER_CONFIRMED, 1, old);
       addContext('expired', 'goal:expired', { id: 'expired', priority: 'low' }, ObservationSource.USER_CONFIRMED, 1, expired, old);
       addObservation('interruptions', 'Heavy interruptions.', old);
       addObservation('burnout', 'Burnout risk detected.', recent);
-      for (let index = 0; index < 6; index += 1) addCalendar(`review-${index}`, `Review ${index + 1}`, (index + 1) * 3_600_000, (index + 2) * 3_600_000, 'meeting');
-    } else if (persona.slug === 'needs-clarity' || persona.slug === 'uncertain-skipper') {
-      addContext('goal', `goal:${persona.slug}`, { id: persona.slug, priority: 'medium' }, ObservationSource.USER_CONFIRMED, 1, old);
+      // Mon – 30 events total
+      addCalendar('mon-standup', 'Daily Standup', wd(0,2), wd(0,2,30), 'meeting');
+      addCalendar('mon-incident', 'Incident Review', wd(0,2,30), wd(0,4), 'meeting', 'https://meet.example.com/phase4-lead-incident');
+      addCalendar('mon-1on1a', '1:1 Alpha', wd(0,4), wd(0,5), 'meeting');
+      addCalendar('mon-lunch', 'Lunch Briefing', wd(0,5), wd(0,6), 'other');
+      addCalendar('mon-product', 'Product Sync', wd(0,6), wd(0,7), 'meeting');
+      addCalendar('mon-arch', 'Architecture Review', wd(0,7), wd(0,9), 'meeting');
+      addCalendar('mon-sprintdemo', 'Sprint Demo', wd(0,9), wd(0,10), 'meeting', 'https://meet.example.com/phase4-lead-sprintdemo');
+      addCalendar('mon-slack', 'Slack Catchup', wd(0,10), wd(0,11), 'other');
+      // Tue
+      addCalendar('tue-standup', 'Daily Standup', wd(1,2), wd(1,2,30), 'meeting');
+      addCalendar('tue-hiring', 'Hiring Interview', wd(1,2,30), wd(1,3,30), 'meeting');
+      addCalendar('tue-1on1b', '1:1 Beta', wd(1,3,30), wd(1,4,30), 'meeting');
+      addCalendar('tue-plan', 'Sprint Planning', wd(1,4,30), wd(1,6), 'meeting');
+      addCalendar('tue-escalation', 'Client Escalation', wd(1,6), wd(1,7,30), 'meeting', 'https://meet.example.com/phase4-lead-escalation');
+      addCalendar('tue-cr', 'Code Review', wd(1,7,30), wd(1,8,30), 'meeting');
+      addCalendar('tue-security', 'Security Sync', wd(1,8,30), wd(1,9,30), 'meeting');
+      addCalendar('tue-metrics', 'Metrics Review', wd(1,9,30), wd(1,10,30), 'meeting');
+      // Wed
+      addCalendar('wed-standup', 'Daily Standup', wd(2,2), wd(2,2,30), 'meeting');
+      addCalendar('wed-allhands', 'All-hands Meeting', wd(2,2,30), wd(2,4), 'meeting', 'https://meet.example.com/phase4-lead-allhands');
+      addCalendar('wed-leads', 'Engineering Leads', wd(2,4), wd(2,5), 'meeting');
+      addCalendar('wed-budget', 'Budget Sync', wd(2,5), wd(2,6), 'meeting');
+      addCalendar('wed-roadmap', 'Product Roadmap', wd(2,6), wd(2,8), 'meeting');
+      addCalendar('wed-1on1c', '1:1 Gamma', wd(2,8), wd(2,9), 'meeting');
+      addCalendar('wed-perf', 'Perf Review Prep', wd(2,9), wd(2,10), 'other');
+      addCalendar('wed-oncall', 'On-call Check', wd(2,10), wd(2,11), 'other');
+      // Thu
+      addCalendar('thu-standup', 'Daily Standup', wd(3,2), wd(3,2,30), 'meeting');
+      addCalendar('thu-vendor', 'Vendor Call', wd(3,2,30), wd(3,3,30), 'meeting');
+      addCalendar('thu-design', 'Design Review', wd(3,3,30), wd(3,5), 'meeting');
+      addCalendar('thu-dw', 'Deep Work (Rare)', wd(3,6), wd(3,7), 'deep_work');
+      addCalendar('thu-crossteam', 'Cross-team Sync', wd(3,7), wd(3,8,30), 'meeting');
+      addCalendar('thu-emergency', 'Emergency Deploy', wd(3,10), wd(3,11,30), 'meeting', 'https://meet.example.com/phase4-lead-deploy');
+    } else if (persona.slug === 'needs-clarity') {
+      addContext('goal', 'goal:needs-clarity', { id: 'needs-clarity', priority: 'medium', deadline: wd(4,10).toISOString() }, ObservationSource.USER_CONFIRMED, 1, old);
       addObservation('uncertainty', 'Availability is unresolved.', old);
-      addCalendar('space', 'Free Time', 3_600_000, 7_200_000, 'recovery');
+      // 9 events
+      addCalendar('mon-focus', 'Focus Block', wd(0,3), wd(0,5), 'deep_work');                   // 10-12 VN
+      addCalendar('tue-sync', 'Team Sync', wd(1,3), wd(1,3,30), 'meeting', 'https://meet.example.com/phase4-clarity-sync');
+      addCalendar('tue-research', 'Research Block', wd(1,6), wd(1,8), 'deep_work');
+      // Wed free – no events
+      addCalendar('thu-review', 'Stakeholder Review', wd(3,7), wd(3,9), 'meeting', 'https://meet.example.com/phase4-clarity-review');
+      addCalendar('fri-dw', 'Deep Work', wd(4,2), wd(4,4), 'deep_work');
+      addCalendar('fri-deadline', 'Deadline: Submit Q3 Report', wd(4,10), wd(4,10,30), 'deadline');
+      addCalendar('sat-rest', 'Recovery / Rest', wd(5,3), wd(5,5), 'recovery');
+      addCalendar('fri-prep', 'Report Prep', wd(4,5), wd(4,7), 'deep_work');
+      addCalendar('tue-plan', 'Planning Notes', wd(1,9), wd(1,9,30), 'other');
+    } else if (persona.slug === 'uncertain-skipper') {
+      addContext('goal', 'goal:uncertain-skipper', { id: 'uncertain-skipper', priority: 'medium' }, ObservationSource.USER_CONFIRMED, 1, old);
+      addObservation('uncertainty', 'Availability is unresolved.', old);
+      // 11 events
+      addCalendar('mon-standup', 'Team Standup', wd(0,2), wd(0,2,30), 'meeting', 'https://meet.example.com/phase4-skip-standup');
+      addCalendar('mon-confprep', 'Conference Talk Prep (Tentative)', wd(0,3), wd(0,5), 'other', undefined, 'TENTATIVE');
+      addCalendar('mon-lunch', 'Lunch with Client (Optional)', wd(0,5), wd(0,6), 'other', undefined, 'TENTATIVE');
+      addCalendar('tue-standup', 'Team Standup', wd(1,2), wd(1,2,30), 'meeting', 'https://meet.example.com/phase4-skip-standup');
+      addCalendar('tue-demo', 'Product Demo (Tentative)', wd(1,7), wd(1,8), 'meeting', 'https://meet.example.com/phase4-skip-demo', 'TENTATIVE');
+      addCalendar('tue-side', 'Side Project', wd(1,12), wd(1,14), 'deep_work');                 // 19-21 VN
+      addCalendar('wed-workshop', 'Workshop Attendance (Tentative)', wd(2,2), wd(2,5), 'other', undefined, 'TENTATIVE');
+      addCalendar('thu-standup', 'Team Standup', wd(3,2), wd(3,2,30), 'meeting', 'https://meet.example.com/phase4-skip-standup');
+      addCalendar('thu-poker', 'Team Poker (Optional)', wd(3,11), wd(3,13), 'recovery', undefined, 'TENTATIVE'); // 18-20 VN
+      addCalendar('fri-retro', 'Weekly Retro', wd(4,3), wd(4,4), 'meeting', 'https://meet.example.com/phase4-skip-retro');
+      addCalendar('fri-dw', 'Deep Work', wd(4,6), wd(4,8), 'deep_work');
     } else {
+      // conflict-check – 14 events with deliberate overlaps
       addContext('conflict-a', 'goal:compete', { id: 'compete', priority: 'high', value: 'win' }, ObservationSource.USER_CONFIRMED, 1, old);
       addContext('conflict-b', 'goal:compete', { id: 'compete', priority: 'low', value: 'lose' }, ObservationSource.USER_CONFIRMED, 1, old);
       addContext('other-goal', 'goal:other', { id: 'other', priority: 'medium' }, ObservationSource.USER_CONFIRMED, 1, old);
       addContext('preference', 'preference:color', { id: 'color', value: 'blue' }, ObservationSource.USER_CONFIRMED, 1, old);
       addObservation('conflict', 'Competing priorities detected.', old);
-      addCalendar('event-a', 'Event A', 3_600_000, 7_200_000, 'other');
-      addCalendar('event-b', 'Event B', 10_800_000, 14_400_000, 'other');
+      // Mon
+      addCalendar('mon-dw', 'Important Deep Work', wd(0,2), wd(0,5), 'deep_work');              // 09-12 VN
+      addCalendar('mon-allhands', 'All-hands (Overlap)', wd(0,4), wd(0,5,30), 'meeting', 'https://meet.example.com/phase4-conflict-allhands'); // 11-12:30 VN overlaps DW
+      addCalendar('mon-lunch', 'Lunch', wd(0,5,30), wd(0,6,30), 'other');
+      // Tue – back-to-back, no gap
+      addCalendar('tue-sprint', 'Sprint Planning', wd(1,2), wd(1,4), 'meeting', 'https://meet.example.com/phase4-conflict-sprint');
+      addCalendar('tue-design', 'Design Review', wd(1,4), wd(1,6), 'meeting');
+      addCalendar('tue-impl', 'Implementation Work', wd(1,6), wd(1,10), 'deep_work');           // 13-17 VN
+      // Wed
+      addCalendar('wed-client', 'Client Call', wd(2,2), wd(2,3,30), 'meeting', 'https://meet.example.com/phase4-conflict-client');
+      addCalendar('wed-internal', 'Internal Sync (Overlap)', wd(2,3), wd(2,4), 'meeting');     // overlaps client call end
+      addCalendar('wed-focus', 'Deep Focus', wd(2,6), wd(2,9), 'deep_work');
+      addCalendar('wed-late', 'Late Meeting', wd(2,10), wd(2,12), 'meeting', 'https://meet.example.com/phase4-conflict-late'); // 17-19 VN
+      // Thu – deadline pressure
+      addCalendar('thu-crunch', 'Pre-deadline Crunch', wd(3,2), wd(3,10), 'deep_work');        // 09-17 VN full day
+      addCalendar('thu-emergency', 'Emergency Meeting (During Crunch)', wd(3,8), wd(3,9), 'meeting', 'https://meet.example.com/phase4-conflict-emergency');
+      // Fri
+      addCalendar('fri-retro', 'Retrospective', wd(4,2), wd(4,3), 'meeting');
+      addCalendar('fri-deploy', 'Release Deployment', wd(4,3), wd(4,6), 'meeting', 'https://meet.example.com/phase4-conflict-deploy');
     }
   }
 
@@ -295,7 +422,7 @@ function parseManifest(raw: unknown): ManifestState {
   });
   if (new Set(personas.map((persona) => persona.slug)).size !== PERSONA_SLUGS.length) throw new Error('Manifest validation failed: duplicate persona');
 
-  if (!Array.isArray(raw.entries) || raw.entries.length !== EXPECTED_COUNTS.total) throw new Error('Manifest validation failed: exactly 64 entries are required');
+  if (!Array.isArray(raw.entries) || raw.entries.length !== EXPECTED_COUNTS.total) throw new Error(`Manifest validation failed: exactly ${EXPECTED_COUNTS.total} entries are required`);
   const personaBySlug = new Map(personas.map((persona) => [persona.slug, persona]));
   const entries: ManifestEntry[] = raw.entries.map((value) => {
     if (!isRecord(value)) throw new Error('Manifest validation failed: entry must be an object');
@@ -384,7 +511,7 @@ function assertDatasetCounts(dataset: GeneratedDataset): void {
     total: Object.values(dataset.records).reduce((total, records) => total + records.length, 0),
   };
   if (Object.entries(EXPECTED_COUNTS).some(([key, count]) => counts[key as keyof ExpectedCounts] !== count) || dataset.personas.length !== PERSONA_SLUGS.length) {
-    throw new Error('Dataset validation failed: expected 6 / 28 / 8 / 16 / 6 = 64');
+    throw new Error(`Dataset validation failed: expected 6 / 28 / 8 / ${EXPECTED_COUNTS.calendarEvents} / 6 = ${EXPECTED_COUNTS.total}`);
   }
 }
 

@@ -17,7 +17,20 @@ calendarRouter.get('/events', async (req: Request, res: Response) => {
   try {
     const calendarRepo = getCalendarEventRepository();
     const userId = getUserId(req);
-    const events = await calendarRepo.findUpcoming(userId);
+    const { start, end } = req.query;
+
+    let events;
+    if (typeof start === 'string' && typeof end === 'string') {
+      const from = new Date(start);
+      const to = new Date(end);
+      if (isNaN(from.getTime()) || isNaN(to.getTime())) {
+        res.status(400).json({ error: 'Invalid start or end date' });
+        return;
+      }
+      events = await calendarRepo.findByRange(userId, from, to);
+    } else {
+      events = await calendarRepo.findUpcoming(userId);
+    }
 
     res.json({ events });
   } catch (error: unknown) {

@@ -331,8 +331,15 @@ export const calendarApi = {
     return response.json();
   },
 
-  async getEvents(userId: string = 'demo-user'): Promise<CalendarEvent[]> {
-    const url = usesClientSuppliedUserId() ? `${API_BASE_URL}/calendar/events?userId=${encodeURIComponent(userId)}` : `${API_BASE_URL}/calendar/events`;
+  async getEvents(options?: { start?: string; end?: string; userId?: string }): Promise<CalendarEvent[]> {
+    const params = new URLSearchParams();
+    if (usesClientSuppliedUserId()) {
+      params.set('userId', options?.userId ?? 'demo-user');
+    }
+    if (options?.start) params.set('start', options.start);
+    if (options?.end) params.set('end', options.end);
+    const query = params.toString();
+    const url = `${API_BASE_URL}/calendar/events${query ? '?' + query : ''}`;
     const response = await authFetch(url);
     if (!response.ok) {
       throw new Error(`Failed to fetch calendar events: ${response.status}`);
