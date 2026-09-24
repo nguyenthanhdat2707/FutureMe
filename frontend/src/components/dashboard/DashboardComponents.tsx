@@ -23,11 +23,19 @@ const categoryLabels: Record<WorkloadCategory, string> = {
 };
 
 const categoryStyles = {
-  deep_work: 'border-violet-300 bg-violet-100 text-violet-950',
-  meeting: 'border-cyan-300 bg-cyan-100 text-cyan-950',
-  deadline: 'border-amber-300 bg-amber-100 text-amber-950',
-  recovery: 'border-purple-200 bg-purple-50 text-purple-950',
-  other: 'border-slate-200 bg-slate-50 text-slate-800',
+  deep_work: 'bg-violet-600 text-white shadow-violet-200',
+  meeting: 'bg-cyan-500 text-white shadow-cyan-200',
+  deadline: 'bg-amber-500 text-white shadow-amber-200',
+  recovery: 'bg-emerald-500 text-white shadow-emerald-200',
+  other: 'bg-slate-500 text-white shadow-slate-200',
+} as const;
+
+const categoryIcons = {
+  deep_work: '🎯',
+  meeting: '👥',
+  deadline: '⚠️',
+  recovery: '🌿',
+  other: '📌',
 } as const;
 
 const categoryBadges = {
@@ -185,15 +193,15 @@ function EventButton({ event, selectedCategory, onOpen, style, mobile = false }:
       onClick={() => onOpen(event)}
       style={style}
       data-category={metadata.category}
-      className={`${mobile ? 'relative w-full' : 'absolute'} min-w-0 overflow-hidden rounded-xl border px-2.5 py-2 text-left shadow-sm transition focus-visible:z-20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${categoryStyles[metadata.category]} ${
+      className={`${mobile ? 'relative w-full' : 'absolute'} min-w-0 overflow-hidden rounded-xl px-2.5 py-2 text-left shadow-sm transition focus-visible:z-20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${categoryStyles[metadata.category]} ${
         highlighted ? 'opacity-100' : 'opacity-30 grayscale-[35%]'
       }`}
       aria-label={`${event.title}, ${formatTime(event.startTime)} to ${formatTime(event.endTime)}, ${badge}`}
     >
       <span className="flex min-w-0 items-center gap-2">
-        <span className="size-2 shrink-0 rounded-full bg-current" aria-hidden="true" />
+        <span aria-hidden="true">{categoryIcons[metadata.category]}</span>
         <span className="min-w-0 flex-1 truncate text-xs font-bold">{event.title}</span>
-        <span className="shrink-0 rounded-full border border-current/20 bg-white/50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide">{badge}</span>
+        <span className="shrink-0 rounded-full bg-white/20 text-white px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide">{badge}</span>
       </span>
       {mobile && <time className="mt-1.5 block text-[11px] opacity-75">{formatTime(event.startTime)}–{formatTime(event.endTime)}</time>}
     </button>
@@ -300,12 +308,14 @@ export function GanttCalendar({
         <div className="hidden min-w-0 md:block" role="region" aria-label="Weekly Gantt calendar">
           <div className="grid grid-cols-[3.5rem_repeat(7,minmax(0,1fr))]">
             <div />
-            {visibleDays.map((day) => (
+            {visibleDays.map((day) => {
+              const isToday = startOfDay(day).getTime() === startOfDay(new Date()).getTime();
+              return (
               <div key={day.toISOString()} className="min-w-0 border-l border-surface-border px-1 pb-3 text-center">
                 <span className="block truncate text-[10px] font-bold uppercase tracking-wider text-text-secondary">{day.toLocaleDateString(undefined, { weekday: 'short' })}</span>
-                <span className="mt-1 block text-sm font-bold text-text-primary">{day.getDate()}</span>
+                <span className={isToday ? 'mx-auto mt-1 flex size-7 items-center justify-center rounded-full bg-blue-500 text-sm font-bold text-white' : 'mt-1 block text-sm font-bold text-text-primary'}>{day.getDate()}</span>
               </div>
-            ))}
+            )})}
 
             <div className="relative h-[clamp(22rem,50vh,30rem)] border-t border-surface-border">
               {TIME_MARKERS.map((hour) => (
@@ -321,11 +331,18 @@ export function GanttCalendar({
             {visibleDays.map((day) => {
               const dayEvents = eventsForDay(events, day);
               const laneMap = computeEventLanes(dayEvents, day);
+              const isToday = startOfDay(day).getTime() === startOfDay(new Date()).getTime();
+              const isWeekend = day.getDay() === 0 || day.getDay() === 6;
               return (
                 <div
                   key={day.toISOString()}
-                  className="relative h-[clamp(22rem,50vh,30rem)] min-w-0 border-l border-t border-surface-border bg-[linear-gradient(to_bottom,transparent_24.8%,var(--color-surface-border)_25%,transparent_25.2%,transparent_62.3%,var(--color-surface-border)_62.5%,transparent_62.7%)]"
+                  className={`relative h-[clamp(22rem,50vh,30rem)] min-w-0 border-l border-t border-surface-border bg-[linear-gradient(to_bottom,transparent_24.8%,var(--color-surface-border)_25%,transparent_25.2%,transparent_62.3%,var(--color-surface-border)_62.5%,transparent_62.7%)] ${
+                    isWeekend ? 'bg-[repeating-linear-gradient(45deg,transparent,transparent_4px,rgba(0,0,0,0.03)_4px,rgba(0,0,0,0.03)_8px)]' : ''
+                  }`}
                 >
+                  {isToday && (
+                    <div className="pointer-events-none absolute inset-y-0 left-1/2 w-px -translate-x-1/2 border-l-2 border-dashed border-blue-400/60" />
+                  )}
                   {dayEvents.map((event) => {
                     const laneInfo = laneMap.get(event.id);
                     if (!laneInfo) return null;
