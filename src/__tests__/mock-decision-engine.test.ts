@@ -1,7 +1,9 @@
+/* eslint-disable @typescript-eslint/require-await, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unused-vars */
 import { MockDecisionEngine } from '../intelligence/mock-decision-engine';
 import { IContextEngine } from '../intelligence/interfaces';
 import { ILLMProvider, LLMMessage } from '../adapters/llm-provider.interface';
-import { DecisionQuery, RelevantContext, Observation, PersonalContext, ContextCorrection, PersonalState } from '../domain/types';
+import { IDecisionRepository, IDecisionChoiceRepository, IOutcomeRepository } from '../repositories/interfaces';
+import { DecisionQuery, RelevantContext, Observation, PersonalContext, ContextCorrection, PersonalState, Decision, DecisionChoice, Outcome } from '../domain/types';
 
 class CountingFakeLLM implements ILLMProvider {
   callCount = 0;
@@ -17,6 +19,49 @@ class CountingFakeLLM implements ILLMProvider {
       })
     };
   }
+}
+
+class FakeDecisionRepository implements IDecisionRepository {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async findById(_id: string): Promise<Decision | null> { return null; }
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async findByUserId(_userId: string, _limit?: number): Promise<Decision[]> { return []; }
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async create(decision: Omit<Decision, 'createdAt'>): Promise<Decision> {
+    return { ...decision, createdAt: new Date() };
+  }
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async updateChoice(_id: string, _userChoice: string): Promise<Decision | null> { return null; }
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async updateStatus(_id: string, _status: any): Promise<Decision | null> { return null; }
+}
+
+class FakeDecisionChoiceRepository implements IDecisionChoiceRepository {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async findById(_id: string): Promise<DecisionChoice | null> { return null; }
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async findByDecisionId(_decisionId: string): Promise<DecisionChoice | null> { return null; }
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async findByUserId(_userId: string, _limit?: number): Promise<DecisionChoice[]> { return []; }
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async create(_choice: any): Promise<DecisionChoice> {
+    return { id: 'test', ..._choice, createdAt: new Date() };
+  }
+}
+
+class FakeOutcomeRepository implements IOutcomeRepository {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async findById(_id: string): Promise<Outcome | null> { return null; }
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async findByDecisionId(_decisionId: string): Promise<Outcome | null> { return null; }
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async findByUserId(_userId: string, _limit?: number): Promise<Outcome[]> { return []; }
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async create(_outcome: any): Promise<Outcome> {
+    return { id: 'test', ..._outcome, createdAt: new Date(), updatedAt: new Date() };
+  }
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async update(_id: string, _updates: any): Promise<Outcome | null> { return null; }
 }
 
 class FakeContextEngine implements IContextEngine {
@@ -62,11 +107,17 @@ describe('MockDecisionEngine Integration', () => {
   let engine: MockDecisionEngine;
   let llm: CountingFakeLLM;
   let contextEngine: FakeContextEngine;
+  let decisionRepo: FakeDecisionRepository;
+  let choiceRepo: FakeDecisionChoiceRepository;
+  let outcomeRepo: FakeOutcomeRepository;
 
   beforeEach(() => {
     llm = new CountingFakeLLM();
     contextEngine = new FakeContextEngine();
-    engine = new MockDecisionEngine(llm, contextEngine);
+    decisionRepo = new FakeDecisionRepository();
+    choiceRepo = new FakeDecisionChoiceRepository();
+    outcomeRepo = new FakeOutcomeRepository();
+    engine = new MockDecisionEngine(llm, contextEngine, decisionRepo, choiceRepo, outcomeRepo);
   });
 
   const baseQuery: DecisionQuery = {
@@ -195,7 +246,12 @@ describe('MockDecisionEngine Integration', () => {
     }
 
     const conflictLlm = new CountingFakeLLM();
-    const conflictEngine = new MockDecisionEngine(conflictLlm, new ConflictingContextEngine());
+    const mockRepos = {
+      decision: new FakeDecisionRepository(),
+      choice: new FakeDecisionChoiceRepository(),
+      outcome: new FakeOutcomeRepository()
+    };
+    const conflictEngine = new MockDecisionEngine(conflictLlm, new ConflictingContextEngine(), mockRepos.decision, mockRepos.choice, mockRepos.outcome);
     const first = await conflictEngine.supportDecision('user1', baseQuery);
 
     expect(first.policy.outcome).toBe('ASK');

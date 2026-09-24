@@ -506,3 +506,71 @@ export interface DemoScenario {
   preloadedTimeBlocks: TimeBlock[];
   simulatedInterventions: Intervention[];
 }
+
+// ============================================================================
+// Phase 6: User Choice, Outcomes, Feedback, and Reusable History
+// ============================================================================
+
+export type ChosenAction = 'accept' | 'decline' | 'defer' | 'custom';
+export type ChoiceStatus = 'final' | 'deferred';
+
+export interface DecisionChoice {
+  id: string;
+  decisionId: string;
+  userId: string;
+  chosenAction: ChosenAction;
+  chosenActionDisplay: string;
+  customNotes?: string;
+  aiRecommendation: string;
+  chosenAt: string;
+  status: ChoiceStatus;
+  createdAt: string;
+}
+
+export type OutcomeStatus = 'positive' | 'neutral' | 'negative' | 'pending';
+
+export interface Outcome {
+  id: string;
+  decisionId: string;
+  userId: string;
+  outcomeStatus: OutcomeStatus;
+  wouldRepeat: boolean | null;
+  outcomeNotes: string | null;
+  recordedAt: string;
+  updatedAt: string;
+  createdAt: string;
+}
+
+export type CheckInStatus = 'pending' | 'triggered' | 'completed' | 'dismissed';
+
+export interface CheckInSchedule {
+  id: string;
+  decisionId: string;
+  userId: string;
+  scheduledAt: string;
+  triggeredAt?: string;
+  dismissedAt?: string;
+  status: CheckInStatus;
+  createdAt: string;
+}
+
+export type DecisionCategory = 'opportunity' | 'commitment' | 'workload' | 'priority' | 'deadline' | 'learning' | 'collaboration' | 'personal-wellbeing' | 'other';
+
+export interface HistoricalDecision {
+  decisionId: string;
+  date: string;
+  category: DecisionCategory;
+  question: string;
+  chosenAction: ChosenAction;
+  chosenActionDisplay: string;
+  outcomeStatus: OutcomeStatus;
+  wouldRepeat: boolean | null;
+  outcomeNotes: string | null;
+  keywords: string[];
+  relevantGoals: string[];
+}
+
+export interface DecisionWithHistory {
+  decision: DecisionApiResponse;
+  relevantHistory: HistoricalDecision[];
+}

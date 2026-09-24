@@ -90,7 +90,7 @@ describe('HTTP Route Auth', () => {
     
     const response = await request(app)
       .post('/api/outcomes')
-      .send({ decisionId: 'non-existent' })
+      .send({ decisionId: 'non-existent', outcomeStatus: 'positive' })
       .expect(404);
       
     expect((response.body as Record<string, string>).error).toBe('Decision not found');

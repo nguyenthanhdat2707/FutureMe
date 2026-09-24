@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/require-await, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unused-vars */
 import { ILLMProvider, LLMMessage } from '../adapters/llm-provider.interface';
 import { MockLLMProvider } from '../adapters/mock-llm-provider';
 import {
@@ -229,7 +230,11 @@ describe('decision tradeoff validation', () => {
         });
       }
     };
-    const engine = new MockDecisionEngine(provider, new FakeContextEngine());
+    const engine = new MockDecisionEngine(provider, new FakeContextEngine(),
+      { findById: async () => null, findByUserId: async () => [], create: async (d: any) => ({...d, createdAt: new Date()}), updateChoice: async () => null, updateStatus: async () => null } as any,
+      { findById: async () => null, findByDecisionId: async () => null, findByUserId: async () => [], create: async (c: any) => ({...c, id: 'test', createdAt: new Date()}) } as any,
+      { findById: async () => null, findByDecisionId: async () => null, findByUserId: async () => [], create: async (o: any) => ({...o, id: 'test', createdAt: new Date(), updatedAt: new Date()}), update: async () => null } as any
+    );
     const query: DecisionQuery = {
       question: 'Should I accept this commitment?',
       impactProfile: {
@@ -268,7 +273,11 @@ describe('decision tradeoff validation', () => {
         };
       }
     };
-    const engine = new MockDecisionEngine(provider, new FakeContextEngine());
+    const engine = new MockDecisionEngine(provider, new FakeContextEngine(),
+      { findById: async () => null, findByUserId: async () => [], create: async (d: any) => ({...d, createdAt: new Date()}), updateChoice: async () => null, updateStatus: async () => null } as any,
+      { findById: async () => null, findByDecisionId: async () => null, findByUserId: async () => [], create: async (c: any) => ({...c, id: 'test', createdAt: new Date()}) } as any,
+      { findById: async () => null, findByDecisionId: async () => null, findByUserId: async () => [], create: async (o: any) => ({...o, id: 'test', createdAt: new Date(), updatedAt: new Date()}), update: async () => null } as any
+    );
 
     const result = await engine.supportDecision('user-1', {
       question: 'Should I accept this commitment?',

@@ -315,7 +315,7 @@ describe('DynamoDB Repositories', () => {
     it('creates and finds by decision id', async () => {
       const repo = new DynamoOutcomeRepository();
       mockSend.mockResolvedValueOnce({ Item: { id: 'test', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), status: DecisionStatus.PENDING, title: 't', external_id: 'ext', start_time: new Date().toISOString(), end_time: new Date().toISOString(), type: 'T', source: 'S', target_type: 'T', target_id: 'T' } });
-      await repo.create({ decisionId: 'd1', userId: 'u1', description: 'desc', observedAt: new Date() });
+      await repo.create({ decisionId: 'd1', userId: 'u1', outcomeStatus: 'positive', wouldRepeat: true, outcomeNotes: 'desc', recordedAt: new Date() });
       
       mockSend.mockClear();
       mockSend.mockResolvedValueOnce({ Items: [] });

@@ -141,6 +141,18 @@ export enum DecisionStatus {
   CANCELLED = 'CANCELLED'
 }
 
+export type DecisionCategory = 
+  | 'opportunity'
+  | 'commitment'
+  | 'workload'
+  | 'priority'
+  | 'deadline'
+  | 'resource-allocation'
+  | 'learning'
+  | 'collaboration'
+  | 'personal-wellbeing'
+  | 'other';
+
 export interface DecisionOption {
   id: string;
   label: string;
@@ -210,6 +222,7 @@ export interface Decision {
   id: string;
   userId: string;
   question: string;
+  category?: DecisionCategory;
   options: DecisionOption[];
   relevantContext: ContextSnapshot;
   tradeoffs: Tradeoff[];
@@ -247,12 +260,31 @@ export interface DecisionQuery {
   clarification?: DecisionClarificationMetadata;
 }
 
+// ========================================
+// Historical Decision (Phase 6) - moved before DecisionSupport
+// ========================================
+
+export interface HistoricalDecision {
+  decisionId: string;
+  date: Date;
+  category: DecisionCategory;
+  question: string;
+  chosenAction: string;
+  chosenActionDisplay: string;
+  outcomeStatus: OutcomeStatus;
+  wouldRepeat: boolean | null;
+  outcomeNotes: string | null;
+  keywords: string[];
+  relevantGoals: string[];
+}
+
 export interface DecisionSupport {
   decision: Decision;
   assessment: DecisionFeasibilityAssessment;
   clarificationNeeded?: string[];
   policy: DecisionPolicyResult;
   state?: StateEstimate;
+  relevantHistory?: HistoricalDecision[];
 }
 
 // ========================================
@@ -307,12 +339,17 @@ export interface InterventionDecision {
 // Outcome
 // ========================================
 
+export type OutcomeStatus = 'positive' | 'neutral' | 'negative' | 'pending';
+
 export interface Outcome {
   id: string;
   decisionId: string;
   userId: string;
-  description: string;
-  observedAt: Date;
+  outcomeStatus: OutcomeStatus;
+  wouldRepeat: boolean | null;
+  outcomeNotes: string | null;
+  recordedAt: Date;
+  updatedAt: Date;
   createdAt: Date;
 }
 
@@ -458,4 +495,41 @@ export interface ContextCorrection {
   attributeId: string;
   correctedValue: string;
   reason?: string;
+}
+
+// ========================================
+// Decision Choice (Phase 6)
+// ========================================
+
+export type ChosenAction = 'accept' | 'decline' | 'defer' | 'custom';
+export type ChoiceStatus = 'final' | 'deferred';
+
+export interface DecisionChoice {
+  id: string;
+  decisionId: string;
+  userId: string;
+  chosenAction: ChosenAction;
+  chosenActionDisplay: string;
+  customNotes?: string;
+  aiRecommendation: string;
+  chosenAt: Date;
+  status: ChoiceStatus;
+  createdAt: Date;
+}
+
+// ========================================
+// Check-in Schedule (Phase 6)
+// ========================================
+
+export type CheckInStatus = 'pending' | 'triggered' | 'dismissed' | 'completed';
+
+export interface CheckInSchedule {
+  id: string;
+  decisionId: string;
+  userId: string;
+  scheduledAt: Date;
+  triggeredAt?: Date;
+  dismissedAt?: Date;
+  status: CheckInStatus;
+  createdAt: Date;
 }

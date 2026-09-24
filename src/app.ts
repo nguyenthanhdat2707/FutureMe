@@ -9,6 +9,7 @@ import { decisionRouter } from './routes/decision.routes';
 import { calendarRouter } from './routes/calendar.routes';
 import { observationRouter } from './routes/observation.routes';
 import { outcomeRouter } from './routes/outcome.routes';
+import { choiceRouter } from './routes/choice.routes';
 import { demoRouter } from './routes/demo.routes';
 import { interventionRouter } from './routes/intervention.routes';
 import { UnauthorizedError, getUserId } from './utils/identity';
@@ -66,6 +67,7 @@ export function createApp() {
   app.use('/api/calendar', calendarRouter);
   app.use('/api/observations', observationRouter);
   app.use('/api/outcomes', outcomeRouter);
+  app.use('/api/choices', choiceRouter);
   app.use('/api/interventions', interventionRouter);
   app.use('/api/demo', demoRouter);
 

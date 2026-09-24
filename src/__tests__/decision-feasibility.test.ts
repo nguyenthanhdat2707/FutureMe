@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/require-await, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unused-vars */
 import { ILLMProvider } from '../adapters/llm-provider.interface';
 import {
   ContextCorrection,
@@ -87,7 +88,11 @@ function queryWithImpact(question: string, impactProfile: DecisionImpactProfile)
 }
 
 async function assess(query: DecisionQuery) {
-  const engine = new MockDecisionEngine(llmProvider, new FakeContextEngine());
+  const engine = new MockDecisionEngine(llmProvider, new FakeContextEngine(),
+    { findById: async () => null, findByUserId: async () => [], create: async (d: any) => ({...d, createdAt: new Date()}), updateChoice: async () => null, updateStatus: async () => null } as any,
+    { findById: async () => null, findByDecisionId: async () => null, findByUserId: async () => [], create: async (c: any) => ({...c, id: 'test', createdAt: new Date()}) } as any,
+    { findById: async () => null, findByDecisionId: async () => null, findByUserId: async () => [], create: async (o: any) => ({...o, id: 'test', createdAt: new Date(), updatedAt: new Date()}), update: async () => null } as any
+  );
   return engine.supportDecision('user-1', query);
 }
 
@@ -211,7 +216,7 @@ describe('deterministic decision feasibility assessment', () => {
         };
       }
     }
-    const engine = new MockDecisionEngine(llmProvider, new ContextEngineWithHistory());
+    const engine = new MockDecisionEngine(llmProvider, new ContextEngineWithHistory(), { findById: async () => null, findByUserId: async () => [], create: async (d: any) => ({...d, createdAt: new Date()}), updateChoice: async () => null, updateStatus: async () => null } as any, { findById: async () => null, findByDecisionId: async () => null, findByUserId: async () => [], create: async (c: any) => ({...c, id: "test", createdAt: new Date()}) } as any, { findById: async () => null, findByDecisionId: async () => null, findByUserId: async () => [], create: async (o: any) => ({...o, id: "test", createdAt: new Date(), updatedAt: new Date()}), update: async () => null } as any);
     const support = await engine.supportDecision('user-1', queryWithImpact('Test', {
       timeCostHours: 4,
       availableHoursBeforeDeadline: 10,
@@ -245,7 +250,7 @@ describe('deterministic decision feasibility assessment', () => {
         };
       }
     }
-    const engine = new MockDecisionEngine(llmProvider, new ContextEngineWithHistory());
+    const engine = new MockDecisionEngine(llmProvider, new ContextEngineWithHistory(), { findById: async () => null, findByUserId: async () => [], create: async (d: any) => ({...d, createdAt: new Date()}), updateChoice: async () => null, updateStatus: async () => null } as any, { findById: async () => null, findByDecisionId: async () => null, findByUserId: async () => [], create: async (c: any) => ({...c, id: "test", createdAt: new Date()}) } as any, { findById: async () => null, findByDecisionId: async () => null, findByUserId: async () => [], create: async (o: any) => ({...o, id: "test", createdAt: new Date(), updatedAt: new Date()}), update: async () => null } as any);
     const support = await engine.supportDecision('user-1', queryWithImpact('Test', {
       timeCostHours: 2,
       availableHoursBeforeDeadline: 10
@@ -276,7 +281,7 @@ describe('deterministic decision feasibility assessment', () => {
         };
       }
     }
-    const engine = new MockDecisionEngine(llmProvider, new ContextEngineWithHistory());
+    const engine = new MockDecisionEngine(llmProvider, new ContextEngineWithHistory(), { findById: async () => null, findByUserId: async () => [], create: async (d: any) => ({...d, createdAt: new Date()}), updateChoice: async () => null, updateStatus: async () => null } as any, { findById: async () => null, findByDecisionId: async () => null, findByUserId: async () => [], create: async (c: any) => ({...c, id: "test", createdAt: new Date()}) } as any, { findById: async () => null, findByDecisionId: async () => null, findByUserId: async () => [], create: async (o: any) => ({...o, id: "test", createdAt: new Date(), updatedAt: new Date()}), update: async () => null } as any);
     const support = await engine.supportDecision('user-1', queryWithImpact('Test', {
       timeCostHours: 1,
       availableHoursBeforeDeadline: 10,

@@ -4,13 +4,15 @@
  * PROVISIONAL - replaceable with real Bedrock integration
  */
 
-import { DecisionQuery, DecisionSupport, Decision, DecisionStatus, Tradeoff } from '../domain/types';
+import { DecisionQuery, DecisionSupport, Decision, DecisionStatus, Tradeoff, HistoricalDecision } from '../domain/types';
 import { IDecisionEngine, IContextEngine } from './interfaces';
 import { ILLMProvider } from '../adapters/llm-provider.interface';
+import { IDecisionRepository, IDecisionChoiceRepository, IOutcomeRepository } from '../repositories/interfaces';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import { assessDecisionFeasibility } from './deterministic-feasibility-assessment';
 import { evaluateDecisionPolicy } from './decision-policy-evaluator';
+import { retrieveRelevantHistory, inferCategory } from './decision-history-retrieval';
 
 const tradeoffSchema: z.ZodType<Tradeoff> = z.object({
   option: z.string().trim().min(1).max(200),
@@ -22,13 +24,45 @@ const tradeoffEnvelopeSchema = z.object({
   tradeoffs: z.array(z.unknown()).max(20)
 }).strict();
 
+/**
+ * Format history for AI prompt context
+ */
+function formatHistoryForPrompt(h: HistoricalDecision): string {
+  const date = h.date.toISOString().split('T')[0];
+  const outcome = h.outcomeStatus === 'positive' ? '✓' : h.outcomeStatus === 'negative' ? '✗' : '~';
+  const repeat = h.wouldRepeat !== null ? (h.wouldRepeat ? ' (would repeat)' : ' (would not repeat)') : '';
+  return `[${date}] "${h.question}" → ${h.chosenActionDisplay} ${outcome}${repeat}${h.outcomeNotes ? ` - "${h.outcomeNotes}"` : ''}`;
+}
+
+/**
+ * Format history for user display
+ */
+function formatHistoryForUser(h: HistoricalDecision): string {
+  const date = h.date.toISOString().split('T')[0];
+  const outcome = h.outcomeStatus.charAt(0).toUpperCase() + h.outcomeStatus.slice(1);
+  const repeat = h.wouldRepeat !== null ? `, would repeat: ${h.wouldRepeat ? 'Yes' : 'No'}` : '';
+  return `${date}: ${h.chosenActionDisplay} (${outcome}${repeat})${h.outcomeNotes ? ` - "${h.outcomeNotes}"` : ''}`;
+}
+
 export class MockDecisionEngine implements IDecisionEngine {
   constructor(
     private llmProvider: ILLMProvider,
-    private contextEngine: IContextEngine
+    private contextEngine: IContextEngine,
+    private decisionRepo: IDecisionRepository,
+    private choiceRepo: IDecisionChoiceRepository,
+    private outcomeRepo: IOutcomeRepository
   ) {}
 
   async supportDecision(userId: string, query: DecisionQuery): Promise<DecisionSupport> {
+    // PHASE 6: Retrieve relevant history BEFORE recommendation generation
+    const relevantHistory = await retrieveRelevantHistory(
+      userId,
+      query,
+      this.decisionRepo,
+      this.choiceRepo,
+      this.outcomeRepo
+    );
+
     // Get relevant context
     const relevantContext = await this.contextEngine.getRelevantContext(userId, query);
     const assessment = assessDecisionFeasibility(query.impactProfile, new Date(), relevantContext);
@@ -43,9 +77,14 @@ export class MockDecisionEngine implements IDecisionEngine {
     let tradeoffs: Tradeoff[] = [];
 
     if (policyResult.outcome === 'RECOMMEND') {
-      // Build LLM prompt
+      // Build LLM prompt with history injected
       const systemPrompt = `You are a decision support assistant. Analyze the user's question in context of their goals, commitments, and constraints. Describe clear tradeoffs.
 
+${relevantHistory.length > 0 ? `IMPORTANT: The user has relevant past experience with similar decisions. Consider this history in your reasoning, but apply it contextually - don't mechanically repeat past choices. Reference specific past decisions naturally in your reasoning.
+
+Past Experience:
+${relevantHistory.map(h => `- ${formatHistoryForPrompt(h)}`).join('\n')}
+` : ''}
 Return your response as JSON with this structure:
 {
   "tradeoffs": [
@@ -65,7 +104,10 @@ Context:
 - Current State: ${relevantContext.state.state}
 - Candidate Impact: ${JSON.stringify(query.impactProfile ?? null)}
 
-Please describe meaningful tradeoffs without inventing feasibility facts.`;
+${relevantHistory.length > 0 ? `Your Past Experience:
+${relevantHistory.map(h => `- ${formatHistoryForUser(h)}`).join('\n')}
+` : ''}
+Please describe meaningful tradeoffs without inventing feasibility facts.${relevantHistory.length > 0 ? ' Reference your past experience where relevant.' : ''}`;
 
       const response = await this.llmProvider.generate([
         { role: 'system', content: systemPrompt },
@@ -74,22 +116,31 @@ Please describe meaningful tradeoffs without inventing feasibility facts.`;
       tradeoffs = parseTradeoffs(response.content);
     }
 
+    const finalReasoning = (policyResult.outcome === 'ABSTAIN' ? policyResult.reason : assessment.recommendation.reasoning) +
+      (relevantHistory.length > 0 ? `\n\nPast experience considered:\n${relevantHistory.map(h => formatHistoryForUser(h)).join('\n')}` : '');
+
     // Create decision object
     const decision: Decision = {
       id: uuidv4(),
       userId,
       question: query.question,
+      category: inferCategory(query.question),
       options: query.options?.map(opt => ({ id: uuidv4(), label: opt })) || [],
       relevantContext: {
         capturedAt: new Date(),
         goals: relevantContext.goals,
         commitments: relevantContext.commitments,
         constraints: relevantContext.constraints,
-        relevantHistory: relevantContext.recentHistory
+        relevantHistory: relevantHistory.map(h => 
+          `${h.date.toISOString().split('T')[0]}: ${h.chosenActionDisplay} (${h.outcomeStatus}${h.wouldRepeat !== null ? ', would repeat: ' + (h.wouldRepeat ? 'yes' : 'no') : ''})`
+        )
       },
       tradeoffs,
-      recommendation: assessment.recommendation,
-      reasoning: policyResult.outcome === 'ABSTAIN' ? policyResult.reason : assessment.recommendation.reasoning,
+      recommendation: {
+        ...assessment.recommendation,
+        reasoning: finalReasoning
+      },
+      reasoning: finalReasoning,
       confidence: assessment.recommendation.confidence,
       status: DecisionStatus.PENDING,
       createdAt: new Date()
@@ -108,7 +159,8 @@ Please describe meaningful tradeoffs without inventing feasibility facts.`;
       assessment,
       clarificationNeeded,
       policy: policyResult,
-      state: relevantContext.state
+      state: relevantContext.state,
+      relevantHistory
     };
   }
 }
