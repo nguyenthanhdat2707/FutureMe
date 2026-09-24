@@ -116,6 +116,9 @@ Please describe meaningful tradeoffs without inventing feasibility facts.${relev
       tradeoffs = parseTradeoffs(response.content);
     }
 
+    const finalReasoning = (policyResult.outcome === 'ABSTAIN' ? policyResult.reason : assessment.recommendation.reasoning) +
+      (relevantHistory.length > 0 ? `\n\nPast experience considered:\n${relevantHistory.map(h => formatHistoryForUser(h)).join('\n')}` : '');
+
     // Create decision object
     const decision: Decision = {
       id: uuidv4(),
@@ -133,8 +136,11 @@ Please describe meaningful tradeoffs without inventing feasibility facts.${relev
         )
       },
       tradeoffs,
-      recommendation: assessment.recommendation,
-      reasoning: policyResult.outcome === 'ABSTAIN' ? policyResult.reason : assessment.recommendation.reasoning,
+      recommendation: {
+        ...assessment.recommendation,
+        reasoning: finalReasoning
+      },
+      reasoning: finalReasoning,
       confidence: assessment.recommendation.confidence,
       status: DecisionStatus.PENDING,
       createdAt: new Date()

@@ -70,9 +70,9 @@ describe('Phase 6: Learning Loop Integration', () => {
     
     const contextEngine = new SimpleContextEngine(
       mockContextRepo as any,
-      mockObservationRepo as any,
-      mockCalendarRepo as any,
       decisionRepo as any,
+      mockCalendarRepo as any,
+      mockObservationRepo as any,
       mockStateEstimator as any
     );
     
