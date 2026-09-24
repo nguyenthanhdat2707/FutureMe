@@ -6,6 +6,7 @@ import {
   buildDeadlines,
   buildSuggestions,
   calculateWorkload,
+  computeEventLanes,
   parseEventMetadata,
 } from './dashboard-utils';
 
@@ -70,8 +71,50 @@ describe('dashboard data derivation', () => {
     expect(workload).toEqual([
       { category: 'deep_work', hours: 3, percentage: 60 },
       { category: 'meeting', hours: 1, percentage: 20 },
-      { category: 'other', hours: 1, percentage: 20 },
+      { category: 'recovery', hours: 1, percentage: 20 },
     ]);
+  });
+
+  it('ignores deadline, other, and malformed metadata in workload allocation to preserve truth', () => {
+    const workload = calculateWorkload([
+      event('Deadline Task', 0, 9, 11, 'deadline'),
+      event('Random Other', 0, 11, 13, 'other'),
+      { ...event('Broken', 0, 13, 15, 'recovery'), rawData: 'not valid json' },
+    ]);
+    expect(workload).toEqual([
+      { category: 'deep_work', hours: 0, percentage: 0 },
+      { category: 'meeting', hours: 0, percentage: 0 },
+      { category: 'recovery', hours: 0, percentage: 0 },
+    ]);
+  });
+
+  it('assigns deterministic lanes to concurrent events on the same day', () => {
+    const day = new Date(2026, 8, 24);
+    const dayEvents = [
+      event('Event-1', 0, 10, 12, 'deep_work'),
+      event('Event-2', 0, 11, 13, 'meeting'),
+      event('Event-3', 0, 14, 15, 'recovery'),
+    ];
+    const lanes = computeEventLanes(dayEvents, day);
+
+    expect(lanes.get('Event-1')).toEqual({
+      lane: 0,
+      totalLanes: 2,
+      visibleStart: new Date(2026, 8, 24, 10).getTime(),
+      visibleEnd: new Date(2026, 8, 24, 12).getTime(),
+    });
+    expect(lanes.get('Event-2')).toEqual({
+      lane: 1,
+      totalLanes: 2,
+      visibleStart: new Date(2026, 8, 24, 11).getTime(),
+      visibleEnd: new Date(2026, 8, 24, 13).getTime(),
+    });
+    expect(lanes.get('Event-3')).toEqual({
+      lane: 0,
+      totalLanes: 1,
+      visibleStart: new Date(2026, 8, 24, 14).getTime(),
+      visibleEnd: new Date(2026, 8, 24, 15).getTime(),
+    });
   });
 
   it('combines commitments and goals due within seven days with urgency labels', () => {
@@ -79,6 +122,34 @@ describe('dashboard data derivation', () => {
     expect(deadlines.map((deadline) => deadline.title)).toEqual(['Demo review', 'Ship dashboard']);
     expect(deadlines[0].urgency).toBe('tomorrow');
     expect(deadlines[1].urgency).toBe('this week');
+  });
+
+  it('includes active overdue items with overdue urgency in the current week but keeps future weeks range-relevant', () => {
+    const contextWithOverdue: PersonalContext = {
+      ...context,
+      goals: [
+        { id: 'overdue-goal', description: 'Past due report', deadline: atLocalTime(-2, 17), priority: 'medium' },
+        { id: 'future-goal', description: 'Next week launch', deadline: atLocalTime(8, 17), priority: 'high' },
+      ],
+      commitments: [
+        { id: 'upcoming-commitment', description: 'Current week demo', startTime: atLocalTime(1, 10), endTime: atLocalTime(1, 11) },
+      ],
+    };
+
+    const currentWeekStart = new Date(2026, 8, 21);
+    const now = new Date(2026, 8, 24, 10);
+    const currentWeekDeadlines = buildDeadlines(contextWithOverdue, currentWeekStart, now);
+
+    expect(currentWeekDeadlines.map((d) => d.title)).toEqual(['Past due report', 'Current week demo']);
+    expect(currentWeekDeadlines[0].urgency).toBe('overdue');
+    expect(currentWeekDeadlines[0].priority).toBe('high');
+    expect(currentWeekDeadlines[1].urgency).toBe('tomorrow');
+
+    const nextWeekStart = new Date(2026, 8, 28);
+    const nextWeekDeadlines = buildDeadlines(contextWithOverdue, nextWeekStart, now);
+
+    expect(nextWeekDeadlines.map((d) => d.title)).toEqual(['Next week launch']);
+    expect(nextWeekDeadlines.find((d) => d.title === 'Past due report')).toBeUndefined();
   });
 
   it('produces at least two deterministic, explained suggestions from gaps, workload, deadlines, and preferences', () => {
