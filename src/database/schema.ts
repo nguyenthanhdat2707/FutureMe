@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS decisions (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES users(id),
   question TEXT NOT NULL,
+  category TEXT,
   context_snapshot TEXT NOT NULL,
   recommendation TEXT,
   user_choice TEXT,
@@ -42,6 +43,7 @@ CREATE TABLE IF NOT EXISTS decisions (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_decisions_user ON decisions(user_id);
+CREATE INDEX IF NOT EXISTS idx_decisions_category_date ON decisions(category, created_at DESC);
 
 -- Observations table
 CREATE TABLE IF NOT EXISTS observations (
@@ -77,10 +79,44 @@ CREATE TABLE IF NOT EXISTS outcomes (
   id TEXT PRIMARY KEY,
   decision_id TEXT NOT NULL REFERENCES decisions(id),
   user_id TEXT NOT NULL REFERENCES users(id),
-  description TEXT NOT NULL,
-  observed_at TIMESTAMP NOT NULL,
+  outcome_status TEXT NOT NULL DEFAULT 'pending',
+  would_repeat INTEGER,
+  outcome_notes TEXT,
+  recorded_at TIMESTAMP NOT NULL,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+CREATE INDEX IF NOT EXISTS idx_outcomes_decision ON outcomes(decision_id);
+
+-- Decision Choices table (Phase 6)
+CREATE TABLE IF NOT EXISTS decision_choices (
+  id TEXT PRIMARY KEY,
+  decision_id TEXT NOT NULL REFERENCES decisions(id),
+  user_id TEXT NOT NULL REFERENCES users(id),
+  chosen_action TEXT NOT NULL,
+  chosen_action_display TEXT NOT NULL,
+  custom_notes TEXT,
+  ai_recommendation TEXT,
+  chosen_at TIMESTAMP NOT NULL,
+  status TEXT NOT NULL DEFAULT 'final',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_decision_choices_decision ON decision_choices(decision_id);
+CREATE INDEX IF NOT EXISTS idx_decision_choices_user ON decision_choices(user_id);
+
+-- Check-in Schedule table (Phase 6)
+CREATE TABLE IF NOT EXISTS check_in_schedule (
+  id TEXT PRIMARY KEY,
+  decision_id TEXT NOT NULL REFERENCES decisions(id),
+  user_id TEXT NOT NULL REFERENCES users(id),
+  scheduled_at TIMESTAMP NOT NULL,
+  triggered_at TIMESTAMP,
+  dismissed_at TIMESTAMP,
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_check_in_schedule_user_scheduled ON check_in_schedule(user_id, scheduled_at);
+CREATE INDEX IF NOT EXISTS idx_check_in_schedule_decision ON check_in_schedule(decision_id);
 
 -- Feedback table
 CREATE TABLE IF NOT EXISTS feedback (

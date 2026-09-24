@@ -1,8 +1,8 @@
 import { getRequiredString, getRequiredDate } from './mapping';
 import { getDynamoClient } from './client';
-import { DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { IOutcomeRepository } from "../interfaces";
-import { Outcome } from "../../domain/types";
+import { Outcome, OutcomeStatus } from "../../domain/types";
 import { v4 as uuidv4 } from "uuid";
 
 export class DynamoOutcomeRepository implements IOutcomeRepository {
@@ -26,23 +26,25 @@ export class DynamoOutcomeRepository implements IOutcomeRepository {
     return response.Item ? this.mapToOutcome(response.Item as Record<string, unknown>) : null;
   }
 
-  async findByDecisionId(decisionId: string): Promise<Outcome[]> {
+  async findByDecisionId(decisionId: string): Promise<Outcome | null> {
     const response = await this.docClient.send(new QueryCommand({
       TableName: this.tableName,
-      IndexName: "decisionId-observedAt-index",
+      IndexName: "decisionId-recordedAt-index",
       KeyConditionExpression: "decision_id = :decisionId",
       ExpressionAttributeValues: {
         ":decisionId": decisionId
       },
-      ScanIndexForward: false
+      ScanIndexForward: false,
+      Limit: 1
     }));
-    return (response.Items || []).map(i => this.mapToOutcome(i as Record<string, unknown>));
+    const items = response.Items || [];
+    return items.length > 0 ? this.mapToOutcome(items[0] as Record<string, unknown>) : null;
   }
 
   async findByUserId(userId: string, limit: number = 50): Promise<Outcome[]> {
     const response = await this.docClient.send(new QueryCommand({
       TableName: this.tableName,
-      IndexName: "userId-observedAt-index",
+      IndexName: "userId-recordedAt-index",
       KeyConditionExpression: "user_id = :userId",
       ExpressionAttributeValues: {
         ":userId": userId
@@ -53,16 +55,20 @@ export class DynamoOutcomeRepository implements IOutcomeRepository {
     return (response.Items || []).map(i => this.mapToOutcome(i as Record<string, unknown>));
   }
 
-  async create(outcome: Omit<Outcome, "id" | "createdAt">): Promise<Outcome> {
+  async create(outcome: Omit<Outcome, "id" | "createdAt" | "updatedAt">): Promise<Outcome> {
     const id = uuidv4();
+    const now = new Date().toISOString();
 
     const item: Record<string, unknown> = {
       id,
       decision_id: outcome.decisionId,
       user_id: outcome.userId,
-      description: outcome.description,
-      observed_at: outcome.observedAt.toISOString(),
-      created_at: new Date().toISOString()
+      outcome_status: outcome.outcomeStatus,
+      would_repeat: outcome.wouldRepeat === null ? null : (outcome.wouldRepeat ? 1 : 0),
+      outcome_notes: outcome.outcomeNotes,
+      recorded_at: outcome.recordedAt.toISOString(),
+      updated_at: now,
+      created_at: now
     };
 
     await this.docClient.send(new PutCommand({
@@ -73,13 +79,58 @@ export class DynamoOutcomeRepository implements IOutcomeRepository {
     return this.mapToOutcome(item);
   }
 
+  async update(id: string, updates: Partial<Pick<Outcome, 'outcomeStatus' | 'wouldRepeat' | 'outcomeNotes'>>): Promise<Outcome | null> {
+    const existing = await this.findById(id);
+    if (!existing) return null;
+
+    const updateExpressions: string[] = [];
+    const expressionAttributeValues: Record<string, unknown> = {};
+    const expressionAttributeNames: Record<string, string> = {};
+
+    if (updates.outcomeStatus !== undefined) {
+      updateExpressions.push('#status = :status');
+      expressionAttributeNames['#status'] = 'outcome_status';
+      expressionAttributeValues[':status'] = updates.outcomeStatus;
+    }
+    if (updates.wouldRepeat !== undefined) {
+      updateExpressions.push('would_repeat = :repeat');
+      expressionAttributeValues[':repeat'] = updates.wouldRepeat === null ? null : (updates.wouldRepeat ? 1 : 0);
+    }
+    if (updates.outcomeNotes !== undefined) {
+      updateExpressions.push('outcome_notes = :notes');
+      expressionAttributeValues[':notes'] = updates.outcomeNotes;
+    }
+
+    if (updateExpressions.length === 0) return existing;
+
+    updateExpressions.push('updated_at = :updated');
+    expressionAttributeValues[':updated'] = new Date().toISOString();
+
+    await this.docClient.send(new UpdateCommand({
+      TableName: this.tableName,
+      Key: { id },
+      UpdateExpression: `SET ${updateExpressions.join(', ')}`,
+      ExpressionAttributeValues: expressionAttributeValues,
+      ...(Object.keys(expressionAttributeNames).length > 0 ? { ExpressionAttributeNames: expressionAttributeNames } : {})
+    }));
+
+    return this.findById(id);
+  }
+
   private mapToOutcome(item: Record<string, unknown>): Outcome {
+    let wouldRepeat: boolean | null = null;
+    if (item.would_repeat === 1) wouldRepeat = true;
+    else if (item.would_repeat === 0) wouldRepeat = false;
+
     return {
       id: getRequiredString(item, 'id'),
       decisionId: getRequiredString(item, 'decision_id'),
       userId: getRequiredString(item, 'user_id'),
-      description: getRequiredString(item, 'description'),
-      observedAt: getRequiredDate(item, 'observed_at'),
+      outcomeStatus: (typeof item.outcome_status === 'string' ? item.outcome_status : 'pending') as OutcomeStatus,
+      wouldRepeat,
+      outcomeNotes: typeof item.outcome_notes === 'string' ? item.outcome_notes : null,
+      recordedAt: getRequiredDate(item, 'recorded_at'),
+      updatedAt: getRequiredDate(item, 'updated_at'),
       createdAt: getRequiredDate(item, 'created_at')
     };
   }

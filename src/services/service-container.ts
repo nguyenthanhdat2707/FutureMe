@@ -19,7 +19,9 @@ import {
   IUserRepository,
   IOutcomeRepository,
   IFeedbackRepository,
-  IInterventionRepository
+  IInterventionRepository,
+  IDecisionChoiceRepository,
+  ICheckInScheduleRepository
 } from '../repositories/interfaces';
 
 import { SqlitePersonalContextRepository } from '../repositories/personal-context.repository';
@@ -30,6 +32,8 @@ import { SqliteUserRepository } from '../repositories/user.repository';
 import { SqliteOutcomeRepository } from '../repositories/outcome.repository';
 import { SqliteFeedbackRepository } from '../repositories/feedback.repository';
 import { SqliteInterventionRepository } from '../repositories/intervention.repository';
+import { SqliteDecisionChoiceRepository } from '../repositories/decision-choice.repository';
+import { SqliteCheckInScheduleRepository } from '../repositories/check-in-schedule.repository';
 
 import { DynamoPersonalContextRepository } from '../repositories/dynamo/personal-context.repository';
 import { DynamoDecisionRepository } from '../repositories/dynamo/decision.repository';
@@ -57,6 +61,8 @@ let userRepo: IUserRepository | null = null;
 let outcomeRepo: IOutcomeRepository | null = null;
 let feedbackRepo: IFeedbackRepository | null = null;
 let interventionRepo: IInterventionRepository | null = null;
+let decisionChoiceRepo: IDecisionChoiceRepository | null = null;
+let checkInScheduleRepo: ICheckInScheduleRepository | null = null;
 
 
 const isDynamo = process.env.PERSISTENCE_PROVIDER === 'dynamodb';
@@ -101,6 +107,16 @@ export function getInterventionRepository(): IInterventionRepository {
   return interventionRepo;
 }
 
+export function getDecisionChoiceRepository(): IDecisionChoiceRepository {
+  if (!decisionChoiceRepo) decisionChoiceRepo = new SqliteDecisionChoiceRepository();
+  return decisionChoiceRepo;
+}
+
+export function getCheckInScheduleRepository(): ICheckInScheduleRepository {
+  if (!checkInScheduleRepo) checkInScheduleRepo = new SqliteCheckInScheduleRepository();
+  return checkInScheduleRepo;
+}
+
 
 export function getContextEngine(): IContextEngine {
   if (!contextEngine) {
@@ -126,7 +142,10 @@ export function getDecisionEngine(): IDecisionEngine {
   if (!decisionEngine) {
     decisionEngine = new MockDecisionEngine(
       getLLMProvider(),
-      getContextEngine()
+      getContextEngine(),
+      getDecisionRepository(),
+      getDecisionChoiceRepository(),
+      getOutcomeRepository()
     );
   }
   return decisionEngine;

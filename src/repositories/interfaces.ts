@@ -1,4 +1,4 @@
-import { User, Decision, Observation, CalendarEvent, Outcome, Feedback, DecisionStatus, ContextAttribute, Intervention, InterventionStatus } from '../domain/types';
+import { User, Decision, Observation, CalendarEvent, Outcome, Feedback, DecisionStatus, ContextAttribute, Intervention, InterventionStatus, DecisionChoice, CheckInSchedule, CheckInStatus } from '../domain/types';
 
 export type Awaitable<T> = T | Promise<T>;
 
@@ -46,9 +46,10 @@ export interface IObservationRepository {
 
 export interface IOutcomeRepository {
   findById(id: string): Awaitable<Outcome | null>;
-  findByDecisionId(decisionId: string): Awaitable<Outcome[]>;
+  findByDecisionId(decisionId: string): Awaitable<Outcome | null>;
   findByUserId(userId: string, limit?: number): Awaitable<Outcome[]>;
-  create(outcome: Omit<Outcome, 'id' | 'createdAt'>): Awaitable<Outcome>;
+  create(outcome: Omit<Outcome, 'id' | 'createdAt' | 'updatedAt'>): Awaitable<Outcome>;
+  update(id: string, updates: Partial<Pick<Outcome, 'outcomeStatus' | 'wouldRepeat' | 'outcomeNotes'>>): Awaitable<Outcome | null>;
 }
 
 export interface IPersonalContextRepository {
@@ -66,4 +67,22 @@ export interface IUserRepository {
   create(user: Omit<User, 'createdAt' | 'updatedAt'>): Awaitable<User>;
   update(id: string, updates: Partial<Omit<User, 'id' | 'createdAt' | 'updatedAt'>>): Awaitable<User | null>;
 }
+
+export interface IDecisionChoiceRepository {
+  findById(id: string): Awaitable<DecisionChoice | null>;
+  findByDecisionId(decisionId: string): Awaitable<DecisionChoice | null>;
+  findByUserId(userId: string, limit?: number): Awaitable<DecisionChoice[]>;
+  create(choice: Omit<DecisionChoice, 'id' | 'createdAt'>): Awaitable<DecisionChoice>;
+}
+
+export interface ICheckInScheduleRepository {
+  findById(id: string): Awaitable<CheckInSchedule | null>;
+  findByDecisionId(decisionId: string): Awaitable<CheckInSchedule | null>;
+  findPendingByUserId(userId: string): Awaitable<CheckInSchedule[]>;
+  findDueCheckIns(userId: string, currentTime: Date): Awaitable<CheckInSchedule[]>;
+  create(schedule: Omit<CheckInSchedule, 'id' | 'createdAt'>): Awaitable<CheckInSchedule>;
+  updateStatus(id: string, status: CheckInStatus, triggeredAt?: Date): Awaitable<CheckInSchedule | null>;
+  dismiss(id: string, dismissedAt?: Date): Awaitable<CheckInSchedule | null>;
+}
+
 
