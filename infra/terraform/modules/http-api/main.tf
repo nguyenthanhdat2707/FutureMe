@@ -17,6 +17,7 @@ resource "aws_apigatewayv2_authorizer" "jwt" {
   jwt_configuration {
     audience = [var.user_pool_client_id]
     issuer   = var.user_pool_issuer
+
   }
 }
 
