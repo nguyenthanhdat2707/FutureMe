@@ -19,15 +19,56 @@
 - Migrated 14 v3 opacity occurrences to v4 slash syntax across 5 files
 - Build verified successful (1.56s, no warnings)
 
-**Next:** Phase 1 - Dashboard
+---
+
+### Phase 1: Dashboard
+**Status:** ACCEPTED — CHECKPOINT COMPLETE
+**Branch:** feat/mvp-refactor
+**Base checkpoint:** 539e70a
+**Dashboard checkpoint commit:** 23291da
+
+**Completed:**
+- Created `dashboard-utils.ts` with calendar range, event filtering, workload calculation, deadline extraction, smart suggestion heuristic (215 lines)
+- Added EventCategory type system: deep_work, meeting, deadline, recovery, other
+- Implemented parseEventMetadata to read category + meetingLink from CalendarEvent.rawData JSON
+- Extended CalendarEvent type with optional status + rawData fields
+- Created comprehensive test suite: dashboard-utils.test.ts (94 lines)
+- Updated phase4-demo-data.test.ts with category + meetingLink validation
+- Added valid category metadata to all 16 Phase 4 calendar fixtures and an HTTPS meeting link to the focused-builder sync fixture
+- Replaced the legacy Calendar page with the vertical weekly Dashboard UI wired to the existing derivation helpers
+- Implemented the seven-day Gantt, mobile daily agenda, overlapping-event lanes, out-of-hours summary, conditional meeting links, deadline cards, exactly three task-type bubbles, and deterministic explained suggestions
+- Preserved sync, loading, error, empty, and proactive-intervention states; sync reloads status, events, context, and interventions
+- Corrected the task link to the existing `/context` route and verified the responsive 7-day/tablet and daily/mobile layouts
+
+**Verification:**
+- Backend: 22 suites, 163/163 tests pass; lint and build pass
+- Frontend: 11 files, 65/65 tests pass; lint and production build pass
+- Focused Dashboard: 2 files, 9/9 tests pass
+- Browser smoke with deterministic demo fixture: desktop 1280px and tablet 800px render seven Gantt days; mobile 390px renders one selected day; conditional Join link, three workload bubbles, two suggestions, overlapping event lanes, and no page-level horizontal overflow verified
+- Independent Antigravity review found the demo metadata compliant and no test/build regressions; its actionable route, overlap, clamping, breakpoint, and accessibility findings were repaired or verified against the explicit responsive spec
+- Scoped `git diff --check` passes
+
+**Demo Direction:**
+- Demo mode is the MVP path; Cognito is not required for this refactor/demo flow
+- Keep the six deterministic personas as distinct user profiles and enrich their examples so each exposes a different user need and a visible Future Me capability
+- Demo data must remain synthetic, deterministic, editable, and separate from authoritative core decision logic
+
+**Blockers:** None
+
+**Remaining non-blocking items:**
+- Run the Product Owner browser sweep across all six demo personas and enrich persona-specific weekly examples where they materially improve the demo
+- Add server-side bounded calendar range support before arbitrary past/future week navigation must be production-complete; the accepted demo currently filters the returned events client-side
+- Event detail editing and calendar Accept/Deny write-back remain deferred beyond this checkpoint
+
+**Next phase:** Phase 2 — Ask Future Me, using the approved Conversation Facade approach
 
 ---
 
 ## Current Status
 
-**IMPLEMENTATION IN PROGRESS**
+**DASHBOARD CHECKPOINT COMPLETE; ASK FUTURE ME IS NEXT**
 
-This document records findings from repository inspection and tracks implementation progress.
+Phase 0 and the Phase 1 Dashboard checkpoint are complete on `feat/mvp-refactor`. The Dashboard implementation is committed at `23291da`; the next implementation phase is Ask Future Me after this branch is merged and a fresh feature branch is created from updated `main`.
 
 **Approved Decisions (2026-09-24):**
 1. Ask Future Me: Conversation Facade (frontend-only state, preserve Decision Engine)
@@ -45,7 +86,9 @@ This document records findings from repository inspection and tracks implementat
 
 ---
 
-## Executive Summary
+## Historical Baseline Assessment (Pre-Implementation)
+
+The gap analysis below is preserved as the pre-refactor audit. Its "Current State" labels describe the repository before the completed Phase 0 and Dashboard checkpoint; use the Implementation Progress and Current Status sections above for the authoritative present state.
 
 Future Me has working business logic (Decision Engine, Context Engine, demo personas) but significant gaps between current UI and approved specifications. Most gaps are **UI-only** or require **demo data**, not business logic changes.
 
