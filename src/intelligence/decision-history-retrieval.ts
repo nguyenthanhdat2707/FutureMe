@@ -8,8 +8,7 @@
 import { 
   HistoricalDecision, 
   DecisionCategory,
-  DecisionQuery,
-  OutcomeStatus
+  DecisionQuery
 } from '../domain/types';
 import { IDecisionRepository, IDecisionChoiceRepository, IOutcomeRepository } from '../repositories/interfaces';
 

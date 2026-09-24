@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/require-await, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unused-vars */
 import { MockDecisionEngine } from '../intelligence/mock-decision-engine';
 import { IContextEngine } from '../intelligence/interfaces';
 import { ILLMProvider, LLMMessage } from '../adapters/llm-provider.interface';

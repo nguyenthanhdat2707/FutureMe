@@ -4,7 +4,7 @@
  * Schedules outcome check-ins based on event timing or time-based defaults.
  */
 
-import { DecisionQuery, DecisionChoice, ChoiceStatus } from '../domain/types';
+import { DecisionQuery, DecisionChoice } from '../domain/types';
 import { ICalendarEventRepository, ICheckInScheduleRepository } from '../repositories/interfaces';
 
 /**
