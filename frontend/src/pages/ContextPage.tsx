@@ -89,7 +89,7 @@ function ContextPage() {
 
     const badges: Record<string, { label: string; color: string; bgColor: string }> = {
       USER_CONFIRMED: { label: 'Confirmed', color: 'text-green-600', bgColor: 'bg-green-50' },
-      SYSTEM_INFERRED: { label: 'AI Inferred', color: 'text-accent-ai', bgColor: 'bg-accent-ai bg-opacity-10' },
+      SYSTEM_INFERRED: { label: 'AI Inferred', color: 'text-accent-ai', bgColor: 'bg-accent-ai/10' },
       SYSTEM_OBSERVED: { label: 'Observed', color: 'text-blue-600', bgColor: 'bg-blue-50' },
       CALENDAR: { label: 'From Calendar', color: 'text-purple-600', bgColor: 'bg-purple-50' },
       HISTORICAL_PATTERN: { label: 'From Pattern', color: 'text-amber-600', bgColor: 'bg-amber-50' },
@@ -226,7 +226,7 @@ function ContextPage() {
                     )}
                   </div>
                   <div className="flex items-center gap-2 ml-4">
-                    <span className={`px-2 py-1 bg-opacity-10 text-xs font-medium rounded ${
+                    <span className={`px-2 py-1 text-xs font-medium rounded ${
                       goal.priority === 'high' ? 'bg-accent-warning text-accent-warning' :
                       goal.priority === 'medium' ? 'bg-accent-intention text-accent-intention' :
                       'bg-slate-200 text-text-secondary'
@@ -327,7 +327,7 @@ function ContextPage() {
                           {new Date(commitment.startTime).toLocaleString()} - {new Date(commitment.endTime).toLocaleString()}
                         </p>
                         {commitment.recurring && (
-                          <span className="inline-block mt-2 px-2 py-1 bg-accent-intention bg-opacity-10 text-accent-intention text-xs font-medium rounded">
+                          <span className="inline-block mt-2 px-2 py-1 bg-accent-intention/10 text-accent-intention text-xs font-medium rounded">
                             RECURRING
                           </span>
                         )}

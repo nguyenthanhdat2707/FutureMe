@@ -156,7 +156,7 @@ function DemoPage() {
                 <button
                   type="button"
                   onClick={() => choosePersona(persona.id)}
-                  className="px-4 py-2 bg-accent-ai text-white rounded-lg text-sm font-medium hover:bg-opacity-90"
+                  className="px-4 py-2 bg-accent-ai text-white rounded-lg text-sm font-medium hover:bg-accent-ai/90"
                 >
                   {active ? 'Open this persona' : 'Use this persona'}
                 </button>
