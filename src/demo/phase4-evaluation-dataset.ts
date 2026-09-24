@@ -144,12 +144,20 @@ export function generatePhase4Dataset(seededAt: Date): GeneratedDataset {
       type: 'CONTEXT_CHANGE', data: JSON.stringify({ detail }), source: ObservationSource.SYSTEM_OBSERVED,
       timestamp: observedAt.toISOString(), confidence: 1, created_at: timestamp,
     });
-    const addCalendar = (purpose: string, title: string, startOffset: number, endOffset: number) => records.calendarEvents.push({
+    const addCalendar = (
+      purpose: string,
+      title: string,
+      startOffset: number,
+      endOffset: number,
+      category: 'deep_work' | 'meeting' | 'deadline' | 'recovery' | 'other',
+      meetingLink?: string,
+    ) => records.calendarEvents.push({
       ...base, id: generatePhase4Id('calendar-events', persona.slug, purpose), user_id: owner,
       external_id: `phase4-${persona.slug}-${purpose}`, title,
       start_time: new Date(seededAt.getTime() + startOffset).toISOString(),
       end_time: new Date(seededAt.getTime() + endOffset).toISOString(), status: 'CONFIRMED',
-      raw_data: JSON.stringify({ summary: title }), synced_at: timestamp, created_at: timestamp,
+      raw_data: JSON.stringify({ summary: title, category, ...(meetingLink ? { meetingLink } : {}) }),
+      synced_at: timestamp, created_at: timestamp,
     });
 
     const old = new Date(seededAt.getTime() - 86_400_000);
@@ -164,34 +172,34 @@ export function generatePhase4Dataset(seededAt: Date): GeneratedDataset {
       addContext('preference', 'preference:work', { id: 'deep-work', value: 'morning' }, ObservationSource.USER_CONFIRMED, 1, old);
       addContext('commitment', 'commitment:launch', { id: 'launch', value: 'v1' }, ObservationSource.USER_CONFIRMED, 1, old);
       addObservation('focus', 'Started deep work focus.', recent);
-      addCalendar('deep-work', 'Deep Work', 3_600_000, 7_200_000);
-      addCalendar('sync', 'Sync', 7_200_000, 10_800_000);
+      addCalendar('deep-work', 'Deep Work', 3_600_000, 7_200_000, 'deep_work');
+      addCalendar('sync', 'Sync', 7_200_000, 10_800_000, 'meeting', 'https://meet.example.com/phase4-focused-builder-sync');
     } else if (persona.slug === 'busy-balancer') {
       addContext('goal-health', 'goal:health', { id: 'health', priority: 'high' }, ObservationSource.USER_CONFIRMED, 1, old);
       addContext('goal-balance', 'goal:balance', { id: 'balance', priority: 'medium' }, ObservationSource.USER_CONFIRMED, 1, old);
       addContext('preference', 'preference:work', { id: 'pace', value: 'steady' }, ObservationSource.USER_CONFIRMED, 1, old);
       addObservation('meetings', 'Meeting volume increased.', old);
       addObservation('capacity', 'Capacity constrained.', recent);
-      for (let index = 0; index < 4; index += 1) addCalendar(`meeting-${index}`, `Meeting ${index + 1}`, (index * 3 + 1) * 3_600_000, (index * 3 + 2) * 3_600_000);
+      for (let index = 0; index < 4; index += 1) addCalendar(`meeting-${index}`, `Meeting ${index + 1}`, (index * 3 + 1) * 3_600_000, (index * 3 + 2) * 3_600_000, 'meeting');
     } else if (persona.slug === 'overloaded-lead') {
       addContext('goal-delivery', 'goal:delivery', { id: 'delivery', priority: 'high' }, ObservationSource.USER_CONFIRMED, 1, old);
       addContext('preference', 'preference:work', { id: 'pace', value: 'fast' }, ObservationSource.USER_CONFIRMED, 1, old);
       addContext('expired', 'goal:expired', { id: 'expired', priority: 'low' }, ObservationSource.USER_CONFIRMED, 1, expired, old);
       addObservation('interruptions', 'Heavy interruptions.', old);
       addObservation('burnout', 'Burnout risk detected.', recent);
-      for (let index = 0; index < 6; index += 1) addCalendar(`review-${index}`, `Review ${index + 1}`, (index + 1) * 3_600_000, (index + 2) * 3_600_000);
+      for (let index = 0; index < 6; index += 1) addCalendar(`review-${index}`, `Review ${index + 1}`, (index + 1) * 3_600_000, (index + 2) * 3_600_000, 'meeting');
     } else if (persona.slug === 'needs-clarity' || persona.slug === 'uncertain-skipper') {
       addContext('goal', `goal:${persona.slug}`, { id: persona.slug, priority: 'medium' }, ObservationSource.USER_CONFIRMED, 1, old);
       addObservation('uncertainty', 'Availability is unresolved.', old);
-      addCalendar('space', 'Free Time', 3_600_000, 7_200_000);
+      addCalendar('space', 'Free Time', 3_600_000, 7_200_000, 'recovery');
     } else {
       addContext('conflict-a', 'goal:compete', { id: 'compete', priority: 'high', value: 'win' }, ObservationSource.USER_CONFIRMED, 1, old);
       addContext('conflict-b', 'goal:compete', { id: 'compete', priority: 'low', value: 'lose' }, ObservationSource.USER_CONFIRMED, 1, old);
       addContext('other-goal', 'goal:other', { id: 'other', priority: 'medium' }, ObservationSource.USER_CONFIRMED, 1, old);
       addContext('preference', 'preference:color', { id: 'color', value: 'blue' }, ObservationSource.USER_CONFIRMED, 1, old);
       addObservation('conflict', 'Competing priorities detected.', old);
-      addCalendar('event-a', 'Event A', 3_600_000, 7_200_000);
-      addCalendar('event-b', 'Event B', 10_800_000, 14_400_000);
+      addCalendar('event-a', 'Event A', 3_600_000, 7_200_000, 'other');
+      addCalendar('event-b', 'Event B', 10_800_000, 14_400_000, 'other');
     }
   }
 

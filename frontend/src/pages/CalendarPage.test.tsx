@@ -1,6 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import CalendarPage from './CalendarPage';
 import { api } from '../api/client';
 import { ObservationSource, type CalendarEvent, type PersonalContext } from '../types/domain';
@@ -64,6 +65,12 @@ const events = [
   calendarEvent('rest', 'Run and reflect', 2, 16, 17, 'recovery'),
 ];
 
+const renderDashboard = () => render(
+  <MemoryRouter>
+    <CalendarPage />
+  </MemoryRouter>,
+);
+
 describe('CalendarPage dashboard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -73,7 +80,7 @@ describe('CalendarPage dashboard', () => {
   });
 
   it('renders the vertical dashboard, bounded Gantt, and three insight cards', async () => {
-    render(<CalendarPage />);
+    renderDashboard();
 
     expect(await screen.findByRole('heading', { name: 'Your Week' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Weekly Gantt calendar' })).toBeInTheDocument();
@@ -81,10 +88,11 @@ describe('CalendarPage dashboard', () => {
     expect(screen.getByRole('heading', { name: 'Upcoming Deadlines' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Workload Distribution' })).toBeInTheDocument();
     expect(screen.getByText('Future Me MVP')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /view all tasks/i })).toHaveAttribute('href', '/context');
   });
 
   it('shows at least two explained deterministic suggestions', async () => {
-    render(<CalendarPage />);
+    renderDashboard();
     const suggestions = await screen.findAllByTestId('smart-suggestion');
     expect(suggestions.length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText('Schedule deep work')).toBeInTheDocument();
@@ -93,7 +101,7 @@ describe('CalendarPage dashboard', () => {
   });
 
   it('shows a meeting link only when rawData includes one', async () => {
-    render(<CalendarPage />);
+    renderDashboard();
     const join = await screen.findByRole('link', { name: /join team sync/i });
     expect(join).toHaveAttribute('href', 'https://meet.example.test/team');
     expect(screen.queryByRole('link', { name: /join future me mvp/i })).not.toBeInTheDocument();
@@ -101,7 +109,7 @@ describe('CalendarPage dashboard', () => {
 
   it('syncs and reloads all dashboard data', async () => {
     vi.mocked(api.calendar.sync).mockResolvedValue({ success: true, synced: 3, timestamp: new Date().toISOString() });
-    render(<CalendarPage />);
+    renderDashboard();
     fireEvent.click(await screen.findByRole('button', { name: 'Sync calendar' }));
     await waitFor(() => expect(api.calendar.sync).toHaveBeenCalledTimes(1));
     expect(api.calendar.getEvents).toHaveBeenCalledTimes(2);
