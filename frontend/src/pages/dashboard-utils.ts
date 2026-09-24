@@ -1,7 +1,7 @@
 import type { CalendarEvent, PersonalContext } from '../types/domain';
 
 export type EventCategory = 'deep_work' | 'meeting' | 'deadline' | 'recovery' | 'other';
-export type WorkloadCategory = 'deep_work' | 'meeting' | 'other';
+export type WorkloadCategory = 'deep_work' | 'meeting' | 'recovery';
 
 export interface EventMetadata {
   category: EventCategory;
@@ -20,11 +20,13 @@ export interface WorkloadSlice {
   percentage: number;
 }
 
+export type DeadlineUrgency = 'overdue' | 'today' | 'tomorrow' | 'this week';
+
 export interface DashboardDeadline {
   id: string;
   title: string;
   deadline: Date;
-  urgency: 'today' | 'tomorrow' | 'this week';
+  urgency: DeadlineUrgency;
   kind: 'commitment' | 'goal';
   priority: 'high' | 'medium';
 }
@@ -37,11 +39,26 @@ export interface SmartSuggestion {
   proposedTime?: Date;
 }
 
+export interface EventLaneInfo {
+  lane: number;
+  totalLanes: number;
+  visibleStart: number;
+  visibleEnd: number;
+}
+
+export const WORKDAY_START = 9;
+export const WORKDAY_END = 17;
 const DAY_MS = 86_400_000;
 const VALID_CATEGORIES = new Set<EventCategory>(['deep_work', 'meeting', 'deadline', 'recovery', 'other']);
 
 export function startOfDay(value: Date): Date {
   return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+}
+
+export function startOfWeek(value: Date): Date {
+  const day = startOfDay(value);
+  const offset = (day.getDay() + 6) % 7;
+  return addDays(day, -offset);
 }
 
 export function addDays(value: Date, amount: number): Date {
@@ -86,16 +103,17 @@ export function filterEventsToRange(events: CalendarEvent[], start: Date, end: D
 }
 
 export function calculateWorkload(events: CalendarEvent[]): WorkloadSlice[] {
-  const hours: Record<WorkloadCategory, number> = { deep_work: 0, meeting: 0, other: 0 };
+  const hours: Record<WorkloadCategory, number> = { deep_work: 0, meeting: 0, recovery: 0 };
   for (const event of events) {
-    const duration = Math.max(0, new Date(event.endTime).getTime() - new Date(event.startTime).getTime()) / 3_600_000;
     const category = parseEventMetadata(event).category;
-    const bucket: WorkloadCategory = category === 'deep_work' || category === 'meeting' ? category : 'other';
-    hours[bucket] += duration;
+    if (category === 'deep_work' || category === 'meeting' || category === 'recovery') {
+      const duration = Math.max(0, new Date(event.endTime).getTime() - new Date(event.startTime).getTime()) / 3_600_000;
+      hours[category] += duration;
+    }
   }
 
-  const total = hours.deep_work + hours.meeting + hours.other;
-  const categories: WorkloadCategory[] = ['deep_work', 'meeting', 'other'];
+  const total = hours.deep_work + hours.meeting + hours.recovery;
+  const categories: WorkloadCategory[] = ['deep_work', 'meeting', 'recovery'];
   let allocated = 0;
   return categories.map((category, index) => {
     const percentage = total === 0 ? 0 : index === categories.length - 1
@@ -106,42 +124,163 @@ export function calculateWorkload(events: CalendarEvent[]): WorkloadSlice[] {
   });
 }
 
+export function computeEventLanes(events: CalendarEvent[], day: Date): Map<string, EventLaneInfo> {
+  const dayStart = new Date(day);
+  dayStart.setHours(WORKDAY_START, 0, 0, 0);
+  const dayEnd = new Date(day);
+  dayEnd.setHours(WORKDAY_END, 0, 0, 0);
+
+  const visibleItems = events
+    .map((event) => {
+      const start = new Date(event.startTime).getTime();
+      const end = new Date(event.endTime).getTime();
+      const visibleStart = Math.max(start, dayStart.getTime());
+      const visibleEnd = Math.min(end, dayEnd.getTime());
+      return { event, visibleStart, visibleEnd };
+    })
+    .filter((item) => item.visibleEnd > item.visibleStart)
+    .sort((left, right) => {
+      if (left.visibleStart !== right.visibleStart) return left.visibleStart - right.visibleStart;
+      if (left.visibleEnd !== right.visibleEnd) return right.visibleEnd - left.visibleEnd;
+      return left.event.id.localeCompare(right.event.id);
+    });
+
+  const clusters: typeof visibleItems[] = [];
+  let currentCluster: typeof visibleItems = [];
+  let currentClusterEnd = -Infinity;
+
+  for (const item of visibleItems) {
+    if (currentCluster.length > 0 && item.visibleStart < currentClusterEnd) {
+      currentCluster.push(item);
+      currentClusterEnd = Math.max(currentClusterEnd, item.visibleEnd);
+    } else {
+      if (currentCluster.length > 0) clusters.push(currentCluster);
+      currentCluster = [item];
+      currentClusterEnd = item.visibleEnd;
+    }
+  }
+  if (currentCluster.length > 0) clusters.push(currentCluster);
+
+  const results = new Map<string, EventLaneInfo>();
+  for (const cluster of clusters) {
+    const laneEndTimes: number[] = [];
+    const assignments: Array<{ id: string; lane: number; visibleStart: number; visibleEnd: number }> = [];
+
+    for (const item of cluster) {
+      let assignedLane = -1;
+      for (let l = 0; l < laneEndTimes.length; l++) {
+        if (laneEndTimes[l] <= item.visibleStart) {
+          assignedLane = l;
+          laneEndTimes[l] = item.visibleEnd;
+          break;
+        }
+      }
+      if (assignedLane === -1) {
+        assignedLane = laneEndTimes.length;
+        laneEndTimes.push(item.visibleEnd);
+      }
+      assignments.push({ id: item.event.id, lane: assignedLane, visibleStart: item.visibleStart, visibleEnd: item.visibleEnd });
+    }
+
+    const totalLanes = Math.max(1, laneEndTimes.length);
+    for (const { id, lane, visibleStart, visibleEnd } of assignments) {
+      results.set(id, { lane, totalLanes, visibleStart, visibleEnd });
+    }
+  }
+
+  return results;
+}
+
 function dayDistance(from: Date, to: Date): number {
   return Math.round((startOfDay(to).getTime() - startOfDay(from).getTime()) / DAY_MS);
 }
 
-export function buildDeadlines(context: PersonalContext | null, now: Date): DashboardDeadline[] {
+export function buildDeadlines(
+  context: PersonalContext | null,
+  rangeStart: Date,
+  now: Date = rangeStart,
+): DashboardDeadline[] {
   if (!context) return [];
-  const end = addDays(now, 7).getTime();
+  const weekStart = startOfWeek(rangeStart);
+  const currentWeek = startOfWeek(now);
+  const isCurrentWeek = weekStart.getTime() === currentWeek.getTime();
+  const rangeEnd = addDays(weekStart, 7);
   const candidates: DashboardDeadline[] = [];
 
+  const checkItem = (
+    id: string,
+    title: string,
+    rawDeadline: Date | string | undefined,
+    kind: 'commitment' | 'goal',
+    basePriority: 'high' | 'medium' | 'low',
+    validUntil?: string,
+  ) => {
+    if (!rawDeadline) return;
+    const deadline = new Date(rawDeadline);
+    if (isNaN(deadline.getTime())) return;
+
+    if (validUntil && new Date(validUntil).getTime() < now.getTime()) {
+      return;
+    }
+
+    const isOverdue = deadline.getTime() < now.getTime();
+
+    if (isCurrentWeek) {
+      if (isOverdue) {
+        candidates.push({
+          id,
+          title,
+          deadline,
+          urgency: 'overdue',
+          kind,
+          priority: 'high',
+        });
+      } else if (deadline.getTime() < rangeEnd.getTime()) {
+        const days = dayDistance(now, deadline);
+        candidates.push({
+          id,
+          title,
+          deadline,
+          urgency: days <= 0 ? 'today' : days === 1 ? 'tomorrow' : 'this week',
+          kind,
+          priority: basePriority === 'high' || days <= 1 ? 'high' : 'medium',
+        });
+      }
+    } else {
+      if (deadline.getTime() >= weekStart.getTime() && deadline.getTime() < rangeEnd.getTime()) {
+        const days = dayDistance(rangeStart, deadline);
+        candidates.push({
+          id,
+          title,
+          deadline,
+          urgency: isOverdue ? 'overdue' : days <= 0 ? 'today' : days === 1 ? 'tomorrow' : 'this week',
+          kind,
+          priority: isOverdue || basePriority === 'high' || days <= 1 ? 'high' : 'medium',
+        });
+      }
+    }
+  };
+
   for (const commitment of context.commitments) {
-    const deadline = new Date(commitment.endTime);
-    if (deadline.getTime() < now.getTime() || deadline.getTime() > end) continue;
-    const days = dayDistance(now, deadline);
-    candidates.push({
-      id: `commitment-${commitment.id}`,
-      title: commitment.description,
-      deadline,
-      urgency: days <= 0 ? 'today' : days === 1 ? 'tomorrow' : 'this week',
-      kind: 'commitment',
-      priority: days <= 1 ? 'high' : 'medium',
-    });
+    checkItem(
+      `commitment-${commitment.id}`,
+      commitment.description,
+      commitment.endTime,
+      'commitment',
+      'medium',
+      commitment.validUntil,
+    );
   }
 
   for (const goal of context.goals) {
-    if (!goal.deadline) continue;
-    const deadline = new Date(goal.deadline);
-    if (deadline.getTime() < now.getTime() || deadline.getTime() > end) continue;
-    const days = dayDistance(now, deadline);
-    candidates.push({
-      id: `goal-${goal.id}`,
-      title: goal.description,
-      deadline,
-      urgency: days <= 0 ? 'today' : days === 1 ? 'tomorrow' : 'this week',
-      kind: 'goal',
-      priority: goal.priority === 'high' || days <= 1 ? 'high' : 'medium',
-    });
+    checkItem(
+      `goal-${goal.id}`,
+      goal.description,
+      goal.deadline,
+      'goal',
+      goal.priority === 'high' ? 'high' : 'medium',
+      goal.validUntil,
+    );
   }
 
   return candidates.sort((left, right) => left.deadline.getTime() - right.deadline.getTime()).slice(0, 3);

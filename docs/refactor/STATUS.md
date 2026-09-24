@@ -22,7 +22,7 @@
 ---
 
 ### Phase 1: Dashboard
-**Status:** ACCEPTED — CHECKPOINT COMPLETE
+**Status:** READY_FOR_USER_TEST — SPEC-STRICT UI REBUILD COMPLETE
 **Branch:** feat/mvp-refactor
 **Base checkpoint:** 539e70a
 **Dashboard checkpoint commit:** 23291da
@@ -38,12 +38,16 @@
 - Replaced the legacy Calendar page with the vertical weekly Dashboard UI wired to the existing derivation helpers
 - Implemented the seven-day Gantt, mobile daily agenda, overlapping-event lanes, out-of-hours summary, conditional meeting links, deadline cards, exactly three task-type bubbles, and deterministic explained suggestions
 - Preserved sync, loading, error, empty, and proactive-intervention states; sync reloads status, events, context, and interventions
-- Corrected the task link to the existing `/context` route and verified the responsive 7-day/tablet and daily/mobile layouts
+- Linked Dashboard tasks to `/understanding` (with `/context` retained as a compatibility redirect) and verified the responsive 7-day/tablet and daily/mobile layouts
+- Rebuilt the authenticated shell from the approved Markdown spec: removed the legacy AppShell, both sidebars, old Today timeline, old Calendar presentation, and Demo persona card from the active codebase
+- Added the approved top navigation, `/dashboard` default route, top-right profile/persona control, fresh Dashboard component hierarchy, event detail dialog/mobile sheet, shared week control, and per-surface retry states
+- Corrected planned-time allocation so only explicit deep-work, meeting, and recovery categories count; uncategorized events no longer become false recovery time
+- Added deterministic overlap lanes, active overdue-deadline treatment, and a viewport-balanced Gantt height (`clamp(22rem, 50vh, 30rem)`)
 
 **Verification:**
 - Backend: 22 suites, 163/163 tests pass; lint and build pass
-- Frontend: 11 files, 65/65 tests pass; lint and production build pass
-- Focused Dashboard: 2 files, 9/9 tests pass
+- Frontend: 12 files, 68/68 tests pass; lint and production build pass
+- Focused Dashboard: dashboard utility and page tests pass, including truthful allocation, overlap lanes, overdue deadlines, event detail, category highlighting, and sync reload
 - Browser smoke with deterministic demo fixture: desktop 1280px and tablet 800px render seven Gantt days; mobile 390px renders one selected day; conditional Join link, three workload bubbles, two suggestions, overlapping event lanes, and no page-level horizontal overflow verified
 - Independent Antigravity review found the demo metadata compliant and no test/build regressions; its actionable route, overlap, clamping, breakpoint, and accessibility findings were repaired or verified against the explicit responsive spec
 - Scoped `git diff --check` passes
@@ -58,7 +62,7 @@
 **Remaining non-blocking items:**
 - Run the Product Owner browser sweep across all six demo personas and enrich persona-specific weekly examples where they materially improve the demo
 - Add server-side bounded calendar range support before arbitrary past/future week navigation must be production-complete; the accepted demo currently filters the returned events client-side
-- Event detail editing and calendar Accept/Deny write-back remain deferred beyond this checkpoint
+- Calendar event editing and persisted suggestion Accept/Deny write-back remain deferred beyond this checkpoint; the current suggestion controls are explicitly local-only acknowledgements
 
 **Next phase:** Phase 2 — Ask Future Me, using the approved Conversation Facade approach
 
