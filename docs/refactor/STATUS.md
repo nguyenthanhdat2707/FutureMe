@@ -770,3 +770,25 @@ Evidence shows:
 - Confirm deployed frontend sends `x-demo-user: phase4-eval-v2:<persona>` in browser  
 - Confirm Dashboard Gantt renders populated calendars for all 6 personas  
 - Confirm no console errors from these fixes
+
+### BROWSER VERIFICATION COMPLETE (Amplify build #34 — 2026-09-25)
+
+**Persona header verification:**  
+`localStorage.getItem('future-me-demo-persona')` returns `phase4-eval-v2:<slug>` for every selected persona. Confirmed in deployed browser session.
+
+**Six-persona calendar verification:**
+
+| Persona | x-demo-user header | Gantt renders events? | Sample events |
+|---|---|---|---|
+| focused-builder | phase4-eval-v2:focused-builder | YES | Deep Work, Team Sync, Code Review, 1:1 with Manager, Sprint Planning, Feature Demo, Weekly Review |
+| busy-balancer | phase4-eval-v2:busy-balancer | YES | Daily Standup, Deep Work, 1:1 with Lead, Client Call |
+| overloaded-lead | phase4-eval-v2:overloaded-lead | YES | Daily Standup, Incident Review, 1:1 Alpha, Lunch Briefing |
+| needs-clarity | phase4-eval-v2:needs-clarity | YES | Focus Block, Team Sync, Research Block, Planning Notes |
+| uncertain-skipper | phase4-eval-v2:uncertain-skipper | YES | Team Standup, Conference Talk Prep (Tentative), Lunch with Client |
+| conflict-check | phase4-eval-v2:conflict-check | YES | Important Deep Work, All-hands (Overlap), Lunch, Sprint Plan |
+
+**Intervention endpoint:** No "No events in this range" shown. Disruption Alert intervention renders for focused-builder (correct — intervention policy triggered on active decision).
+
+**Console errors:** None related to these fixes. Only [role="alert"] present is the Disruption Alert intervention (expected behavior).
+
+**All acceptance gates PASSED.**
