@@ -21,7 +21,81 @@
 
 ---
 
-### Phase 1: Dashboard
+### Phase 1: Dashboard UI Rebuild
+**Status:** COMPLETE (merged to main via PR #36 / c16d5f2)  
+**Branch:** feat/mvp-refactor → origin/main
+
+**Completed:**
+- Removed legacy AppShell, left/right sidebars, old Today timeline, old Calendar page
+- Added top navigation, `/dashboard` default route, persona/profile control top-right
+- Desktop/tablet weekly Gantt with overlapping-event lanes
+- Mobile daily agenda
+- Event detail dialog, conditional meeting links, deadline cards
+- Three workload bubbles, deterministic suggestions heuristic
+- Loading/error/empty/retry states
+
+---
+
+### Phase 1b: Dashboard Demo Calendar Data Fix
+**Status:** READY_FOR_USER_TEST  
+**Branch:** feat/dashboard-demo-calendar (from origin/main / c16d5f2)  
+**Commit:** 741aaea
+
+#### Root Cause
+`GET /api/calendar/events` called `findUpcoming(userId)` with no lower or upper bound — defaulting to "from now, unbounded". MockCalendarAdapter generated 3 generic events at `now+2h/+4h/+24h` identical for every user. Persona seed used millisecond offsets from `seededAt` (not week-anchored), producing events at wrong UTC hours (e.g. 03:00 UTC instead of 09:00 local). Only 16 total calendar events across 6 personas.
+
+#### Solution
+**Backend:**
+- Added `findByRange(userId, from, to)` to `ICalendarEventRepository` interface and both SQLite and Dynamo implementations
+- Dynamo `findUpcoming` limit raised from 50→200
+- `GET /api/calendar/events` now accepts optional `start`/`end` ISO query params; uses `findByRange` when present, falls back to `findUpcoming` for existing callers
+- `MockCalendarAdapter` now generates week-anchored events at sensible local hours (Mon-Fri 09:00–15:00)
+- Bumped `DEMO_SEED_VERSION` to `phase4-eval-v2`
+- Rewrote persona calendar seeding: 94 week-anchored events (was 16), stored as UTC 02–11h = Vietnam 09–18h
+
+**Frontend:**
+- `api.calendar.getEvents()` accepts optional `{ start, end }` range params
+- `DashboardPage` passes the selected week range to every `getEvents` call
+- Week navigation now re-fetches events for the newly displayed week (effect on `rangeStart`)
+- All retry callbacks pass `rangeStart` to `loadData`
+
+#### Seeded Persona Scenarios
+| Persona | Events | Scenario |
+|---|---|---|
+| focused-builder | 12 | Deep-work mornings Mon–Fri, few meetings, clear space |
+| busy-balancer | 18 | Mon–Thu spread, overlapping 1:1/DW on Mon, gym/reading |
+| overloaded-lead | 30 | Mon–Thu packed 8 events/day, standups + meetings + reviews |
+| needs-clarity | 9 | Sparse with Q3 report deadline Friday 17:00 |
+| uncertain-skipper | 11 | Mix of CONFIRMED + TENTATIVE optional events |
+| conflict-check | 14 | Deliberate overlaps Mon/Wed, back-to-back Tue, full-day crunch Thu |
+
+#### Changed Files
+- `src/repositories/interfaces.ts`
+- `src/repositories/calendar-event.repository.ts`
+- `src/repositories/dynamo/calendar-event.repository.ts`
+- `src/routes/calendar.routes.ts`
+- `src/adapters/mock-calendar-adapter.ts`
+- `src/demo/personas.ts`
+- `src/demo/phase4-evaluation-dataset.ts`
+- `src/__tests__/phase4-demo-data.test.ts`
+- `src/__tests__/cognito-identity.test.ts`
+- `src/__tests__/http-auth.test.ts`
+- `src/__tests__/routes.integration.test.ts`
+- `frontend/src/api/client.ts`
+- `frontend/src/pages/DashboardPage.tsx`
+
+#### Test Results
+- Backend: 22 suites, 163/163 tests pass
+- Frontend: 12 suites, 68/68 tests pass
+- Backend build: tsc clean
+- Frontend build: Vite 947ms, no warnings
+
+#### Known Limitations / Deferred
+- `allocationRange='next-week'` and `allocationRange='today'` in the TaskType card still filter client-side from the already-loaded current-week events; those ranges are not separately fetched (acceptable for demo, both ranges are within reasonable window)
+- Browser smoke across all 6 personas not yet completed — awaiting user test
+- Ask Future Me, Understanding, Landing remain separate phases
+
+---
 **Status:** READY_FOR_USER_TEST — SPEC-STRICT UI REBUILD COMPLETE
 **Branch:** feat/mvp-refactor
 **Base checkpoint:** 539e70a

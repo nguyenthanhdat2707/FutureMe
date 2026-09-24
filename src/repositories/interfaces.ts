@@ -17,6 +17,7 @@ export interface ICalendarEventRepository {
   findById(id: string): Awaitable<CalendarEvent | null>;
   findByUserId(userId: string, limit?: number): Awaitable<CalendarEvent[]>;
   findUpcoming(userId: string, fromDate?: Date): Awaitable<CalendarEvent[]>;
+  findByRange(userId: string, from: Date, to: Date): Awaitable<CalendarEvent[]>;
   findByExternalId(userId: string, externalId: string): Awaitable<CalendarEvent | null>;
   create(event: Omit<CalendarEvent, 'id' | 'createdAt'>): Awaitable<CalendarEvent>;
   upsert(event: Omit<CalendarEvent, 'id' | 'createdAt'>): Awaitable<CalendarEvent>;

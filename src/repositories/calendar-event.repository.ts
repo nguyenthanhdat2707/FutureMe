@@ -36,6 +36,16 @@ export class SqliteCalendarEventRepository extends BaseRepository implements ICa
     return rows.map(this.mapToCalendarEvent.bind(this));
   }
 
+  findByRange(userId: string, from: Date, to: Date): Awaitable<CalendarEvent[]> {
+    const rows = this.db.all(`
+      SELECT * FROM calendar_events
+      WHERE user_id = ? AND start_time >= ? AND start_time < ?
+      ORDER BY start_time ASC
+    `, [userId, from.toISOString(), to.toISOString()]);
+
+    return rows.map(this.mapToCalendarEvent.bind(this));
+  }
+
   findByExternalId(userId: string, externalId: string): Awaitable<CalendarEvent | null> {
     const row = this.db.get(`
       SELECT * FROM calendar_events

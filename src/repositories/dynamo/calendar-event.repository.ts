@@ -51,7 +51,22 @@ export class DynamoCalendarEventRepository implements ICalendarEventRepository {
         ":from": from.toISOString()
       },
       ScanIndexForward: true,
-      Limit: 50
+      Limit: 200
+    }));
+    return (response.Items || []).map(i => this.mapToEvent(i as Record<string, unknown>));
+  }
+
+  async findByRange(userId: string, from: Date, to: Date): Promise<CalendarEvent[]> {
+    const response = await this.docClient.send(new QueryCommand({
+      TableName: this.tableName,
+      IndexName: "userId-startTime-index",
+      KeyConditionExpression: "user_id = :userId AND start_time BETWEEN :from AND :to",
+      ExpressionAttributeValues: {
+        ":userId": userId,
+        ":from": from.toISOString(),
+        ":to": to.toISOString()
+      },
+      ScanIndexForward: true
     }));
     return (response.Items || []).map(i => this.mapToEvent(i as Record<string, unknown>));
   }
