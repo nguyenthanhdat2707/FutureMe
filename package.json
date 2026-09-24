@@ -13,10 +13,10 @@
     "lint:fix": "eslint src --ext .ts --fix",
     "test": "jest --coverage",
     "test:watch": "jest --watch",
-    "demo:phase4:plan": "tsx scripts/phase4-evaluation-data.ts plan phase4-eval-v1",
-    "demo:phase4:apply": "tsx scripts/phase4-evaluation-data.ts apply phase4-eval-v1",
-    "demo:phase4:verify": "tsx scripts/phase4-evaluation-data.ts verify phase4-eval-v1",
-    "demo:phase4:rollback": "tsx scripts/phase4-evaluation-data.ts rollback phase4-eval-v1"
+    "demo:phase4:plan": "tsx scripts/phase4-evaluation-data.ts plan phase4-eval-v2",
+    "demo:phase4:apply": "tsx scripts/phase4-evaluation-data.ts apply phase4-eval-v2",
+    "demo:phase4:verify": "tsx scripts/phase4-evaluation-data.ts verify phase4-eval-v2",
+    "demo:phase4:rollback": "tsx scripts/phase4-evaluation-data.ts rollback phase4-eval-v2"
   },
   "keywords": [
     "hackathon",
