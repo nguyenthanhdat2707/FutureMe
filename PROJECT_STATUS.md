@@ -114,7 +114,7 @@ The following are explicitly deferred or non-goals for this MVP:
 - **Explicitly not part of this phase:** Native notifications, advanced JITAI, autonomous action, or custom ML/model training.
 
 ### Phase 6: User choice, outcomes, feedback, and reusable history
-- **Status:** PLANNED
+- **Status:** BACKEND COMPLETE / FRONTEND PAUSED (Awaiting UI/UX Revamp)
 - **Goal:** Capture actual user decisions and real-world outcomes to provide relevant history for future decisions.
 - **Capability boundary:** Choice is separate from recommendation; outcome is separate from feedback. Future decision retrieval uses relevant stored history.
 - **Main deliverables:** Recent decision/history surfaces, choice persistence flow, outcome and feedback capture flows, historical context retrieval.
