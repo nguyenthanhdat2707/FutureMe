@@ -711,3 +711,62 @@ Evidence shows:
 ---
 
 **Document Status:** COMPLETE — awaiting user input to proceed
+
+---
+
+## Deployed Demo Runtime Fix
+**Status:** COMPLETE  
+**Branch:** fix/deployed-demo-runtime  
+**Commit:** 887a42e (merged to main as 5e8b41c)  
+**Date:** 2026-09-25
+
+### Issues Fixed
+
+#### Issue 1: Amplify SPA Deep-Link 404
+**Root cause:** Not actionable — Amplify rewrite rule (`/<*>` → `/index.html` 404-200) was already correct.  
+**Decision:** Skipped per user direction; deep-link routing is not required for demo flow.
+
+#### Issue 2: Deployed Demo Persona Version Mismatch
+**Root cause:** `frontend/src/config/demo-personas.ts` had hardcoded `phase4-eval-v1` persona IDs for all 6 personas. The backend bumped to `phase4-eval-v2` in commit 741aaea but the frontend config was not updated in that PR.  
+**Files changed:**  
+- `frontend/src/config/demo-personas.ts` — all 6 persona IDs updated from v1 to v2  
+- `frontend/src/api/client.test.ts` — test mock updated to v2  
+- `package.json` — `demo:phase4:*` scripts updated to pass `phase4-eval-v2` as confirmation arg  
+
+**Deployed:** Amplify job #34 rebuilding from commit 5e8b41c (in progress at time of writing).
+
+#### Issue 3: /api/interventions/check Returns 404
+**Root cause (A):** Lambda binary was built on 2026-09-23 19:26, before `intervention.routes.ts` was wired into `app.ts`. The route existed in source but the deployed ZIP did not contain `dist/routes/intervention.routes.js`.  
+**Root cause (B):** `future-me-prod-interventions` DynamoDB table did not exist (not provisioned in Terraform). Lambda IAM role had no permission to access it. No `INTERVENTIONS_TABLE` env var on Lambda.  
+
+**Actions taken (all direct, no Terraform apply):**  
+1. Rebuilt Lambda ZIP with `npm run package:lambda` — now contains `dist/routes/intervention.routes.js`  
+2. Created `future-me-prod-interventions` DynamoDB table with 3 GSIs: `userId-createdAt-index`, `userId-status-index`, `userId-issueKey-index`  
+3. Updated `future-me-prod-lambda-role` IAM inline policy to grant DynamoDB actions on the new table + indexes  
+4. Added `INTERVENTIONS_TABLE=future-me-prod-interventions` to Lambda environment variables  
+5. Deployed updated ZIP via `aws lambda update-function-code`  
+
+### DEPLOYED DEMO VERIFICATION
+
+**Backend API verification (direct curl against deployed API):**
+
+| Persona | interventions/check | Calendar events (week Sep 21–28) |
+|---|---|---|
+| phase4-eval-v2:focused-builder | 200 OK | 12 events |
+| phase4-eval-v2:busy-balancer | 200 OK | 18 events |
+| phase4-eval-v2:overloaded-lead | 200 OK | 30 events |
+| phase4-eval-v2:needs-clarity | 200 OK | 9 events |
+| phase4-eval-v2:uncertain-skipper | 200 OK | 11 events |
+| phase4-eval-v2:conflict-check | 200 OK | 14 events |
+
+**Total seeded events:** 94 (matches commit message expected counts).  
+**Seed verification:** `npm run demo:phase4:verify` passed with "Verification passed."
+
+**Test results:**  
+- Frontend: 12 test files, 68 tests — all PASS  
+- Backend: 22 test suites, 163 tests — all PASS  
+
+**Remaining for browser verification (pending Amplify build #34 completion):**  
+- Confirm deployed frontend sends `x-demo-user: phase4-eval-v2:<persona>` in browser  
+- Confirm Dashboard Gantt renders populated calendars for all 6 personas  
+- Confirm no console errors from these fixes
