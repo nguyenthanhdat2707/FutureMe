@@ -6,6 +6,23 @@
 
 ---
 
+## Implementation Progress
+
+### Phase 0: CSS Foundation Fix
+**Status:** COMPLETE  
+**Branch:** feat/mvp-refactor  
+**Commit:** 0855855
+
+**Completed:**
+- Removed `--color-*: initial;` from `@theme` to restore Tailwind v4 default palette
+- Added four missing surface tokens: `--color-surface-card`, `--color-surface-hover`, `--color-surface-border`
+- Migrated 14 v3 opacity occurrences to v4 slash syntax across 5 files
+- Build verified successful (1.56s, no warnings)
+
+**Next:** Phase 1 - Dashboard
+
+---
+
 ## Current Status
 
 **IMPLEMENTATION IN PROGRESS**
