@@ -11,6 +11,8 @@ import { SqliteFeedbackRepository } from '../repositories/feedback.repository';
 import { SqliteObservationRepository } from '../repositories/observation.repository';
 import { SqliteOutcomeRepository } from '../repositories/outcome.repository';
 import { SqlitePersonalContextRepository } from '../repositories/personal-context.repository';
+import { SqliteCalendarEventRepository } from '../repositories/calendar-event.repository';
+import { SqliteDecisionRepository } from '../repositories/decision.repository';
 
 describe('API route integration', () => {
   const app = createApp();
@@ -62,6 +64,63 @@ describe('API route integration', () => {
       scenario: 'hackathon-deadline',
     });
     expect(stateResponse.body.contextAttributes).toBeGreaterThanOrEqual(2);
+  });
+
+  it('seeds the full backdated phase 4 dataset for a persona without duplicating it', async () => {
+    const personaUserId = 'phase4-eval-v3:focused-builder';
+
+    const seedResponse = await request(app)
+      .post('/api/demo/seed')
+      .set('X-Demo-User', personaUserId)
+      .send({ scenario: 'phase4-eval-v3' });
+
+    expect(seedResponse.status).toBe(200);
+    expect(seedResponse.body).toMatchObject({
+      success: true,
+      scenario: 'phase4-eval-v3',
+    });
+
+    const contextRepo = new SqlitePersonalContextRepository();
+    const calendarRepo = new SqliteCalendarEventRepository();
+    const decisionRepo = new SqliteDecisionRepository();
+    const observationRepo = new SqliteObservationRepository();
+    expect(await contextRepo.findByUserId(personaUserId, 500)).toHaveLength(9);
+    expect(await calendarRepo.findByUserId(personaUserId, 500)).toHaveLength(12);
+    expect(await decisionRepo.findByUserId(personaUserId, 500)).toHaveLength(3);
+    expect(await observationRepo.findByUserId(personaUserId, 500)).toHaveLength(1);
+
+    const historyResponse = await request(app)
+      .get('/api/context/history?days=30')
+      .set('X-Demo-User', personaUserId);
+
+    expect(historyResponse.status).toBe(200);
+    expect(historyResponse.body.hasHistory).toBe(true);
+    const historyPoints = historyResponse.body.points as Array<{
+      goals: number;
+      commitments: number;
+      preferences: number;
+      decisions: number;
+    }>;
+    const nonZeroPoints = historyPoints.filter((point) =>
+      point.goals + point.commitments + point.preferences + point.decisions > 0
+    );
+    expect(nonZeroPoints.length).toBeGreaterThan(1);
+
+    const firstHistory = historyResponse.body;
+    const reseedResponse = await request(app)
+      .post('/api/demo/seed')
+      .set('X-Demo-User', personaUserId)
+      .send({ scenario: 'phase4-eval-v3' });
+    expect(reseedResponse.status).toBe(200);
+    expect(await contextRepo.findByUserId(personaUserId, 500)).toHaveLength(9);
+    expect(await calendarRepo.findByUserId(personaUserId, 500)).toHaveLength(12);
+    expect(await decisionRepo.findByUserId(personaUserId, 500)).toHaveLength(3);
+    expect(await observationRepo.findByUserId(personaUserId, 500)).toHaveLength(1);
+
+    const reseededHistoryResponse = await request(app)
+      .get('/api/context/history?days=30')
+      .set('X-Demo-User', personaUserId);
+    expect(reseededHistoryResponse.body).toEqual(firstHistory);
   });
 
   it('syncs calendar events and reports persisted events and status', async () => {

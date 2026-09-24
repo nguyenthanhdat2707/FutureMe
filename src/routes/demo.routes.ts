@@ -3,7 +3,7 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { ObservationSource, ObservationType, DecisionStatus, InterventionLevel } from '../domain/types';
+import { ObservationSource, ObservationType, DecisionStatus, InterventionLevel, type ContextSnapshot, type Recommendation } from '../domain/types';
 import {
   getUserRepository,
   getContextRepository,
@@ -14,8 +14,123 @@ import {
 } from '../services/service-container';
 import { getUserId } from '../utils/identity';
 import { getErrorMessage } from '../utils/error';
+import { generatePhase4Dataset, PERSONA_SLUGS, type PersonaSlug } from '../demo/phase4-evaluation-dataset';
 
 export const demoRouter = Router();
+
+function parseRecordJson<T>(value: unknown, label: string): T {
+  if (typeof value !== 'string') throw new Error(`Invalid phase 4 ${label}`);
+  return JSON.parse(value) as T;
+}
+
+function contextEntityId(value: string): string | undefined {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (parsed && typeof parsed === 'object' && 'id' in parsed) {
+      const id = (parsed as { id?: unknown }).id;
+      if (typeof id === 'string' || typeof id === 'number') return String(id);
+    }
+  } catch {
+    // Scalar context records are identified by attribute and source.
+  }
+  return undefined;
+}
+
+async function seedPhase4Persona(personaSlug: PersonaSlug, seededAt: Date): Promise<void> {
+  const userRepo = getUserRepository();
+  const contextRepo = getContextRepository();
+  const calendarRepo = getCalendarEventRepository();
+  const decisionRepo = getDecisionRepository();
+  const observationRepo = getObservationRepository();
+  const dataset = generatePhase4Dataset(seededAt);
+  const persona = dataset.personas.find((candidate) => candidate.slug === personaSlug);
+  if (!persona) throw new Error(`Unknown phase 4 persona: ${personaSlug}`);
+
+  if (!await userRepo.findById(persona.userId)) {
+    await userRepo.create({
+      id: persona.userId,
+      email: persona.email,
+      displayName: persona.displayName,
+    });
+  }
+
+  const contextRecords = dataset.records.personalContext.filter((record) => record.user_id === persona.userId);
+  const existingContext = await contextRepo.findByUserId(persona.userId, 500);
+  for (const record of contextRecords) {
+    const attribute = record.attribute as string;
+    const value = record.value as string;
+    const source = record.source as ObservationSource;
+    const entityId = contextEntityId(value);
+    const alreadySeeded = existingContext.some((existing) =>
+      existing.attribute === attribute &&
+      existing.source === source &&
+      (entityId === undefined ? contextEntityId(existing.value) === undefined : existing.value === value)
+    );
+    if (!alreadySeeded) {
+      await contextRepo.create({
+        userId: persona.userId,
+        attribute,
+        value,
+        source,
+        confidence: record.confidence as number,
+        observedAt: new Date(record.observed_at as string),
+        validUntil: typeof record.valid_until === 'string' ? new Date(record.valid_until) : undefined,
+      });
+    }
+  }
+
+  for (const record of dataset.records.calendarEvents.filter((candidate) => candidate.user_id === persona.userId)) {
+    await calendarRepo.upsert({
+      userId: persona.userId,
+      externalId: record.external_id as string,
+      title: record.title as string,
+      startTime: new Date(record.start_time as string),
+      endTime: new Date(record.end_time as string),
+      status: record.status as string,
+      rawData: record.raw_data as string,
+      syncedAt: new Date(record.synced_at as string),
+    });
+  }
+
+  for (const record of dataset.records.decisions.filter((candidate) => candidate.user_id === persona.userId)) {
+    if (await decisionRepo.findById(record.id)) continue;
+    const relevantContext = parseRecordJson<ContextSnapshot>(record.context_snapshot, 'decision context');
+    relevantContext.capturedAt = new Date(relevantContext.capturedAt);
+    const recommendation = parseRecordJson<Recommendation>(record.recommendation, 'decision recommendation');
+    await decisionRepo.create({
+      id: record.id,
+      userId: persona.userId,
+      question: record.question as string,
+      options: [],
+      relevantContext,
+      tradeoffs: [],
+      recommendation,
+      reasoning: recommendation.reasoning,
+      confidence: recommendation.confidence,
+      userChoice: typeof record.user_choice === 'string' ? record.user_choice : undefined,
+      status: record.status as DecisionStatus,
+    });
+  }
+
+  const existingObservations = await observationRepo.findByUserId(persona.userId, 500);
+  for (const record of dataset.records.observations.filter((candidate) => candidate.user_id === persona.userId)) {
+    const data = parseRecordJson<Record<string, unknown>>(record.data, 'observation data');
+    const timestamp = new Date(record.timestamp as string);
+    const alreadySeeded = existingObservations.some((existing) =>
+      existing.type === record.type && JSON.stringify(existing.data) === JSON.stringify(data)
+    );
+    if (!alreadySeeded) {
+      await observationRepo.create({
+        userId: persona.userId,
+        type: record.type as ObservationType,
+        data,
+        source: record.source as ObservationSource,
+        confidence: record.confidence as number,
+        timestamp,
+      });
+    }
+  }
+}
 
 // Clear data for demo user
 demoRouter.post('/reset', (req: Request, res: Response) => {
@@ -65,6 +180,22 @@ demoRouter.post('/seed', async (req: Request, res: Response) => {
     const body = req.body as { scenario?: string };
     const scenario = typeof body.scenario === 'string' ? body.scenario : 'hackathon-deadline';
     const userId = getUserId(req);
+    const personaSlug = PERSONA_SLUGS.find((slug) => userId.includes(slug));
+    const isPhase4Seed = scenario === 'phase4-eval-v3' || personaSlug !== undefined;
+
+    if (isPhase4Seed) {
+      if (!personaSlug) {
+        return res.status(400).json({
+          error: `X-Demo-User must contain one of: ${PERSONA_SLUGS.join(', ')}`,
+        });
+      }
+      await seedPhase4Persona(personaSlug, new Date());
+      return res.json({
+        success: true,
+        scenario: 'phase4-eval-v3',
+        message: `Demo scenario 'phase4-eval-v3' seeded for ${personaSlug}`,
+      });
+    }
 
     // Ensure demo user exists
     let user = await userRepo.findById(userId);
