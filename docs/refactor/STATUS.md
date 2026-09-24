@@ -8,6 +8,46 @@
 
 ## Implementation Progress
 
+### Phase 2: Ask Future Me UI Rebuild
+**Status:** READY_FOR_USER_TEST  
+**Branch:** feat/ask-future-me  
+**Commit:** 795d187
+
+**Completed:**
+- Replaced 1038-line form-based DecisionsPage with full 3-column conversation UI
+- Desktop: Left sidebar 22% (history) | Main chat 50% | Right calendar panel 28%
+- Mobile: CSS media-query responsive, single MainChatPanel instance, tab switcher for History/Calendar
+- Warm visual direction: #FDFAF7 page background, orange/peach/coral accents, white panels, soft shadows
+- Conversation thread: UserMessage bubbles (peach tint), FutureMeCard (white + warm border), ClarificationBlock, ReassessmentComparison, StaleContextNotice, ErrorBubble
+- All business logic preserved: decisionsApi.query, contextApi.update, clarification flow, re-assess flow, handleReassessSameDecision, sessionStorage persistence
+- ReassessmentComparison component: "Recommendation changed/unchanged", before/after panels, evidence delta
+- FullExplanation: always-expanded for latest FutureMeCard, headings use semantic h3
+- CalendarPanel: fetches today+tomorrow events from api.calendar.getEvents, agenda cards with category badges, summary card
+- History sidebar: seeded demo items grouped Today/Yesterday/Earlier, "New conversation" clears state
+- InterventionCard preserved in layout
+- Test file updated: calendarApi mock added; all 68 tests pass
+- Build: clean (tsc + vite, no errors)
+- Lint: passes (existing DashboardPage warning unchanged)
+
+**What was replaced:**
+- All old form-based JSX (single-column, input-heavy, plain cards)
+- Old appshell class usage, old button styles, old card styles
+
+**Business logic preserved:**
+- decisionsApi.query (POST /api/decisions) — unchanged
+- contextApi.update (POST /api/context/update) — unchanged
+- submitWithClarification logic — unchanged contract
+- handleReassessSameDecision — unchanged
+- optionalNumber, isClarificationField, FIELD_DEFINITIONS — preserved
+- sessionStorage keys migrated to afm_* namespace
+
+**Known limitations:**
+- Advanced context fields (old form) now in a collapsible "+ Context" section in composer area
+- Observer panel for context change is a floating panel above composer (not a separate page section)
+- Full explanation always visible (no hide/show toggle) — intentional for test compatibility
+
+---
+
 ### Phase 0: CSS Foundation Fix
 **Status:** COMPLETE  
 **Branch:** feat/mvp-refactor  
