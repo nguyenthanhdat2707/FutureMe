@@ -28,7 +28,7 @@ function LeftSidebar() {
             to="/"
             className={`block px-3 py-2 rounded-lg text-sm ${
               location.pathname === '/'
-                ? 'bg-accent-ai bg-opacity-10 text-accent-ai font-medium'
+                ? 'bg-accent-ai/10 text-accent-ai font-medium'
                 : 'text-text-primary hover:bg-slate-100'
             }`}
           >
@@ -38,7 +38,7 @@ function LeftSidebar() {
             to="/context"
             className={`block px-3 py-2 rounded-lg text-sm ${
               location.pathname === '/context'
-                ? 'bg-accent-ai bg-opacity-10 text-accent-ai font-medium'
+                ? 'bg-accent-ai/10 text-accent-ai font-medium'
                 : 'text-text-primary hover:bg-slate-100'
             }`}
           >
@@ -48,7 +48,7 @@ function LeftSidebar() {
             to="/decisions"
             className={`block px-3 py-2 rounded-lg text-sm ${
               location.pathname === '/decisions'
-                ? 'bg-accent-ai bg-opacity-10 text-accent-ai font-medium'
+                ? 'bg-accent-ai/10 text-accent-ai font-medium'
                 : 'text-text-primary hover:bg-slate-100'
             }`}
           >
@@ -58,7 +58,7 @@ function LeftSidebar() {
             to="/calendar"
             className={`block px-3 py-2 rounded-lg text-sm ${
               location.pathname === '/calendar'
-                ? 'bg-accent-ai bg-opacity-10 text-accent-ai font-medium'
+                ? 'bg-accent-ai/10 text-accent-ai font-medium'
                 : 'text-text-primary hover:bg-slate-100'
             }`}
           >
@@ -68,7 +68,7 @@ function LeftSidebar() {
             to="/demo"
             className={`block px-3 py-2 rounded-lg text-sm ${
               location.pathname === '/demo'
-                ? 'bg-accent-ai bg-opacity-10 text-accent-ai font-medium'
+                ? 'bg-accent-ai/10 text-accent-ai font-medium'
                 : 'text-text-primary hover:bg-slate-100'
             }`}
           >

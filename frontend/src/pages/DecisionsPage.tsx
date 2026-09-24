@@ -552,7 +552,7 @@ function DecisionsPage() {
           <button
             type="submit"
             disabled={isLoading}
-            className="inline-flex items-center gap-2 rounded-lg bg-accent-ai px-6 py-3 font-medium text-white hover:bg-opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center gap-2 rounded-lg bg-accent-ai px-6 py-3 font-medium text-white hover:bg-accent-ai/90 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isLoading && (
               <span
@@ -596,7 +596,7 @@ function DecisionsPage() {
             type="button"
             onClick={handleReassessSameDecision}
             disabled={isLoading}
-            className="inline-flex items-center gap-2 rounded-lg bg-accent-ai px-6 py-3 font-medium text-white hover:bg-opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center gap-2 rounded-lg bg-accent-ai px-6 py-3 font-medium text-white hover:bg-accent-ai/90 disabled:cursor-not-allowed disabled:opacity-60"
           >
             Re-assess same decision
           </button>
@@ -652,7 +652,7 @@ function DecisionsPage() {
           <button
             type="submit"
             disabled={isLoading}
-            className="inline-flex items-center gap-2 rounded-lg bg-accent-ai px-6 py-3 font-medium text-white hover:bg-opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center gap-2 rounded-lg bg-accent-ai px-6 py-3 font-medium text-white hover:bg-accent-ai/90 disabled:cursor-not-allowed disabled:opacity-60"
           >
             Submit Observation
           </button>
@@ -707,7 +707,7 @@ function DecisionsPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="inline-flex items-center gap-2 rounded-lg bg-accent-warning px-6 py-3 font-medium text-white hover:bg-opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex items-center gap-2 rounded-lg bg-accent-warning px-6 py-3 font-medium text-white hover:bg-accent-warning/90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               Re-assess with Clarifications
             </button>

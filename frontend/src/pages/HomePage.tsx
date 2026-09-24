@@ -147,7 +147,7 @@ function HomePage() {
           <button
             onClick={() => void handleSetupSubmit()}
             disabled={submitting}
-            className="px-6 py-2 bg-accent-ai text-white rounded-lg font-medium hover:bg-opacity-90 disabled:opacity-50"
+            className="px-6 py-2 bg-accent-ai text-white rounded-lg font-medium hover:bg-accent-ai/90 disabled:opacity-50"
           >
             {submitting ? 'Saving...' : 'Complete Setup'}
           </button>
