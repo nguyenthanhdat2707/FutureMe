@@ -13,6 +13,9 @@ vi.mock('../api/client', () => ({
   },
   contextApi: {
     update: vi.fn()
+  },
+  calendarApi: {
+    getEvents: vi.fn().mockResolvedValue([])
   }
 }));
 
