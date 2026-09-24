@@ -20,7 +20,7 @@ function requiredEnvironment(env: NodeJS.ProcessEnv, names: string[]): void {
 export async function main(args = process.argv.slice(2), env = process.env): Promise<void> {
   const [command, confirmation] = args;
   if (command !== 'plan' && command !== 'apply' && command !== 'verify' && command !== 'rollback') {
-    throw new Error('Usage: phase4-evaluation-data <plan|apply|verify|rollback> [phase4-eval-v1]');
+    throw new Error(`Usage: phase4-evaluation-data <plan|apply|verify|rollback> [${SEED_VERSION}]`);
   }
   if (command !== 'plan' && confirmation !== SEED_VERSION) {
     throw new Error(`Confirmation argument must be exactly '${SEED_VERSION}'`);

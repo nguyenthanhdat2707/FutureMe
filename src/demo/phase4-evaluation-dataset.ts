@@ -74,11 +74,11 @@ export interface DynamoTableItems {
 
 export const EXPECTED_COUNTS: ExpectedCounts = {
   users: 6,
-  personalContext: 28,
+  personalContext: 48,
   observations: 8,
   calendarEvents: 94,
-  decisions: 6,
-  total: 142,
+  decisions: 19,
+  total: 175,
 };
 
 const MAX_BATCH_SIZE = 25;
@@ -122,12 +122,23 @@ export function generatePhase4Dataset(seededAt: Date): GeneratedDataset {
       ...base, id: owner, email: persona.email, display_name: persona.displayName,
       created_at: timestamp, updated_at: timestamp,
     });
-    records.decisions.push({
-      ...base, id: generatePhase4Id('decisions', persona.slug, 'default'), user_id: owner,
-      question: 'Should I take on this new project?',
-      context_snapshot: JSON.stringify({ capturedAt: timestamp, goals: [], commitments: [], constraints: [], relevantHistory: [] }),
-      recommendation: JSON.stringify({ option: 'proceed', confidence: 0.8, reasoning: 'Synthetic evaluation fixture.' }),
-      user_choice: null, status: 'PENDING', created_at: timestamp,
+    const addDecision = (
+      purpose: string,
+      question: string,
+      status: 'PENDING' | 'CHOSEN',
+      createdAt: Date,
+      userChoice: string | null = null,
+      recommendationText = 'Synthetic evaluation fixture: recommended option based on simulated workload.'
+    ) => records.decisions.push({
+      ...base,
+      id: generatePhase4Id('decisions', persona.slug, purpose),
+      user_id: owner,
+      question,
+      context_snapshot: JSON.stringify({ capturedAt: createdAt.toISOString(), goals: [], commitments: [], constraints: [], relevantHistory: [] }),
+      recommendation: JSON.stringify({ option: userChoice || 'proceed', confidence: 0.8, reasoning: recommendationText }),
+      user_choice: userChoice,
+      status,
+      created_at: createdAt.toISOString(),
     });
 
     const addContext = (
@@ -175,17 +186,25 @@ export function generatePhase4Dataset(seededAt: Date): GeneratedDataset {
     const wd = (day: number, utcH: number, utcM = 0): Date =>
       new Date(weekStart.getTime() + day * 86_400_000 + utcH * 3_600_000 + utcM * 60_000);
 
-    const old = new Date(seededAt.getTime() - 86_400_000);
+    const daysAgo = (d: number, hour = 10): Date =>
+      new Date(seededAt.getTime() - d * 86_400_000 + (hour - 10) * 3_600_000);
+
     const recent = new Date(seededAt.getTime() - 3_600_000);
-    const expired = new Date(seededAt.getTime() - 10 * 86_400_000);
     addContext('setup', 'setup_completed', 'true', ObservationSource.USER_CONFIRMED, 1, seededAt);
     addContext('calendar-sync', 'calendar_last_sync', timestamp, ObservationSource.SYSTEM_OBSERVED, 1, seededAt);
 
     if (persona.slug === 'focused-builder') {
-      addContext('goal-user', 'goal:ship', { id: 'ship', priority: 'high', value: 'ship-v1' }, ObservationSource.USER_CONFIRMED, 1, old);
-      addContext('goal-inferred', 'goal:ship', { id: 'ship', priority: 'low', value: 'defer-v1' }, ObservationSource.SYSTEM_INFERRED, 0.5, recent);
-      addContext('preference', 'preference:work', { id: 'deep-work', value: 'morning' }, ObservationSource.USER_CONFIRMED, 1, old);
-      addContext('commitment', 'commitment:launch', { id: 'launch', value: 'v1' }, ObservationSource.USER_CONFIRMED, 1, old);
+      addDecision('cut-scope', 'Should we cut non-critical features for v1?', 'CHOSEN', daysAgo(22), 'cut-features');
+      addDecision('auth-provider', 'Should we migrate the auth provider before launch?', 'CHOSEN', daysAgo(8), 'defer-migration');
+      addDecision('default', 'Should I take on this new project?', 'PENDING', seededAt, null);
+
+      addContext('goal-ship-user', 'goal', { id: 'ship', priority: 'high', description: 'Ship v1 MVP release to production' }, ObservationSource.USER_CONFIRMED, 1, daysAgo(25));
+      addContext('goal-ship-inferred', 'goal', { id: 'ship', priority: 'low', description: 'Defer v1 MVP release' }, ObservationSource.SYSTEM_INFERRED, 0.5, daysAgo(2));
+      addContext('goal-focus', 'goal', { id: 'deep-focus', priority: 'medium', description: 'Maintain 4 hours of daily deep work' }, ObservationSource.USER_CONFIRMED, 1, daysAgo(16));
+      addContext('commitment-freeze', 'commitment', { id: 'code-freeze', description: 'Code freeze for v1 core release', startTime: wd(2, 7).toISOString(), endTime: wd(2, 9).toISOString(), status: 'CONFIRMED' }, ObservationSource.USER_CONFIRMED, 1, daysAgo(18));
+      addContext('commitment-retro', 'commitment', { id: 'sprint-1-retro', description: 'Sprint 1 team retrospective', startTime: wd(0, 2).toISOString(), endTime: wd(0, 3).toISOString() }, ObservationSource.USER_CONFIRMED, 1, daysAgo(28), daysAgo(12));
+      addContext('pref-work', 'preference', { id: 'morning-focus', category: 'focus', description: 'Morning deep work block (09:00 - 12:00)', value: 'morning' }, ObservationSource.USER_CONFIRMED, 1, daysAgo(25));
+      addContext('pref-dnd', 'preference', { id: 'dnd-focus', category: 'communication', description: 'Do Not Disturb active during focus blocks', value: 'dnd-enabled' }, ObservationSource.USER_CONFIRMED, 1, daysAgo(10));
       addObservation('focus', 'Started deep work focus.', recent);
       // Mon – 12 events
       addCalendar('mon-dw1', 'Deep Work', wd(0,2), wd(0,4), 'deep_work');                          // 09-11 VN
@@ -205,10 +224,19 @@ export function generatePhase4Dataset(seededAt: Date): GeneratedDataset {
       addCalendar('fri-review', 'Weekly Review', wd(4,2), wd(4,3), 'meeting');                   // 09-10 VN
       addCalendar('fri-dw', 'Deep Work', wd(4,3), wd(4,5), 'deep_work');                         // 10-12 VN
     } else if (persona.slug === 'busy-balancer') {
-      addContext('goal-health', 'goal:health', { id: 'health', priority: 'high' }, ObservationSource.USER_CONFIRMED, 1, old);
-      addContext('goal-balance', 'goal:balance', { id: 'balance', priority: 'medium' }, ObservationSource.USER_CONFIRMED, 1, old);
-      addContext('preference', 'preference:work', { id: 'pace', value: 'steady' }, ObservationSource.USER_CONFIRMED, 1, old);
-      addObservation('meetings', 'Meeting volume increased.', old);
+      addDecision('committee-meeting', 'Should I accept the recurring Tuesday committee meeting?', 'CHOSEN', daysAgo(18), 'decline');
+      addDecision('reschedule-client', 'Should I reschedule the client sync to protect gym time?', 'CHOSEN', daysAgo(5), 'reschedule');
+      addDecision('default', 'Should I take on this new project?', 'PENDING', seededAt, null);
+
+      addContext('goal-health', 'goal', { id: 'health', priority: 'high', description: 'Maintain daily 45-minute physical exercise and recovery' }, ObservationSource.USER_CONFIRMED, 1, daysAgo(20));
+      addContext('goal-balance', 'goal', { id: 'balance', priority: 'medium', description: 'Cap daily meetings at maximum 4 hours' }, ObservationSource.USER_CONFIRMED, 1, daysAgo(14));
+      addContext('commitment-review', 'commitment', { id: 'client-review', description: 'Quarterly client strategic milestone review', startTime: wd(1, 3).toISOString(), endTime: wd(1, 5).toISOString() }, ObservationSource.USER_CONFIRMED, 1, daysAgo(16));
+      addContext('commitment-gym', 'commitment', { id: 'gym-routine', description: 'Evening fitness and wellness session', startTime: wd(0, 11).toISOString(), endTime: wd(0, 12).toISOString(), recurring: true }, ObservationSource.USER_CONFIRMED, 1, daysAgo(12));
+      addContext('commitment-checkin', 'commitment', { id: 'biweekly-checkin', description: 'Bi-weekly cross-functional check-in', startTime: wd(2, 2).toISOString(), endTime: wd(2, 3).toISOString() }, ObservationSource.USER_CONFIRMED, 1, daysAgo(26), daysAgo(10));
+      addContext('pref-pace', 'preference', { id: 'pace', category: 'work-style', description: 'Steady pacing with 15-minute buffer between meetings', value: 'steady' }, ObservationSource.USER_CONFIRMED, 1, daysAgo(22));
+      addContext('pref-quiet', 'preference', { id: 'evening-quiet', category: 'boundary', description: 'No meetings after 18:00 for recovery', value: 'evening-quiet' }, ObservationSource.USER_CONFIRMED, 1, daysAgo(15));
+      addContext('pref-lunch', 'preference', { id: 'protected-lunch', category: 'wellbeing', description: 'Protect 12:00-13:00 for lunch and mental reset', value: 'protected-lunch' }, ObservationSource.SYSTEM_INFERRED, 0.75, daysAgo(5));
+      addObservation('meetings', 'Meeting volume increased.', daysAgo(20));
       addObservation('capacity', 'Capacity constrained.', recent);
       // Mon – 18 events total
       addCalendar('mon-standup', 'Daily Standup', wd(0,2), wd(0,2,30), 'meeting', 'https://meet.example.com/phase4-busy-standup');
@@ -233,10 +261,20 @@ export function generatePhase4Dataset(seededAt: Date): GeneratedDataset {
       addCalendar('thu-dw', 'Deep Work', wd(3,6), wd(3,8), 'deep_work');
       addCalendar('thu-doctor', 'Doctor Appointment', wd(3,10), wd(3,11), 'other');              // 17-18 VN
     } else if (persona.slug === 'overloaded-lead') {
-      addContext('goal-delivery', 'goal:delivery', { id: 'delivery', priority: 'high' }, ObservationSource.USER_CONFIRMED, 1, old);
-      addContext('preference', 'preference:work', { id: 'pace', value: 'fast' }, ObservationSource.USER_CONFIRMED, 1, old);
-      addContext('expired', 'goal:expired', { id: 'expired', priority: 'low' }, ObservationSource.USER_CONFIRMED, 1, expired, old);
-      addObservation('interruptions', 'Heavy interruptions.', old);
+      addDecision('incident-cache', 'Should we declare an incident on the cache latency increase?', 'CHOSEN', daysAgo(25), 'declare-p2');
+      addDecision('delegate-onboarding', 'Should we delegate junior engineer onboarding to a senior peer?', 'CHOSEN', daysAgo(17), 'delegate');
+      addDecision('freeze-features', 'Should we freeze non-essential feature development for stability?', 'CHOSEN', daysAgo(9), 'freeze');
+      addDecision('decline-sync', 'Should we decline the cross-team sync request?', 'CHOSEN', daysAgo(3), 'decline');
+      addDecision('default', 'Should I take on this new project?', 'PENDING', seededAt, null);
+
+      addContext('goal-delivery', 'goal', { id: 'delivery', priority: 'high', description: 'Deliver core platform reliability improvements' }, ObservationSource.USER_CONFIRMED, 1, daysAgo(28));
+      addContext('goal-brownbag', 'goal', { id: 'arch-brownbag', priority: 'low', description: 'Lead bi-weekly architecture brown-bag sessions' }, ObservationSource.USER_CONFIRMED, 1, daysAgo(29), daysAgo(15));
+      addContext('commitment-incident', 'commitment', { id: 'incident-triage', description: 'Lead weekly engineering incident reviews', startTime: wd(0, 2, 30).toISOString(), endTime: wd(0, 4).toISOString() }, ObservationSource.USER_CONFIRMED, 1, daysAgo(20));
+      addContext('commitment-board', 'commitment', { id: 'board-reporting', description: 'Prepare monthly executive engineering roadmap report', startTime: wd(2, 6).toISOString(), endTime: wd(2, 8).toISOString() }, ObservationSource.USER_CONFIRMED, 1, daysAgo(12));
+      addContext('commitment-oncall', 'commitment', { id: 'sprint3-oncall', description: 'Sprint 3 emergency primary on-call rotation', startTime: wd(1, 6).toISOString(), endTime: wd(1, 7, 30).toISOString() }, ObservationSource.USER_CONFIRMED, 1, daysAgo(24), daysAgo(8));
+      addContext('pref-pace', 'preference', { id: 'lead-pace', category: 'communication', description: 'Fast execution with asynchronous updates', value: 'async-first' }, ObservationSource.USER_CONFIRMED, 1, daysAgo(27));
+      addContext('pref-alert', 'preference', { id: 'alert-threshold', category: 'alerting', description: 'Immediate escalation only for P0 system outages', value: 'p0-only' }, ObservationSource.USER_CONFIRMED, 1, daysAgo(16));
+      addObservation('interruptions', 'Heavy interruptions.', daysAgo(28));
       addObservation('burnout', 'Burnout risk detected.', recent);
       // Mon – 30 events total
       addCalendar('mon-standup', 'Daily Standup', wd(0,2), wd(0,2,30), 'meeting');
@@ -273,8 +311,13 @@ export function generatePhase4Dataset(seededAt: Date): GeneratedDataset {
       addCalendar('thu-crossteam', 'Cross-team Sync', wd(3,7), wd(3,8,30), 'meeting');
       addCalendar('thu-emergency', 'Emergency Deploy', wd(3,10), wd(3,11,30), 'meeting', 'https://meet.example.com/phase4-lead-deploy');
     } else if (persona.slug === 'needs-clarity') {
-      addContext('goal', 'goal:needs-clarity', { id: 'needs-clarity', priority: 'medium', deadline: wd(4,10).toISOString() }, ObservationSource.USER_CONFIRMED, 1, old);
-      addObservation('uncertainty', 'Availability is unresolved.', old);
+      addDecision('early-signoff', 'Should we seek early stakeholder sign-off on requirements?', 'CHOSEN', daysAgo(11), 'seek-signoff');
+      addDecision('default', 'Should I take on this new project?', 'PENDING', seededAt, null);
+
+      addContext('goal-q3', 'goal', { id: 'q3-report', priority: 'medium', deadline: wd(4,10).toISOString(), description: 'Finalize and submit Q3 strategic roadmap analysis' }, ObservationSource.USER_CONFIRMED, 1, daysAgo(15));
+      addContext('commitment-briefing', 'commitment', { id: 'stakeholder-briefing', description: 'Stakeholder roadmap review presentation', startTime: wd(3,7).toISOString(), endTime: wd(3,9).toISOString() }, ObservationSource.USER_CONFIRMED, 1, daysAgo(10));
+      addContext('pref-feedback', 'preference', { id: 'feedback-format', category: 'collaboration', description: 'Structured written feedback 24 hours prior to decision review', value: 'written-first' }, ObservationSource.USER_CONFIRMED, 1, daysAgo(12));
+      addObservation('uncertainty', 'Availability is unresolved.', daysAgo(15));
       // 9 events
       addCalendar('mon-focus', 'Focus Block', wd(0,3), wd(0,5), 'deep_work');                   // 10-12 VN
       addCalendar('tue-sync', 'Team Sync', wd(1,3), wd(1,3,30), 'meeting', 'https://meet.example.com/phase4-clarity-sync');
@@ -287,8 +330,14 @@ export function generatePhase4Dataset(seededAt: Date): GeneratedDataset {
       addCalendar('fri-prep', 'Report Prep', wd(4,5), wd(4,7), 'deep_work');
       addCalendar('tue-plan', 'Planning Notes', wd(1,9), wd(1,9,30), 'other');
     } else if (persona.slug === 'uncertain-skipper') {
-      addContext('goal', 'goal:uncertain-skipper', { id: 'uncertain-skipper', priority: 'medium' }, ObservationSource.USER_CONFIRMED, 1, old);
-      addObservation('uncertainty', 'Availability is unresolved.', old);
+      addDecision('conference-talk', 'Should I submit the proposal to Conference A or B?', 'CHOSEN', daysAgo(14), 'conference-a');
+      addDecision('default', 'Should I take on this new project?', 'PENDING', seededAt, null);
+
+      addContext('goal-conf', 'goal', { id: 'conference-talk', priority: 'medium', description: 'Prepare tech conference speaker submission' }, ObservationSource.USER_CONFIRMED, 1, daysAgo(22));
+      addContext('goal-side', 'goal', { id: 'side-project', priority: 'low', description: 'Prototype experimental vector search plugin' }, ObservationSource.USER_CONFIRMED, 1, daysAgo(18));
+      addContext('commitment-retro', 'commitment', { id: 'weekly-retro', description: 'Attend Friday engineering team retrospective', startTime: wd(4,3).toISOString(), endTime: wd(4,4).toISOString() }, ObservationSource.USER_CONFIRMED, 1, daysAgo(21));
+      addContext('pref-flex', 'preference', { id: 'flex-hours', category: 'schedule', description: 'Flexible schedule start between 09:00 and 10:00', value: 'flexible' }, ObservationSource.USER_CONFIRMED, 1, daysAgo(25));
+      addObservation('uncertainty', 'Availability is unresolved.', daysAgo(22));
       // 11 events
       addCalendar('mon-standup', 'Team Standup', wd(0,2), wd(0,2,30), 'meeting', 'https://meet.example.com/phase4-skip-standup');
       addCalendar('mon-confprep', 'Conference Talk Prep (Tentative)', wd(0,3), wd(0,5), 'other', undefined, 'TENTATIVE');
@@ -303,11 +352,19 @@ export function generatePhase4Dataset(seededAt: Date): GeneratedDataset {
       addCalendar('fri-dw', 'Deep Work', wd(4,6), wd(4,8), 'deep_work');
     } else {
       // conflict-check – 14 events with deliberate overlaps
-      addContext('conflict-a', 'goal:compete', { id: 'compete', priority: 'high', value: 'win' }, ObservationSource.USER_CONFIRMED, 1, old);
-      addContext('conflict-b', 'goal:compete', { id: 'compete', priority: 'low', value: 'lose' }, ObservationSource.USER_CONFIRMED, 1, old);
-      addContext('other-goal', 'goal:other', { id: 'other', priority: 'medium' }, ObservationSource.USER_CONFIRMED, 1, old);
-      addContext('preference', 'preference:color', { id: 'color', value: 'blue' }, ObservationSource.USER_CONFIRMED, 1, old);
-      addObservation('conflict', 'Competing priorities detected.', old);
+      addDecision('delay-candidate', 'Should we delay the release candidate by 3 days?', 'CHOSEN', daysAgo(20), 'delay');
+      addDecision('override-design', 'Should we override the conflicting design direction?', 'CHOSEN', daysAgo(13), 'override');
+      addDecision('emergency-overtime', 'Should we approve emergency overtime for deployment?', 'CHOSEN', daysAgo(6), 'approve');
+      addDecision('default', 'Should I take on this new project?', 'PENDING', seededAt, null);
+
+      addContext('conflict-a', 'goal', { id: 'compete', priority: 'high', description: 'Compete for product leadership (Option A)', value: 'win' }, ObservationSource.USER_CONFIRMED, 1, daysAgo(25));
+      addContext('conflict-b', 'goal', { id: 'compete', priority: 'low', description: 'Compete for product leadership (Option B)', value: 'lose' }, ObservationSource.USER_CONFIRMED, 1, daysAgo(25));
+      addContext('goal-morale', 'goal', { id: 'team-morale', priority: 'medium', description: 'Maintain team morale and prevent burnout amidst release crunch' }, ObservationSource.USER_CONFIRMED, 1, daysAgo(20));
+      addContext('commitment-crunch', 'commitment', { id: 'crunch-review', description: 'Pre-deadline release crunch review', startTime: wd(3,2).toISOString(), endTime: wd(3,10).toISOString() }, ObservationSource.USER_CONFIRMED, 1, daysAgo(18));
+      addContext('commitment-client', 'commitment', { id: 'client-sync', description: 'Direct client feedback and escalation call', startTime: wd(2,2).toISOString(), endTime: wd(2,3,30).toISOString() }, ObservationSource.USER_CONFIRMED, 1, daysAgo(12));
+      addContext('commitment-sprint', 'commitment', { id: 'design-sprint', description: 'Cross-functional product design sprint workshop', startTime: wd(1,4).toISOString(), endTime: wd(1,6).toISOString() }, ObservationSource.USER_CONFIRMED, 1, daysAgo(27), daysAgo(14));
+      addContext('pref-resolve', 'preference', { id: 'conflict-res', category: 'prioritization', description: 'Prioritize customer-facing blockers over internal refactors', value: 'customer-first' }, ObservationSource.USER_CONFIRMED, 1, daysAgo(23));
+      addObservation('conflict', 'Competing priorities detected.', daysAgo(25));
       // Mon
       addCalendar('mon-dw', 'Important Deep Work', wd(0,2), wd(0,5), 'deep_work');              // 09-12 VN
       addCalendar('mon-allhands', 'All-hands (Overlap)', wd(0,4), wd(0,5,30), 'meeting', 'https://meet.example.com/phase4-conflict-allhands'); // 11-12:30 VN overlaps DW
@@ -511,7 +568,7 @@ function assertDatasetCounts(dataset: GeneratedDataset): void {
     total: Object.values(dataset.records).reduce((total, records) => total + records.length, 0),
   };
   if (Object.entries(EXPECTED_COUNTS).some(([key, count]) => counts[key as keyof ExpectedCounts] !== count) || dataset.personas.length !== PERSONA_SLUGS.length) {
-    throw new Error(`Dataset validation failed: expected 6 / 28 / 8 / ${EXPECTED_COUNTS.calendarEvents} / 6 = ${EXPECTED_COUNTS.total}`);
+    throw new Error(`Dataset validation failed: expected ${EXPECTED_COUNTS.users} / ${EXPECTED_COUNTS.personalContext} / ${EXPECTED_COUNTS.observations} / ${EXPECTED_COUNTS.calendarEvents} / ${EXPECTED_COUNTS.decisions} = ${EXPECTED_COUNTS.total}`);
   }
 }
 
@@ -521,12 +578,12 @@ export function runPlan(dataset: GeneratedDataset): void {
   console.log(`Personas: ${dataset.personas.length}`);
   for (const persona of dataset.personas) console.log(` - ${persona.slug} (${persona.userId})`);
   console.log('Table counts:');
-  console.log(' - users: 6');
-  console.log(' - personalContext: 28');
-  console.log(' - observations: 8');
-  console.log(' - calendarEvents: 16');
-  console.log(' - decisions: 6');
-  console.log('Total records: 64');
+  console.log(` - users: ${EXPECTED_COUNTS.users}`);
+  console.log(` - personalContext: ${EXPECTED_COUNTS.personalContext}`);
+  console.log(` - observations: ${EXPECTED_COUNTS.observations}`);
+  console.log(` - calendarEvents: ${EXPECTED_COUNTS.calendarEvents}`);
+  console.log(` - decisions: ${EXPECTED_COUNTS.decisions}`);
+  console.log(`Total records: ${EXPECTED_COUNTS.total}`);
 }
 
 function exactOwner(item: Record<string, unknown>, table: TableKey): string | undefined {

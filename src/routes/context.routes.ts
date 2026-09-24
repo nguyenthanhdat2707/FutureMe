@@ -3,13 +3,50 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { getContextEngine, getLLMContextAnalyst, getContextRepository, getObservationRepository } from '../services/service-container';
+import {
+  getContextEngine,
+  getLLMContextAnalyst,
+  getContextRepository,
+  getObservationRepository,
+  getDecisionRepository,
+} from '../services/service-container';
 import { getUserId } from '../utils/identity';
+import { deriveUnderstandingHistory } from '../services/understanding-history';
 
 import { getErrorMessage } from '../utils/error';
 import { ObservationSource, ObservationType, type Observation, type ContextCorrection, type ContextAnalystRequest } from '../domain/types';
 
 export const contextRouter = Router();
+
+// Get understanding evolution history
+contextRouter.get('/history', async (req: Request, res: Response) => {
+  try {
+    const rawDays = req.query.days;
+    let days: 7 | 30 | 90 = 30;
+
+    if (rawDays !== undefined && rawDays !== '') {
+      const parsedDays = Number(rawDays);
+      if (![7, 30, 90].includes(parsedDays)) {
+        return res.status(400).json({ error: 'days must be 7, 30, or 90' });
+      }
+      days = parsedDays as 7 | 30 | 90;
+    }
+
+    const userId = getUserId(req);
+    const contextRepo = getContextRepository();
+    const decisionRepo = getDecisionRepository();
+
+    const [attributes, decisions] = await Promise.all([
+      contextRepo.findByUserId(userId, 500),
+      decisionRepo.findByUserId(userId, 500),
+    ]);
+
+    const history = deriveUnderstandingHistory(attributes, decisions, { days });
+    res.json(history);
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
+});
 
 // Get current context
 contextRouter.get('/', async (req: Request, res: Response) => {

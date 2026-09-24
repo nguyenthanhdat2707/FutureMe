@@ -28,6 +28,12 @@ describe('public demo personas', () => {
     expect(document.body.textContent?.toLowerCase()).not.toMatch(/password|secret|token/);
   });
 
+  it('keeps every frontend persona on the current seeded contract', () => {
+    expect(DEMO_PERSONAS.map((persona) => persona.id)).toEqual(
+      DEMO_PERSONAS.map((persona) => `phase4-eval-v3:${persona.slug}`),
+    );
+  });
+
   it('persists only an allowlisted persona ID and clears decision session state when switching', () => {
     sessionStorage.setItem('decisions_result', 'old-result');
     sessionStorage.setItem('unrelated', 'keep');

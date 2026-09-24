@@ -39,10 +39,10 @@ describe('HTTP Route Auth', () => {
 
     const response = await request(app)
       .get('/api/context')
-      .set('X-Demo-User', 'phase4-eval-v2:focused-builder')
+      .set('X-Demo-User', 'phase4-eval-v3:focused-builder')
       .expect(200);
 
-    expect((response.body as Record<string, unknown>).userId).toBe('phase4-eval-v2:focused-builder');
+    expect((response.body as Record<string, unknown>).userId).toBe('phase4-eval-v3:focused-builder');
   });
   
   it('returns 401 when blank subject in cognito mode', async () => {
