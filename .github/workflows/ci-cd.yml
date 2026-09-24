@@ -3,8 +3,14 @@ name: CI/CD Pipeline
 on:
   push:
     branches: [main, develop, 'feat/**']
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
   pull_request:
     branches: [main, develop]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
 
 env:
   REGISTRY: ghcr.io
