@@ -91,6 +91,8 @@ export interface CalendarEvent {
   startTime: string;
   endTime: string;
   source: ObservationSource;
+  status?: string;
+  rawData?: string;
 }
 
 export interface CalendarStatusResponse {

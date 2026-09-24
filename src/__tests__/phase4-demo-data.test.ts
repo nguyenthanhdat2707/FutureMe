@@ -70,6 +70,22 @@ describe('Phase 4 deterministic demo dataset', () => {
     }
   });
 
+  it('stores a valid dashboard category and optional meeting link in every calendar raw_data payload', () => {
+    const dataset = generatePhase4Dataset(seededAt);
+    const validCategories = new Set(['deep_work', 'meeting', 'deadline', 'recovery', 'other']);
+
+    for (const record of dataset.records.calendarEvents) {
+      const metadata = JSON.parse(record.raw_data as string) as Record<string, unknown>;
+      expect(validCategories.has(metadata.category as string)).toBe(true);
+      if ('meetingLink' in metadata) expect(metadata.meetingLink).toMatch(/^https:\/\//);
+    }
+
+    expect(dataset.records.calendarEvents.some((record) => {
+      const metadata = JSON.parse(record.raw_data as string) as Record<string, unknown>;
+      return typeof metadata.meetingLink === 'string';
+    })).toBe(true);
+  });
+
   it('preserves authority, expiry, and stable-entity conflict fixtures', () => {
     const dataset = generatePhase4Dataset(seededAt);
     const focused = dataset.records.personalContext.filter((record) => record.persona === 'focused-builder' && record.attribute === 'goal:ship');
