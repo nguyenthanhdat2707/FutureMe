@@ -30,13 +30,17 @@ const categoryStyles = {
   other: 'bg-slate-500 text-white shadow-slate-200',
 } as const;
 
-const categoryIcons = {
-  deep_work: '🎯',
-  meeting: '👥',
-  deadline: '⚠️',
-  recovery: '🌿',
-  other: '📌',
-} as const;
+const calendarPastelStyles: Record<string, { bg: string; border: string; text: string }> = {
+  deep_work: { bg: '#EDE9FE', border: '#C4B5FD', text: '#6D28D9' },
+  meeting:   { bg: '#DBEAFE', border: '#93C5FD', text: '#1D4ED8' },
+  deadline:  { bg: '#FEE2E2', border: '#FCA5A5', text: '#B91C1C' },
+  recovery:  { bg: '#D1FAE5', border: '#6EE7B7', text: '#047857' },
+  other:     { bg: '#F3F4F6', border: '#D1D5DB', text: '#4B5563' },
+};
+
+function getPastelStyle(category: string) {
+  return calendarPastelStyles[category] ?? calendarPastelStyles.other;
+}
 
 const categoryBadges = {
   deep_work: 'Focus',
@@ -185,25 +189,67 @@ interface EventButtonProps {
 function EventButton({ event, selectedCategory, onOpen, style, mobile = false }: EventButtonProps) {
   const metadata = parseEventMetadata(event);
   const highlighted = selectedCategory === null || selectedCategory === metadata.category;
-  const badge = categoryBadges[metadata.category];
+  const pastel = getPastelStyle(metadata.category);
+
+  // Duration-based adaptive rendering
+  const durationMs = new Date(event.endTime).getTime() - new Date(event.startTime).getTime();
+  const durationMin = durationMs / 60_000;
+  const isCompact = durationMin < 45;
+  const isExtended = durationMin > 90;
+
+  // Flexibility from rawData
+  let flexibility = '';
+  try {
+    const raw = JSON.parse(event.rawData ?? '{}') as Record<string, unknown>;
+    if (typeof raw.flexibility === 'string') flexibility = (raw.flexibility as string).toUpperCase();
+  } catch { /* ignore */ }
 
   return (
     <button
       type="button"
       onClick={() => onOpen(event)}
-      style={style}
+      style={{
+        ...(style ?? {}),
+        background: pastel.bg,
+        borderColor: pastel.border,
+        color: pastel.text,
+      }}
       data-category={metadata.category}
-      className={`${mobile ? 'relative w-full' : 'absolute'} min-w-0 overflow-hidden rounded-xl px-2.5 py-2 text-left shadow-sm transition focus-visible:z-20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${categoryStyles[metadata.category]} ${
-        highlighted ? 'opacity-100' : 'opacity-30 grayscale-[35%]'
+      className={`${mobile ? 'relative w-full' : 'absolute'} min-w-0 overflow-hidden rounded-[14px] border px-2.5 py-2 text-left transition focus-visible:z-20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
+        highlighted ? 'opacity-100' : 'opacity-40'
       }`}
-      aria-label={`${event.title}, ${formatTime(event.startTime)} to ${formatTime(event.endTime)}, ${badge}`}
+      aria-label={`${event.title}, ${formatTime(event.startTime)} to ${formatTime(event.endTime)}`}
     >
-      <span className="flex min-w-0 items-center gap-2">
-        <span aria-hidden="true">{categoryIcons[metadata.category]}</span>
-        <span className="min-w-0 flex-1 truncate text-xs font-bold">{event.title}</span>
-        <span className="shrink-0 rounded-full bg-white/20 text-white px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide">{badge}</span>
+      {/* Subtle decorative circle — only on non-compact */}
+      {!isCompact && (
+        <span
+          className="pointer-events-none absolute right-1 top-1 size-8 rounded-full opacity-20"
+          style={{ background: pastel.border }}
+          aria-hidden="true"
+        />
+      )}
+      <span className="relative flex min-w-0 items-center gap-1.5">
+        <span className="min-w-0 flex-1 truncate text-xs font-bold" style={{ color: pastel.text }}>{event.title}</span>
+        {!isCompact && flexibility && (
+          <span
+            className="shrink-0 rounded px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide"
+            style={{ background: pastel.border + '55', color: pastel.text }}
+          >
+            {flexibility}
+          </span>
+        )}
       </span>
-      {mobile && <time className="mt-1.5 block text-[11px] opacity-75">{formatTime(event.startTime)}–{formatTime(event.endTime)}</time>}
+      {!isCompact && (
+        <time className="mt-0.5 block text-[11px] opacity-80">{formatTime(event.startTime)}–{formatTime(event.endTime)}</time>
+      )}
+      {isCompact && (
+        <time className="block text-[10px] opacity-70">{formatTime(event.startTime)}</time>
+      )}
+      {isExtended && (
+        <span className="mt-1 block text-[10px] leading-4 opacity-70" style={{ color: pastel.text }}>
+          {metadata.category.replace('_', ' ').toUpperCase()}
+        </span>
+      )}
     </button>
   );
 }
@@ -388,7 +434,7 @@ export interface DeadlinesCardProps extends AsyncStateProps {
 export function DeadlinesCard({ deadlines, loading, error, onRetry }: DeadlinesCardProps) {
   if (loading) return <CardSkeleton label="deadlines" />;
   return (
-    <section className="card flex min-h-[25rem] flex-col p-5 sm:p-6" aria-labelledby="deadlines-title">
+    <section className="card flex min-h-[22rem] flex-col p-5 sm:p-6" aria-labelledby="deadlines-title">
       <div>
         <p className="text-xs font-bold uppercase tracking-[0.18em] text-text-secondary">Priority queue</p>
         <h2 id="deadlines-title" className="mt-2 text-xl font-semibold text-text-primary">Deadlines</h2>
@@ -450,13 +496,13 @@ export function TaskTypeBubbleCard({
   const sorted = [...allocation].sort((left, right) => right.hours - left.hours);
   const hasData = allocation.some((slice) => slice.hours > 0);
   const bubbleClasses = [
-    'left-1/2 top-2 size-[8.5rem] -translate-x-1/2 bg-violet-950 text-white z-10',
-    'right-3 top-10 size-20 bg-violet-200 text-violet-950',
-    'bottom-2 left-5 size-14 bg-violet-100 text-violet-950',
+    'left-1/2 top-1/2 size-36 -translate-x-1/2 -translate-y-1/2 bg-violet-950 text-white z-10',
+    'right-[calc(50%-4.5rem-1.5rem)] top-[calc(50%-4.5rem-2rem)] size-20 bg-violet-200 text-violet-950 z-20',
+    'left-[calc(50%-4.5rem-1.5rem)] bottom-[calc(50%-4.5rem-2rem)] size-14 bg-violet-100 text-violet-950 z-20',
   ];
 
   return (
-    <section className="card flex min-h-[25rem] flex-col p-5 sm:p-6" aria-labelledby="task-type-title">
+    <section className="card flex min-h-[22rem] flex-col p-5 sm:p-6" aria-labelledby="task-type-title">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 id="task-type-title" className="text-xl font-semibold text-text-primary">Task type</h2>
@@ -477,7 +523,7 @@ export function TaskTypeBubbleCard({
 
       {error ? <ErrorState copy="Allocation could not load" onRetry={onRetry} /> : (
         <>
-          <div className="relative mx-auto mt-5 h-56 w-full max-w-72" aria-label="Planned time allocation">
+          <div className="relative mx-auto mt-5 h-60 w-full max-w-72" aria-label="Planned time allocation">
             {sorted.map((slice, index) => (
               <button
                 key={slice.category}
@@ -543,7 +589,7 @@ export function UpcomingAndSuggestionsCard({ upcomingMeeting, suggestions, now, 
   const visibleSuggestions = suggestions.filter((suggestion) => !dismissed.includes(suggestion.id));
 
   return (
-    <section className="card flex min-h-[25rem] flex-col p-5 sm:p-6" aria-labelledby="upcoming-title">
+    <section className="card flex min-h-[22rem] flex-col p-5 sm:p-6" aria-labelledby="upcoming-title">
       <h2 id="upcoming-title" className="text-xl font-semibold text-text-primary">Upcoming &amp; Suggestions</h2>
       {error ? <ErrorState copy="Suggestions could not load" onRetry={onRetry} /> : (
         <div className="mt-5 space-y-5">
@@ -607,7 +653,11 @@ export interface DashboardInsightGridProps {
 }
 
 export function DashboardInsightGrid({ children }: DashboardInsightGridProps) {
-  return <div className="grid min-w-0 grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3 [&>*:last-child]:md:col-span-2 [&>*:last-child]:lg:col-span-1">{children}</div>;
+  return (
+    <div className="grid min-w-0 grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-[31fr_32fr_37fr] [&>*:last-child]:md:col-span-2 [&>*:last-child]:lg:col-span-1">
+      {children}
+    </div>
+  );
 }
 
 export interface EventDetailDialogProps {
