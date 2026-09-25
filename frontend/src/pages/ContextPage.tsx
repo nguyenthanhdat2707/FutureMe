@@ -6,15 +6,14 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   LineChart,
   Line,
-  BarChart,
-  Bar,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   Legend,
   ResponsiveContainer,
-  Cell,
 } from 'recharts';
 import { api } from '../api/client';
 import { DEMO_PERSONA_CHANGED_EVENT } from '../config/demo-personas';
@@ -86,45 +85,64 @@ function SectionAccordion({
 // ─── Estimated Focus Patterns ────────────────────────────────────────────────
 function EstimatedFocusPatterns({ context, events }: { context: PersonalContext; events: CalendarEvent[] }) {
   const pattern = buildEstimatedFocusPattern(context, events);
-  const chartData = pattern.map((point) => ({ time: point.time, Focus: point.focus }));
   const bestWindow = bestFocusWindow(pattern);
   const hasCalendarData = events.length > 0 || context.goals.length > 0;
 
+  // Build multi-layer streamgraph data from focus pattern
+  const chartData = pattern.map((point) => {
+    const focus = point.focus;
+    const meeting = Math.max(0, 100 - focus) * 0.4;
+    const recovery = focus < 50 ? (50 - focus) * 0.3 : 0;
+    return {
+      time: point.time,
+      'Focus potential': focus,
+      'Meeting load': Math.round(meeting),
+      'Recovery': Math.round(recovery),
+    };
+  });
+
   return (
     <div
-      className="rounded-2xl bg-white shadow-sm p-6"
-      style={{ border: '1px solid rgba(249,115,22,0.14)' }}
+      className="rounded-3xl bg-white p-6"
+      style={{ border: '1px solid rgba(40,50,70,0.08)', boxShadow: '0 8px 28px rgba(30,35,55,0.05)' }}
     >
       <div className="flex items-baseline justify-between mb-4">
         <h2 className="text-base font-semibold text-gray-800">Estimated Focus Patterns</h2>
-        <span className="text-xs text-gray-400 italic">Estimated from your schedule and context</span>
+        <span className="text-xs text-gray-400">This week</span>
       </div>
       {hasCalendarData ? (
         <>
           <ResponsiveContainer width="100%" height={180}>
-            <BarChart data={chartData} margin={{ top: 4, right: 16, bottom: 4, left: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.05)" vertical={false} />
-              <XAxis dataKey="time" tick={{ fontSize: 11, fill: '#9ca3af' }} />
-              <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: '#9ca3af' }} unit="%" hide />
+            <AreaChart data={chartData} margin={{ top: 8, right: 16, bottom: 4, left: 0 }}>
+              <defs>
+                <linearGradient id="focusGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#7C3AED" stopOpacity={0.5} />
+                  <stop offset="95%" stopColor="#7C3AED" stopOpacity={0.05} />
+                </linearGradient>
+                <linearGradient id="meetingGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#C4B5FD" stopOpacity={0.55} />
+                  <stop offset="95%" stopColor="#C4B5FD" stopOpacity={0.05} />
+                </linearGradient>
+                <linearGradient id="recoveryGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#F97316" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#F97316" stopOpacity={0.02} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="0" stroke="rgba(0,0,0,0)" vertical={false} />
+              <XAxis dataKey="time" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+              <YAxis hide domain={[0, 100]} />
               <Tooltip
-                formatter={(v: unknown) => [`${v as number}%`, 'Focus potential']}
-                contentStyle={{ borderRadius: 10, border: '1px solid rgba(249,115,22,0.2)', fontSize: 13 }}
+                contentStyle={{ borderRadius: 10, border: '1px solid rgba(122,92,246,0.2)', fontSize: 12, background: 'white' }}
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                formatter={(v: any, name: any) => [`${String(v)}%`, name] as any}
               />
-              <Bar dataKey="Focus" radius={[4, 4, 0, 0]}>
-                {chartData.map((entry) => (
-                  <Cell
-                    key={entry.time}
-                    fill={entry.Focus >= 80 ? '#6366F1' : entry.Focus >= 60 ? '#F97316' : entry.Focus >= 40 ? '#F59E0B' : '#e5e7eb'}
-                  />
-                ))}
-              </Bar>
-            </BarChart>
+              <Area type="monotone" dataKey="Focus potential" stroke="#7C3AED" strokeWidth={2} fill="url(#focusGrad)" />
+              <Area type="monotone" dataKey="Meeting load" stroke="#C4B5FD" strokeWidth={1.5} fill="url(#meetingGrad)" />
+              <Area type="monotone" dataKey="Recovery" stroke="#F97316" strokeWidth={1} fill="url(#recoveryGrad)" />
+            </AreaChart>
           </ResponsiveContainer>
-          <p className="text-xs text-gray-400 mt-3">
-            Purple = high · Orange = moderate · Yellow = low · Gray = minimal
-          </p>
           {bestWindow && (
-            <p className="text-sm text-gray-600 mt-2">Best estimated focus conditions: <strong>{bestWindow}</strong></p>
+            <p className="text-sm text-gray-600 mt-3">Best estimated focus window: <strong>{bestWindow}</strong></p>
           )}
         </>
       ) : (
@@ -398,57 +416,50 @@ function ContextPage() {
 
         {/* ── Context by Category + AI Insight ──────────────────── */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* bar chart */}
+        {/* Context by Category — compact dot list */}
           <div
-            className="rounded-2xl bg-white shadow-sm p-6"
-            style={{ border: '1px solid rgba(249,115,22,0.14)' }}
+            className="rounded-3xl bg-white p-6"
+            style={{ border: '1px solid rgba(40,50,70,0.08)', boxShadow: '0 8px 28px rgba(30,35,55,0.05)' }}
           >
-            <h2 className="text-base font-semibold text-gray-800 mb-4">Context by Category</h2>
-            <ResponsiveContainer width="100%" height={160}>
-              <BarChart
-                layout="vertical"
-                data={barData}
-                margin={{ top: 0, right: 24, bottom: 0, left: 16 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.05)" horizontal={false} />
-                <XAxis type="number" tick={{ fontSize: 12, fill: '#9ca3af' }} allowDecimals={false} />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 13, fill: '#374151' }} width={96} />
-                <Tooltip
-                  contentStyle={{ borderRadius: 10, border: '1px solid rgba(249,115,22,0.2)', fontSize: 13 }}
-                />
-                <Bar dataKey="value" radius={[0, 6, 6, 0]}>
-                  {barData.map((_, i) => (
-                    <Cell key={i} fill={barColors[i]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-gray-400 mb-4">Context by Category</p>
+            <div className="space-y-3">
+              {barData.map((item, i) => {
+                const maxVal = Math.max(...barData.map(d => d.value), 1);
+                void maxVal; // used for future scaling
+                return (
+                  <div key={item.name} className="flex items-center gap-3">
+                    <span className="w-24 text-sm text-gray-700 shrink-0">{item.name}</span>
+                    <span className="text-sm font-semibold text-gray-800 w-5 shrink-0">{item.value}</span>
+                    <div className="flex-1 flex gap-1 items-center">
+                      {Array.from({ length: Math.min(item.value, 12) }, (_, dot) => (
+                        <span key={dot} className="inline-block size-2 rounded-full flex-shrink-0" style={{ background: barColors[i] }} />
+                      ))}
+                      {item.value > 12 && <span className="text-[10px] text-gray-400">+{item.value - 12}</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           {/* AI insight card */}
           <div
-            className="rounded-2xl bg-white shadow-sm p-6 flex flex-col justify-between"
-            style={{ border: '1px solid rgba(249,115,22,0.14)', borderLeft: '4px solid #F97316' }}
+            className="rounded-3xl bg-white p-6 flex flex-col justify-between"
+            style={{ border: '1px solid rgba(40,50,70,0.08)', borderLeft: '4px solid #7C3AED', boxShadow: '0 8px 28px rgba(30,35,55,0.05)' }}
           >
-            <h2 className="text-base font-semibold text-gray-800 mb-4">What Future Me Learned</h2>
-            <ul className="space-y-3 text-sm text-gray-700">
-              <li className="flex items-start gap-2">
-                <span className="mt-0.5 text-green-500">✓</span>
-                <span>
-                  <strong>{confirmedCount}</strong> item{confirmedCount !== 1 ? 's' : ''} confirmed by you
-                </span>
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-gray-400 mb-4">What Future Me Learned</p>
+            <ul className="space-y-2 text-sm text-gray-700">
+              <li className="flex items-center gap-3 p-2 rounded-xl bg-green-50">
+                <span className="text-green-600 font-bold">✓</span>
+                <span><strong>{confirmedCount}</strong> confirmed by you</span>
               </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-0.5" style={{ color: COLORS.decisions }}>◆</span>
-                <span>
-                  <strong>{inferredCount}</strong> item{inferredCount !== 1 ? 's' : ''} inferred by AI
-                </span>
+              <li className="flex items-center gap-3 p-2 rounded-xl bg-violet-50">
+                <span className="text-violet-500">◆</span>
+                <span><strong>{inferredCount}</strong> inferred patterns</span>
               </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-0.5 text-purple-400">📅</span>
-                <span>
-                  <strong>{calendarCount}</strong> item{calendarCount !== 1 ? 's' : ''} from your calendar
-                </span>
+              <li className="flex items-center gap-3 p-2 rounded-xl bg-blue-50">
+                <span className="text-blue-400">◷</span>
+                <span><strong>{calendarCount}</strong> calendar signals</span>
               </li>
               {latestDate && (
                 <li className="flex items-start gap-2 text-gray-400">
@@ -457,6 +468,12 @@ function ContextPage() {
                 </li>
               )}
             </ul>
+            {latestDate && (
+              <div className="mt-3 p-3 rounded-xl bg-violet-50 border border-violet-100">
+                <p className="text-xs font-semibold text-violet-700 mb-1">Most recent signal</p>
+                <p className="text-xs text-violet-600">Last observed: {latestDate}</p>
+              </div>
+            )}
             <p className="text-xs text-gray-400 mt-4">
               Total context items: <strong>{gc + cc + pc + dc}</strong>
             </p>

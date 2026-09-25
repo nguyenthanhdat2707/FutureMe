@@ -6,6 +6,7 @@ import DecisionsPage from './pages/DecisionsPage';
 import DashboardPage from './pages/DashboardPage';
 import DemoPage from './pages/DemoPage';
 import AuthPage from './pages/AuthPage';
+import LandingPage from './pages/LandingPage';
 import { AuthProvider } from './auth/AuthProvider';
 import { RequireAuth } from './auth/RequireAuth';
 
@@ -15,6 +16,7 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/auth" element={<AuthPage />} />
+          <Route path="/landing" element={<LandingPage />} />
           <Route path="/" element={<RequireAuth><AuthenticatedLayout /></RequireAuth>}>
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<DashboardPage />} />
