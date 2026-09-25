@@ -1,5 +1,13 @@
 # Project Status & Roadmap: Future Me
 
+## Active Phase — Temporal Intelligence, Trade-Off Reasoning & Demo Reset
+
+- **State:** IMPLEMENTING
+- **Branch:** `feat/temporal-tradeoff-reset`
+- **Fixed gates:** 1/8 verified; Work Unit 2 in progress
+- **Detailed resumable status:** `docs/temporal/STATUS.md`
+- **Scope boundary:** deterministic temporal/capacity reasoning, six coherent demo personas, shared runtime state, focus-pattern behavior, selected-persona reset, and verification only. Landing and later phases remain out of scope.
+
 This document tracks the verified completion of the Future Me MVP roadmap. It separates structural scaffolding from verified behavioral capabilities. Completion criteria require passing automated tests or explicit visual proof, not just code existence.
 
 ## Status Summary

@@ -18,6 +18,14 @@ export interface PersonalContext {
   setupCompleted?: boolean;
 }
 
+export type GoalStatusType = 'active' | 'paused' | 'completed';
+export type CommitmentPriority = 'low' | 'medium' | 'high';
+export type CommitmentFlexibility = 'fixed' | 'movable' | 'optional';
+export type CommitmentConsequence = 'low' | 'medium' | 'high';
+export type CalendarEventCategory = 'deep_work' | 'meeting' | 'deadline' | 'recovery' | 'other';
+export type AttendanceRequirement = 'required' | 'optional' | 'unknown';
+export type FocusQuality = 'high' | 'medium' | 'low';
+
 export interface Goal {
   id: string;
   description: string;
@@ -28,6 +36,9 @@ export interface Goal {
   attributeId?: string;
   observedAt?: Date;
   validUntil?: Date;
+  status?: GoalStatusType;
+  progressPercent?: number;
+  remainingEffortHours?: number;
 }
 
 export interface Commitment {
@@ -42,6 +53,13 @@ export interface Commitment {
   observedAt?: Date;
   validUntil?: Date;
   status?: string;
+  priority?: CommitmentPriority;
+  flexibility?: CommitmentFlexibility;
+  consequence?: CommitmentConsequence;
+  category?: CalendarEventCategory;
+  linkedGoalId?: string;
+  attendanceRequirement?: AttendanceRequirement;
+  focusQuality?: FocusQuality;
 }
 
 export interface Preference {
