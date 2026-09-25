@@ -26,6 +26,7 @@ import type {
   ObservationSource,
   CalendarEvent,
 } from '../types/domain';
+import { bestFocusWindow, buildEstimatedFocusPattern } from '../utils/focus-patterns';
 
 // ─── colour palette (shared across charts) ───────────────────────────────────
 const COLORS = {
@@ -83,54 +84,11 @@ function SectionAccordion({
 }
 
 // ─── Estimated Focus Patterns ────────────────────────────────────────────────
-// Derived from the persona's seeded calendar context (busy hours by time of day).
-// Does NOT require a focus_sessions table — uses calendar metadata already present.
-const FOCUS_HOURS = [6, 8, 10, 12, 14, 16, 18, 20, 22];
-
-function EstimatedFocusPatterns({ context }: { context: PersonalContext }) {
-  // Build a synthetic time-of-day focus score from calendar data
-  // We use busyHoursToday / busyHoursThisWeek and known persona preferences
-  // to infer at which hours conditions are best for focus.
-  // The chart is labelled "Estimated — derived from your schedule and context"
-
-  const busyToday = context.calendar.busyHoursToday ?? 0;
-  const busyWeek = context.calendar.busyHoursThisWeek ?? 0;
-
-  // Derive a fragmentation score: high busy-to-available ratio = more fragmented
-  const dailyCapacity = 8; // workday hours
-  const todayFrag = Math.min(1, busyToday / dailyCapacity);
-
-  // Check if persona prefers morning work
-  const morningPreferred = context.preferences.some(
-    (p: Preference) => typeof p.value === 'string' && /morning/i.test(p.value),
-  );
-
-  // Build time-of-day focus score (0–100)
-  // Morning deep work: high score 06–12 if morning preferred and not over-busy
-  // Afternoon: moderate but drops if heavily loaded
-  // Evening: low baseline
-  const focusScore = (h: number): number => {
-    const base = (() => {
-      if (h >= 6 && h < 9) return morningPreferred ? 80 : 50;
-      if (h >= 9 && h < 12) return morningPreferred ? 90 : 70;
-      if (h === 12) return 30; // lunch
-      if (h >= 13 && h < 16) return morningPreferred ? 55 : 75;
-      if (h >= 16 && h < 18) return 40;
-      if (h >= 18 && h < 20) return morningPreferred ? 25 : 35;
-      return 15;
-    })();
-    // Reduce by fragmentation for typical busy hours (9–17)
-    if (h >= 9 && h < 17) return Math.max(5, Math.round(base * (1 - todayFrag * 0.4)));
-    return base;
-  };
-
-  const chartData = FOCUS_HOURS.map((h) => ({
-    time: `${String(h).padStart(2, '0')}:00`,
-    Focus: focusScore(h),
-  }));
-
-  // Show empty state if no meaningful calendar data available
-  const hasCalendarData = busyWeek > 0 || context.goals.length > 0;
+function EstimatedFocusPatterns({ context, events }: { context: PersonalContext; events: CalendarEvent[] }) {
+  const pattern = buildEstimatedFocusPattern(context, events);
+  const chartData = pattern.map((point) => ({ time: point.time, Focus: point.focus }));
+  const bestWindow = bestFocusWindow(pattern);
+  const hasCalendarData = events.length > 0 || context.goals.length > 0;
 
   return (
     <div
@@ -165,6 +123,9 @@ function EstimatedFocusPatterns({ context }: { context: PersonalContext }) {
           <p className="text-xs text-gray-400 mt-3">
             Purple = high · Orange = moderate · Yellow = low · Gray = minimal
           </p>
+          {bestWindow && (
+            <p className="text-sm text-gray-600 mt-2">Best estimated focus conditions: <strong>{bestWindow}</strong></p>
+          )}
         </>
       ) : (
         <p className="text-gray-400 text-sm py-4 text-center">Add goals or commitments to see your estimated focus window</p>
@@ -503,7 +464,7 @@ function ContextPage() {
         </div>
 
         {/* ── Focus Patterns (estimated from calendar) ─────────── */}
-        <EstimatedFocusPatterns context={context} />
+        <EstimatedFocusPatterns context={context} events={weekEvents} />
 
         {/* ── Personal Context ──────────────────────────────────── */}
 

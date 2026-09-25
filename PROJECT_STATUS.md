@@ -4,7 +4,7 @@
 
 - **State:** IMPLEMENTING
 - **Branch:** `feat/temporal-tradeoff-reset`
-- **Fixed gates:** 2/8 verified; Work Unit 3 in progress
+- **Fixed gates:** 4/8 verified; Work Unit 5 in progress
 - **Detailed resumable status:** `docs/temporal/STATUS.md`
 - **Scope boundary:** deterministic temporal/capacity reasoning, six coherent demo personas, shared runtime state, focus-pattern behavior, selected-persona reset, and verification only. Landing and later phases remain out of scope.
 

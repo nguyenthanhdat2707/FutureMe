@@ -9,14 +9,14 @@ Working tree: `/home/tdat/Documents/Learn/Code/HackathonIdea-VKU-09-2026/Future-
 
 1. Existing semantics and minimal metadata — COMPLETE
 2. Capacity and trade-off reasoning — COMPLETE
-3. Six coherent temporal personas — IN PROGRESS
-4. Deterministic persona-specific focus patterns — PENDING
-5. Shared accepted/rejected runtime state — PENDING
+3. Six coherent temporal personas — COMPLETE
+4. Deterministic persona-specific focus patterns — COMPLETE
+5. Shared accepted/rejected runtime state — IN PROGRESS
 6. Selected-persona canonical reset — PENDING
 7. Full tests/lint/build/browser and high-risk review — PENDING
 8. Incremental commits pushed and READY_FOR_USER_TEST handoff — PENDING
 
-Progress: 2/8 (25%)
+Progress: 4/8 (50%)
 
 ## Latest verification
 
@@ -31,6 +31,11 @@ Progress: 2/8 (25%)
 - Work Unit 2 backend lint/build: PASS. Frontend types remain compatible with the previously verified 70/70 frontend tests and production build.
 - Full backend suite after Work Unit 2: 179/180 PASS. Only the previously isolated time-sensitive mock-calendar test remains.
 - Claude Opus 5 independent rereview: PASS with no blockers after Codex repaired long-horizon relevance, material-overlap, protected linked-work, explicit-precedence, and recommendation-order edge cases.
+- Work Units 3–4 targeted backend persona/calendar tests: 21/21 PASS; backend lint/build PASS.
+- Work Unit 4 frontend: 13 files / 72 tests PASS; lint and production build PASS with three pre-existing lint warnings and the existing bundle-size advisory.
+- Seed contract is now `temporal-demo-v1`: six coherent personas, 36 context records, 94 calendar records, eight observations and six decisions across a rolling 30-day narrative.
+- The mock calendar's stale current-week anchoring was repaired and its rolling-horizon integration test passes.
+- Focus patterns deterministically use persona preferences, shared calendar events, fragmentation, and `Asia/Ho_Chi_Minh`; the UI keeps the required estimation label.
 
 ## Preflight decisions
 
@@ -54,3 +59,5 @@ Claude Opus 5 completed a read-only capacity-mechanism review. Accepted: optiona
 - Antigravity stalled twice during Work Unit 1. Its partial type/helper edits were preserved; Codex completed and verified the bounded unit. No out-of-scope worker artifacts remain.
 - Antigravity also remained at its startup banner for Work Unit 2 and produced no source diff within the 90-second execution boundary. Codex stopped it, removed its dependency symlink artifact, implemented the bounded unit directly, and obtained an independent Claude Opus 5 review.
 - The full backend gate currently has one pre-existing temporal failure: the mock adapter anchors all events Monday-Friday, so Friday's 09:00 event is already past when the Phase 3 sync test runs later Friday. This will be repaired in the temporal-data unit rather than hidden or treated as a Work Unit 1 regression.
+- The mock-calendar temporal failure was repaired in Work Unit 3. The first full-suite rerun then exposed a stale week-range assertion in `routes.integration.test.ts`; the targeted rolling-horizon repair now passes and awaits the final full-suite gate.
+- Antigravity was not retried for Work Units 3–4 after repeated no-edit stalls. Codex completed the bounded changes directly; an independent final review remains required before the phase gate closes.

@@ -78,17 +78,16 @@ describe('API route integration', () => {
     expect(syncResponse.body.synced).toBeGreaterThan(0);
 
     const now = new Date();
-    const weekStart = new Date(now);
-    weekStart.setDate(now.getDate() - ((now.getDay() + 6) % 7));
-    weekStart.setHours(0, 0, 0, 0);
-    const weekEnd = new Date(weekStart.getTime() + 7 * 86_400_000);
+    const horizonStart = new Date(now);
+    horizonStart.setHours(0, 0, 0, 0);
+    const horizonEnd = new Date(horizonStart.getTime() + 7 * 86_400_000);
 
     const eventsResponse = await request(app)
       .get('/api/calendar/events')
       .query({
         userId: 'demo-user',
-        start: weekStart.toISOString(),
-        end: weekEnd.toISOString(),
+        start: horizonStart.toISOString(),
+        end: horizonEnd.toISOString(),
       });
 
     expect(eventsResponse.status).toBe(200);
