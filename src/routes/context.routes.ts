@@ -230,6 +230,55 @@ contextRouter.post('/analyze', async (req: Request, res: Response) => {
   }
 });
 
+// Get context understanding evolution history (time-windowed counts)
+contextRouter.get('/history', async (req: Request, res: Response) => {
+  try {
+    const userId = getUserId(req);
+    const contextRepo = getContextRepository();
+
+    const rawDays = typeof req.query.days === 'string' ? parseInt(req.query.days, 10) : 30;
+    const days = Math.max(1, Math.min(90, Number.isFinite(rawDays) ? rawDays : 30));
+
+    const attributes = await contextRepo.findByUserId(userId, 500);
+    const now = new Date();
+
+    // Skip system/meta attributes; only count persona data
+    const SKIP_ATTRS = new Set(['setup_completed', 'calendar_last_sync', 'calendar-sync', 'onboarding_answer', 'setup', 'expired']);
+    const relevant = attributes.filter(a => !SKIP_ATTRS.has(a.attribute) && !a.attribute.startsWith('calendar'));
+
+    // Build 7 equally-spaced data points from (now - days) to now
+    const POINTS = 7;
+    const history = Array.from({ length: POINTS }, (_, i) => {
+      // i=0 is oldest, i=6 is now
+      const fraction = i / (POINTS - 1);
+      const t = new Date(now.getTime() - (1 - fraction) * days * 86_400_000);
+      const label = i === POINTS - 1 ? 'Today' : `-${Math.round((1 - fraction) * days)}d`;
+
+      let goals = 0;
+      let commitments = 0;
+      let preferences = 0;
+      let decisions = 0;
+
+      for (const attr of relevant) {
+        const observedAt = attr.observedAt instanceof Date ? attr.observedAt : new Date(attr.observedAt);
+        const validUntil = attr.validUntil ? (attr.validUntil instanceof Date ? attr.validUntil : new Date(attr.validUntil)) : null;
+        if (observedAt > t) continue;
+        if (validUntil && validUntil <= t) continue;
+        if (attr.attribute.startsWith('goal:')) goals++;
+        else if (attr.attribute.startsWith('commitment:')) commitments++;
+        else if (attr.attribute.startsWith('preference:')) preferences++;
+        else if (attr.attribute.startsWith('decision:')) decisions++;
+      }
+
+      return { label, goals, commitments, preferences, decisions };
+    });
+
+    res.json({ history });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
+});
+
 // Clarify an uncertain context attribute
 contextRouter.post('/clarify', async (req: Request, res: Response) => {
   try {

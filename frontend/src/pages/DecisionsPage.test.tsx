@@ -83,8 +83,8 @@ describe('DecisionsPage - RECOMMEND', () => {
       expect(screen.getByText(/proceed/i)).toBeInTheDocument();
     });
 
-    expect(screen.getByText(/This recommendation is non-binding/i)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Choose|Accept|Persist/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/What will you do\?/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Accept & Add to Schedule/i })).toBeInTheDocument();
     expect(screen.queryByText('AI')).not.toBeInTheDocument(); // No standalone AI badge
   });
 

@@ -96,6 +96,14 @@ export const contextApi = {
     return response.json();
   },
 
+  async getHistory(days = 30): Promise<{ history: Array<{ label: string; goals: number; commitments: number; preferences: number; decisions: number }> }> {
+    const response = await authFetch(`${API_BASE_URL}/context/history?days=${days}`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch context history: ${response.status}`);
+    }
+    return response.json();
+  },
+
   async update(observation: ContextUpdateObservation, userId: string = 'demo-user'): Promise<PersonalContext> {
     const response = await authFetch(`${API_BASE_URL}/context/update`, {
       method: 'POST',
@@ -346,7 +354,26 @@ export const calendarApi = {
     }
     const data = await response.json();
     return data.events || [];
-  }
+  },
+
+  async createEvent(event: { title: string; startTime: string; endTime: string; category?: string; note?: string }): Promise<CalendarEvent> {
+    const response = await authFetch(`${API_BASE_URL}/calendar/events`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(event),
+    });
+    if (!response.ok) {
+      let message = `Failed to create calendar event: ${response.status}`;
+      try {
+        const body: unknown = await response.json();
+        if (typeof body === 'object' && body !== null && 'error' in body && typeof (body as Record<string, unknown>).error === 'string') {
+          message = (body as Record<string, string>).error;
+        }
+      } catch { /* keep status message */ }
+      throw new Error(message);
+    }
+    return response.json();
+  },
 };
 
 // ============================================================================

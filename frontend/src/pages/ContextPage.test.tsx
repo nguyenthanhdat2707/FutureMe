@@ -9,8 +9,12 @@ vi.mock('../api/client', () => ({
   api: {
     context: {
       getCurrent: vi.fn(),
+      getHistory: vi.fn(),
       confirm: vi.fn(),
       correct: vi.fn(),
+    },
+    calendar: {
+      getEvents: vi.fn(),
     }
   }
 }));
@@ -18,6 +22,46 @@ vi.mock('../api/client', () => ({
 describe('ContextPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(api.context.getHistory).mockResolvedValue({ history: [] });
+    vi.mocked(api.calendar.getEvents).mockResolvedValue([]);
+  });
+
+  it('loads context history on mount', async () => {
+    vi.mocked(api.context.getCurrent).mockResolvedValueOnce({
+      userId: 'test',
+      setupCompleted: true,
+      goals: [], commitments: [], preferences: [],
+      calendar: { status: 'synced', lastSync: '2023-01-01T00:00:00Z', upcomingEvents: 0, busyHoursToday: 0, busyHoursThisWeek: 0 },
+      recentDecisions: [],
+      lastUpdated: ''
+    });
+    vi.mocked(api.context.getHistory).mockResolvedValueOnce({ history: [{ label: 'Q1', goals: 1, commitments: 2, preferences: 3, decisions: 4 }] });
+    
+    render(<ContextPage />);
+    
+    await waitFor(() => {
+      expect(api.context.getHistory).toHaveBeenCalledWith(30);
+    });
+    expect(screen.queryByText(/This week \(/)).not.toBeInTheDocument();
+  });
+
+  it('shows this week events in calendar overview when events present', async () => {
+    vi.mocked(api.context.getCurrent).mockResolvedValueOnce({
+      userId: 'test',
+      setupCompleted: true,
+      goals: [], commitments: [], preferences: [],
+      calendar: { status: 'synced', lastSync: '2023-01-01T00:00:00Z', upcomingEvents: 1, busyHoursToday: 1, busyHoursThisWeek: 1 },
+      recentDecisions: [],
+      lastUpdated: ''
+    });
+    vi.mocked(api.calendar.getEvents).mockResolvedValueOnce([
+      { id: 'ev1', title: 'Test Weekly Sync', startTime: '2023-01-02T10:00:00Z', endTime: '2023-01-02T11:00:00Z', source: 'USER_CONFIRMED' as ObservationSource, status: 'confirmed' }
+    ]);
+
+    render(<ContextPage />);
+
+    expect(await screen.findByText('Test Weekly Sync')).toBeInTheDocument();
+    expect(screen.getByText('This week (1 events)')).toBeInTheDocument();
   });
 
   it('renders null busy hours as Unknown and shows calendar status', async () => {

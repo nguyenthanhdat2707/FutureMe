@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client';
+import { DEMO_PERSONA_CHANGED_EVENT } from '../config/demo-personas';
 import { InterventionCard } from '../components/InterventionCard';
 import {
   DashboardHeader,
@@ -77,6 +78,32 @@ export function DashboardPage() {
     const controller = new AbortController();
     void loadData(rangeStart, controller.signal);
     return () => controller.abort();
+  }, [loadData, rangeStart]);
+
+  useEffect(() => {
+    const handler = () => {
+      setEvents([]);
+      setContext(null);
+      void loadData(startOfWeek(new Date()));
+    };
+    window.addEventListener(DEMO_PERSONA_CHANGED_EVENT, handler);
+    return () => window.removeEventListener(DEMO_PERSONA_CHANGED_EVENT, handler);
+  }, [loadData]);
+
+  // Reload calendar when an AI-accepted action creates a new event
+  useEffect(() => {
+    const handler = () => { void loadData(rangeStart); };
+    window.addEventListener('future-me-calendar-updated', handler);
+    return () => window.removeEventListener('future-me-calendar-updated', handler);
+  }, [loadData, rangeStart]);
+
+  // Reload when tab regains focus (catches navigation back from Ask Future Me)
+  useEffect(() => {
+    const handler = () => {
+      if (document.visibilityState === 'visible') void loadData(rangeStart);
+    };
+    document.addEventListener('visibilitychange', handler);
+    return () => document.removeEventListener('visibilitychange', handler);
   }, [loadData, rangeStart]);
 
   const handleSync = async () => {

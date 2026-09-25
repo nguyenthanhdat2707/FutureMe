@@ -1,5 +1,5 @@
 import { useState, useEffect, type FormEvent } from 'react';
-import { decisionsApi, contextApi } from '../api/client';
+import { decisionsApi, contextApi, api } from '../api/client';
 import type { DecisionApiRequest, DecisionApiResponse, ContextUpdateObservation, ObservationSource } from '../types/domain';
 import { useInterventions } from '../hooks/useInterventions';
 import { InterventionCard } from '../components/InterventionCard';
@@ -138,6 +138,8 @@ function DecisionsPage() {
   const [clarificationAnswers, setClarificationAnswers] = useState<Record<string, string>>(() => readSessionValue('decisions_clarificationAnswers', {}));
   const [showObservationForm, setShowObservationForm] = useState(false);
   const [hasStaleContext, setHasStaleContext] = useState(() => readSessionValue('decisions_hasStaleContext', false));
+  const [choiceState, setChoiceState] = useState<'none' | 'accepted' | 'rejected' | 'pending'>('none');
+  const [choiceError, setChoiceError] = useState<string | null>(null);
   const { intervention, refresh: refreshInterventions, respond, dismiss } = useInterventions();
 
   useEffect(() => sessionStorage.setItem('decisions_form', JSON.stringify(form)), [form]);
@@ -161,6 +163,8 @@ function DecisionsPage() {
     setClarificationAnswers({});
     setHasStaleContext(false);
     setError(null);
+    setChoiceState('none');
+    setChoiceError(null);
   };
 
   const updateField = (field: keyof DemoForm, value: string) => {
@@ -220,6 +224,8 @@ function DecisionsPage() {
       setResult(response);
       setHasStaleContext(false);
       setClarificationAnswers({});
+      setChoiceState('none');
+      setChoiceError(null);
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : 'Unable to request decision support.');
     } finally {
@@ -295,10 +301,65 @@ function DecisionsPage() {
       setResult(response);
       setHasStaleContext(false);
       setClarificationAnswers({});
+      setChoiceState('none');
+      setChoiceError(null);
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : 'Unable to reassess decision.');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // ── Accept / Reject write-back ────────────────────────────────────────────
+  const handleAccept = async () => {
+    if (!result) return;
+    const decisionId = result.decision?.id;
+    const option = result.decision?.recommendation?.option ?? 'proceed';
+    const question = form.question.trim();
+    setChoiceState('pending');
+    setChoiceError(null);
+    try {
+      if (decisionId) {
+        await decisionsApi.recordChoice(decisionId, option, `Accepted: ${option}`);
+      }
+      // Scheduling intent heuristic
+      const isSchedulingIntent = /reserve|schedule|block|add.*session|focus.*time|time.*for|set aside/i.test(question);
+      if (isSchedulingIntent) {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(9, 0, 0, 0);
+        const tomorrowEnd = new Date(tomorrow);
+        tomorrowEnd.setHours(11, 0, 0, 0);
+        await api.calendar.createEvent({
+          title: `Focus: ${question.slice(0, 60)}`,
+          startTime: tomorrow.toISOString(),
+          endTime: tomorrowEnd.toISOString(),
+          category: 'deep_work',
+          note: `AI-recommended. Decision: ${option}`,
+        });
+        window.dispatchEvent(new CustomEvent('future-me-calendar-updated'));
+      }
+      setChoiceState('accepted');
+    } catch (err) {
+      setChoiceError(err instanceof Error ? err.message : 'Failed to record acceptance');
+      setChoiceState('none');
+    }
+  };
+
+  const handleReject = async () => {
+    if (!result) return;
+    const decisionId = result.decision?.id;
+    const option = result.decision?.recommendation?.option ?? 'proceed';
+    setChoiceState('pending');
+    setChoiceError(null);
+    try {
+      if (decisionId) {
+        await decisionsApi.recordChoice(decisionId, 'rejected', `Rejected: ${option}`);
+      }
+      setChoiceState('rejected');
+    } catch (err) {
+      setChoiceError(err instanceof Error ? err.message : 'Failed to record rejection');
+      setChoiceState('none');
     }
   };
 
@@ -797,12 +858,38 @@ function DecisionsPage() {
 
       {result?.policy?.outcome === 'RECOMMEND' && recommendation && assessment && (
         <section className="space-y-6" aria-live="polite">
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800" role="alert">
-            <p className="font-medium">Decision guidance</p>
-            <p className="mt-1">
-              This recommendation is non-binding. Future Me cannot record your final choice in this phase. The decision is yours to make. Trade-offs are explanatory and do not determine the policy outcome.
-            </p>
-          </div>
+          {choiceState === 'none' || choiceState === 'pending' ? (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+              <p className="font-medium text-emerald-800 text-sm mb-3">What will you do?</p>
+              <div className="flex flex-wrap gap-3">
+                <button
+                  onClick={() => void handleAccept()}
+                  disabled={choiceState === 'pending'}
+                  className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {choiceState === 'pending' ? 'Saving...' : 'Accept & Add to Schedule'}
+                </button>
+                <button
+                  onClick={() => void handleReject()}
+                  disabled={choiceState === 'pending'}
+                  className="px-4 py-2 rounded-lg bg-white border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Not now
+                </button>
+              </div>
+              {choiceError && <p className="mt-2 text-xs text-red-600">{choiceError}</p>}
+            </div>
+          ) : choiceState === 'accepted' ? (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+              ✓ Choice recorded. If this was a scheduling request, the event was added to your calendar.
+              <button onClick={() => setChoiceState('none')} className="ml-4 underline text-xs">Change</button>
+            </div>
+          ) : (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+              Noted — no calendar change was made.
+              <button onClick={() => setChoiceState('none')} className="ml-4 underline text-xs">Change mind</button>
+            </div>
+          )}
 
           <article className="card p-6">
             <div className="flex items-start gap-3">

@@ -38,6 +38,54 @@ calendarRouter.get('/events', async (req: Request, res: Response) => {
   }
 });
 
+// Create a calendar event (persists an AI-accepted action)
+calendarRouter.post('/events', async (req: Request, res: Response) => {
+  try {
+    const calendarRepo = getCalendarEventRepository();
+    const userId = getUserId(req);
+    const body = req.body as { title?: unknown; startTime?: unknown; endTime?: unknown; category?: unknown; note?: unknown };
+
+    const { title, startTime, endTime, category, note } = body;
+
+    if (typeof title !== 'string' || title.trim().length === 0) {
+      res.status(400).json({ error: 'title must be a non-empty string' });
+      return;
+    }
+    if (typeof startTime !== 'string' || typeof endTime !== 'string') {
+      res.status(400).json({ error: 'startTime and endTime must be ISO date strings' });
+      return;
+    }
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      res.status(400).json({ error: 'Invalid startTime or endTime' });
+      return;
+    }
+    if (end.getTime() <= start.getTime()) {
+      res.status(400).json({ error: 'endTime must be after startTime' });
+      return;
+    }
+
+    const categoryStr = typeof category === 'string' && category.trim().length > 0 ? category.trim() : 'other';
+    const noteStr = typeof note === 'string' ? note.trim() : '';
+
+    const event = await calendarRepo.create({
+      userId,
+      externalId: `accepted-action-${Date.now()}`,
+      title: title.trim(),
+      startTime: start,
+      endTime: end,
+      status: 'CONFIRMED',
+      rawData: JSON.stringify({ category: categoryStr, note: noteStr, source: 'ai-accepted' }),
+      syncedAt: new Date(),
+    });
+
+    res.status(201).json(event);
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
+});
+
 // Trigger sync
 calendarRouter.post('/sync', async (req: Request, res: Response) => {
   try {
