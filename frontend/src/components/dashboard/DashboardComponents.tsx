@@ -166,7 +166,7 @@ function CalendarSkeleton() {
         <div className="h-6 w-52 animate-pulse rounded bg-slate-100" />
         <div className="mt-2 h-4 w-72 max-w-full animate-pulse rounded bg-slate-100" />
       </div>
-      <div className="grid h-[clamp(22rem,50vh,30rem)] grid-cols-7 gap-px bg-surface-border p-px">
+      <div className="grid h-[clamp(26rem,56vh,38rem)] grid-cols-7 gap-px bg-surface-border p-px">
         {Array.from({ length: 7 }, (_, index) => <div key={index} className="animate-pulse bg-slate-50" />)}
       </div>
       <span className="sr-only">Loading calendar data...</span>
@@ -317,7 +317,7 @@ export function GanttCalendar({
               </div>
             )})}
 
-            <div className="relative h-[clamp(22rem,50vh,30rem)] border-t border-surface-border">
+            <div className="relative h-[clamp(26rem,56vh,38rem)] border-t border-surface-border">
               {TIME_MARKERS.map((hour) => (
                 <time
                   key={hour}
@@ -336,7 +336,7 @@ export function GanttCalendar({
               return (
                 <div
                   key={day.toISOString()}
-                  className={`relative h-[clamp(22rem,50vh,30rem)] min-w-0 border-l border-t border-surface-border bg-[linear-gradient(to_bottom,transparent_24.8%,var(--color-surface-border)_25%,transparent_25.2%,transparent_62.3%,var(--color-surface-border)_62.5%,transparent_62.7%)] ${
+                  className={`relative h-[clamp(26rem,56vh,38rem)] min-w-0 border-l border-t border-surface-border bg-[linear-gradient(to_bottom,transparent_24.8%,var(--color-surface-border)_25%,transparent_25.2%,transparent_62.3%,var(--color-surface-border)_62.5%,transparent_62.7%)] ${
                     isWeekend ? 'bg-[repeating-linear-gradient(45deg,transparent,transparent_4px,rgba(0,0,0,0.03)_4px,rgba(0,0,0,0.03)_8px)]' : ''
                   }`}
                 >
@@ -397,8 +397,8 @@ export function DeadlinesCard({ deadlines, loading, error, onRetry }: DeadlinesC
         <p className="my-auto py-12 text-center text-sm text-text-secondary">No urgent deadlines this week</p>
       ) : (
         <ol className="mt-5 divide-y divide-surface-border">
-          {deadlines.slice(0, 3).map((deadline, index) => (
-            <li key={deadline.id} className={`items-center gap-3 py-4 ${index === 2 ? 'hidden sm:flex' : 'flex'}`}>
+          {deadlines.slice(0, 5).map((deadline, index) => (
+            <li key={deadline.id} className={`items-center gap-3 py-3 ${index >= 3 ? 'hidden sm:flex' : 'flex'}`}>
               <time
                 className={`grid size-12 shrink-0 place-items-center rounded-xl text-center ${
                   deadline.urgency === 'overdue' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-900'

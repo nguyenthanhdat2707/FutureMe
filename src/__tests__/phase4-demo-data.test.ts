@@ -49,15 +49,78 @@ afterAll(() => fs.rmSync(tempRoot, { recursive: true, force: true }));
 describe('Phase 4 deterministic demo dataset', () => {
   const seededAt = new Date('2026-01-02T03:04:05.000Z');
 
-  it('produces six personas and the exact 6/36/8/94/6 = 150 contract', () => {
+  it('produces six personas and the exact 6/72/36/390/6 = 510 contract', () => {
     const dataset = generatePhase4Dataset(seededAt);
     expect(dataset.personas.map((persona) => persona.slug)).toEqual(PERSONA_SLUGS);
     expect(dataset.records.users).toHaveLength(6);
-    expect(dataset.records.personalContext).toHaveLength(36);
-    expect(dataset.records.observations).toHaveLength(8);
-    expect(dataset.records.calendarEvents).toHaveLength(94);
+    expect(dataset.records.personalContext).toHaveLength(72);
+    expect(dataset.records.observations).toHaveLength(36);
+    expect(dataset.records.calendarEvents).toHaveLength(390);
     expect(dataset.records.decisions).toHaveLength(6);
-    expect(Object.values(dataset.records).flat()).toHaveLength(150);
+    expect(Object.values(dataset.records).flat()).toHaveLength(510);
+  });
+
+  it('busy-balancer has at least 60 calendar events and multiple displaceable commitments', () => {
+    const dataset = generatePhase4Dataset(seededAt);
+    const events = dataset.records.calendarEvents.filter((record) => record.persona === 'busy-balancer');
+    expect(events.length).toBeGreaterThanOrEqual(60);
+    const displaceable = events.filter((record) => {
+      const metadata = JSON.parse(record.raw_data as string) as Record<string, unknown>;
+      return (metadata.flexibility === 'OPTIONAL' || metadata.flexibility === 'MOVABLE') && metadata.priority === 'LOW';
+    });
+    expect(displaceable.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('needs-clarity has zero events on day 2 (Wednesday) and at most 2 on day 3 (Thursday)', () => {
+    const dataset = generatePhase4Dataset(seededAt);
+    const refDate = new Date('2026-01-02T03:04:05.000Z');
+    const localClock = new Date(refDate.getTime() + 7 * 3_600_000);
+    const localDayStartUtc = new Date(Date.UTC(localClock.getUTCFullYear(), localClock.getUTCMonth(), localClock.getUTCDate(), -7));
+    const wd = (day: number) => new Date(localDayStartUtc.getTime() + day * 86_400_000);
+    const events = dataset.records.calendarEvents.filter((record) => record.persona === 'needs-clarity');
+    const wedEvents = events.filter((record) => {
+      const start = new Date(record.start_time as string);
+      return start >= wd(2) && start < wd(3);
+    });
+    const thuEvents = events.filter((record) => {
+      const start = new Date(record.start_time as string);
+      return start >= wd(3) && start < wd(4);
+    });
+    expect(wedEvents).toHaveLength(0);
+    expect(thuEvents.length).toBeLessThanOrEqual(2);
+  });
+
+  it('focused-builder has a LOW-priority MOVABLE event during the morning focus window on day 2', () => {
+    const dataset = generatePhase4Dataset(seededAt);
+    const events = dataset.records.calendarEvents.filter((record) => record.persona === 'focused-builder');
+    const movableLow = events.filter((record) => {
+      const metadata = JSON.parse(record.raw_data as string) as Record<string, unknown>;
+      return metadata.flexibility === 'MOVABLE' && metadata.priority === 'LOW';
+    });
+    expect(movableLow.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('overloaded-lead has no events on day 2 (Wednesday) after 13:00 VN', () => {
+    const dataset = generatePhase4Dataset(seededAt);
+    const refDate = new Date('2026-01-02T03:04:05.000Z');
+    const localClock = new Date(refDate.getTime() + 7 * 3_600_000);
+    const localDayStartUtc = new Date(Date.UTC(localClock.getUTCFullYear(), localClock.getUTCMonth(), localClock.getUTCDate(), -7));
+    const wdStart = (day: number, hour: number) => new Date(localDayStartUtc.getTime() + day * 86_400_000 + hour * 3_600_000);
+    const events = dataset.records.calendarEvents.filter((record) => record.persona === 'overloaded-lead');
+    const wedAfternoon = events.filter((record) => {
+      const start = new Date(record.start_time as string);
+      return start >= wdStart(2, 6) && start < wdStart(3, 0);
+    });
+    expect(wedAfternoon).toHaveLength(0);
+  });
+
+  it('all personas have at least 50 calendar events', () => {
+    const dataset = generatePhase4Dataset(seededAt);
+    const slugs = ['focused-builder', 'busy-balancer', 'overloaded-lead', 'needs-clarity', 'uncertain-skipper', 'conflict-check'] as const;
+    for (const slug of slugs) {
+      const count = dataset.records.calendarEvents.filter((record) => record.persona === slug).length;
+      expect(count).toBeGreaterThanOrEqual(50);
+    }
   });
 
   it('uses deterministic public demo IDs as every record owner', () => {
@@ -121,7 +184,7 @@ describe('Phase 4 manifest safety', () => {
     const persisted = fs.readFileSync(manifestPath, 'utf8');
     expect(persisted.toLowerCase()).not.toMatch(/password|secret|token/);
     expect(state.entries.map((entry) => entry.id)).toEqual(callerOrder);
-    expect(loadManifest(manifestPath)?.entries).toHaveLength(150);
+    expect(loadManifest(manifestPath)?.entries).toHaveLength(510);
   });
 
   it('rejects altered persona IDs and credential-bearing manifests', () => {
@@ -206,7 +269,7 @@ describe('Phase 4 exact DynamoDB protections', () => {
 });
 
 describe('Phase 4 apply, verify, and rollback', () => {
-  it('preflights all 150 keys before the first write and persists completion', async () => {
+  it('preflights all 510 keys before the first write and persists completion', async () => {
     const manifestPath = setupTemp('apply');
     const send = jest.fn().mockImplementation((command: unknown) => {
       const input = commandInput(command);
@@ -217,8 +280,8 @@ describe('Phase 4 apply, verify, and rollback', () => {
     logSpy.mockRestore();
 
     const calls = send.mock.calls as Array<[unknown]>;
-    expect(calls.slice(0, 150).every(([command]) => !commandInput(command).RequestItems)).toBe(true);
-    expect(commandInput(calls[150][0]).RequestItems).toBeDefined();
+    expect(calls.slice(0, 510).every(([command]) => !commandInput(command).RequestItems)).toBe(true);
+    expect(commandInput(calls[510][0]).RequestItems).toBeDefined();
     expect(loadManifest(manifestPath)?.entries.every((entry) => entry.completed)).toBe(true);
   });
 
