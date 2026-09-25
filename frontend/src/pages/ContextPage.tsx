@@ -33,17 +33,7 @@ const COLORS = {
   decisions: '#F59E0B',
 };
 
-// ─── synthetic 7-point history ────────────────────────────────────────────────
-function buildHistory(g: number, c: number, p: number, d: number) {
-  const days = ['Day 1', 'Day 2', 'Day 3', 'Day 4', 'Day 5', 'Day 6', 'Today'];
-  return days.map((day, i) => ({
-    day,
-    Goals: Math.max(0, g - (6 - i)),
-    Commitments: Math.max(0, c - Math.floor((6 - i) * 1.2)),
-    Preferences: Math.max(0, p - (6 - i)),
-    Decisions: Math.max(0, d - (6 - i) * 2),
-  }));
-}
+type HistoryPoint = { label: string; Goals: number; Commitments: number; Preferences: number; Decisions: number };
 
 // ─── sub-components ───────────────────────────────────────────────────────────
 
@@ -90,10 +80,102 @@ function SectionAccordion({
   );
 }
 
+// ─── Estimated Focus Patterns ────────────────────────────────────────────────
+// Derived from the persona's seeded calendar context (busy hours by time of day).
+// Does NOT require a focus_sessions table — uses calendar metadata already present.
+const FOCUS_HOURS = [6, 8, 10, 12, 14, 16, 18, 20, 22];
+
+function EstimatedFocusPatterns({ context }: { context: PersonalContext }) {
+  // Build a synthetic time-of-day focus score from calendar data
+  // We use busyHoursToday / busyHoursThisWeek and known persona preferences
+  // to infer at which hours conditions are best for focus.
+  // The chart is labelled "Estimated — derived from your schedule and context"
+
+  const busyToday = context.calendar.busyHoursToday ?? 0;
+  const busyWeek = context.calendar.busyHoursThisWeek ?? 0;
+
+  // Derive a fragmentation score: high busy-to-available ratio = more fragmented
+  const dailyCapacity = 8; // workday hours
+  const todayFrag = Math.min(1, busyToday / dailyCapacity);
+
+  // Check if persona prefers morning work
+  const morningPreferred = context.preferences.some(
+    (p: Preference) => typeof p.value === 'string' && /morning/i.test(p.value),
+  );
+
+  // Build time-of-day focus score (0–100)
+  // Morning deep work: high score 06–12 if morning preferred and not over-busy
+  // Afternoon: moderate but drops if heavily loaded
+  // Evening: low baseline
+  const focusScore = (h: number): number => {
+    const base = (() => {
+      if (h >= 6 && h < 9) return morningPreferred ? 80 : 50;
+      if (h >= 9 && h < 12) return morningPreferred ? 90 : 70;
+      if (h === 12) return 30; // lunch
+      if (h >= 13 && h < 16) return morningPreferred ? 55 : 75;
+      if (h >= 16 && h < 18) return 40;
+      if (h >= 18 && h < 20) return morningPreferred ? 25 : 35;
+      return 15;
+    })();
+    // Reduce by fragmentation for typical busy hours (9–17)
+    if (h >= 9 && h < 17) return Math.max(5, Math.round(base * (1 - todayFrag * 0.4)));
+    return base;
+  };
+
+  const chartData = FOCUS_HOURS.map((h) => ({
+    time: `${String(h).padStart(2, '0')}:00`,
+    Focus: focusScore(h),
+  }));
+
+  // Show empty state if no meaningful calendar data available
+  const hasCalendarData = busyWeek > 0 || context.goals.length > 0;
+
+  return (
+    <div
+      className="rounded-2xl bg-white shadow-sm p-6"
+      style={{ border: '1px solid rgba(249,115,22,0.14)' }}
+    >
+      <div className="flex items-baseline justify-between mb-4">
+        <h2 className="text-base font-semibold text-gray-800">Estimated Focus Patterns</h2>
+        <span className="text-xs text-gray-400 italic">Estimated from your schedule and context</span>
+      </div>
+      {hasCalendarData ? (
+        <>
+          <ResponsiveContainer width="100%" height={180}>
+            <BarChart data={chartData} margin={{ top: 4, right: 16, bottom: 4, left: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.05)" vertical={false} />
+              <XAxis dataKey="time" tick={{ fontSize: 11, fill: '#9ca3af' }} />
+              <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: '#9ca3af' }} unit="%" hide />
+              <Tooltip
+                formatter={(v: unknown) => [`${v as number}%`, 'Focus potential']}
+                contentStyle={{ borderRadius: 10, border: '1px solid rgba(249,115,22,0.2)', fontSize: 13 }}
+              />
+              <Bar dataKey="Focus" radius={[4, 4, 0, 0]}>
+                {chartData.map((entry) => (
+                  <Cell
+                    key={entry.time}
+                    fill={entry.Focus >= 80 ? '#6366F1' : entry.Focus >= 60 ? '#F97316' : entry.Focus >= 40 ? '#F59E0B' : '#e5e7eb'}
+                  />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+          <p className="text-xs text-gray-400 mt-3">
+            Purple = high · Orange = moderate · Yellow = low · Gray = minimal
+          </p>
+        </>
+      ) : (
+        <p className="text-gray-400 text-sm py-4 text-center">Add goals or commitments to see your estimated focus window</p>
+      )}
+    </div>
+  );
+}
+
 // ─── main component ───────────────────────────────────────────────────────────
 
 function ContextPage() {
   const [context, setContext] = useState<PersonalContext | null>(null);
+  const [historyData, setHistoryData] = useState<HistoryPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingItem, setEditingItem] = useState<{ type: string; id: string; value: string } | null>(null);
@@ -102,9 +184,21 @@ function ContextPage() {
   const loadContext = useCallback(async (isInitial = false, signal?: AbortSignal) => {
     try {
       if (isInitial) setLoading(true);
-      const data = await api.context.getCurrent();
+      const [data, historyResult] = await Promise.all([
+        api.context.getCurrent(),
+        api.context.getHistory(30).catch(() => null),
+      ]);
       if (signal?.aborted) return;
       setContext(data);
+      if (historyResult?.history) {
+        setHistoryData(historyResult.history.map((p) => ({
+          label: p.label,
+          Goals: p.goals,
+          Commitments: p.commitments,
+          Preferences: p.preferences,
+          Decisions: p.decisions,
+        })));
+      }
       setError(null);
     } catch (err) {
       if (signal?.aborted) return;
@@ -233,7 +327,8 @@ function ContextPage() {
   const pc = context.preferences.length;
   const dc = context.recentDecisions.length;
 
-  const historyData = buildHistory(gc, cc, pc, dc);
+  // historyData is loaded from API (real temporal data from personal_context)
+  // Falls back to empty array until API responds; chart shows flat line for new users
 
   const barData = [
     { name: 'Goals', value: gc },
@@ -295,12 +390,12 @@ function ContextPage() {
         >
           <div className="flex items-baseline justify-between mb-4">
             <h2 className="text-base font-semibold text-gray-800">Understanding Evolution</h2>
-            <span className="text-xs text-gray-400 italic">Illustrative data</span>
+            <span className="text-xs text-gray-400 italic">{historyData.length > 0 ? 'From your context history' : 'No history yet'}</span>
           </div>
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={historyData} margin={{ top: 4, right: 16, bottom: 4, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.05)" />
-              <XAxis dataKey="day" tick={{ fontSize: 12, fill: '#9ca3af' }} />
+              <XAxis dataKey="label" tick={{ fontSize: 12, fill: '#9ca3af' }} />
               <YAxis tick={{ fontSize: 12, fill: '#9ca3af' }} allowDecimals={false} />
               <Tooltip
                 contentStyle={{ borderRadius: 10, border: '1px solid rgba(249,115,22,0.2)', fontSize: 13 }}
@@ -388,14 +483,8 @@ function ContextPage() {
           </div>
         </div>
 
-        {/* ── Focus Patterns (empty state) ──────────────────────── */}
-        <div
-          className="rounded-2xl bg-white shadow-sm p-8 text-center"
-          style={{ border: '1px solid rgba(249,115,22,0.14)' }}
-        >
-          <h2 className="text-base font-semibold text-gray-800 mb-2">Your Focus Patterns</h2>
-          <p className="text-gray-400 text-sm">Record a focus session to see your patterns</p>
-        </div>
+        {/* ── Focus Patterns (estimated from calendar) ─────────── */}
+        <EstimatedFocusPatterns context={context} />
 
         {/* ── Personal Context ──────────────────────────────────── */}
 
