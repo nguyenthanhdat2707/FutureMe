@@ -10,20 +10,25 @@ import {
   getCalendarEventRepository,
   getDecisionRepository,
   getObservationRepository,
-  getInterventionRepository
+  getInterventionRepository,
+  getDemoResetRepository
 } from '../services/service-container';
+import { isDemoPersonaId } from '../demo/personas';
 import { getUserId } from '../utils/identity';
 import { getErrorMessage } from '../utils/error';
 
 export const demoRouter = Router();
 
-// Clear data for demo user
-demoRouter.post('/reset', (req: Request, res: Response) => {
+// Restore only the selected demo persona to its deterministic baseline.
+demoRouter.post('/reset', async (req: Request, res: Response) => {
   try {
     const userId = getUserId(req);
-
-    // Reset stub executed
-    res.json({ success: true, clearedUserId: userId, message: "Reset stub executed" });
+    if (!isDemoPersonaId(userId)) {
+      res.status(400).json({ error: 'Reset is available only for an allowlisted demo persona' });
+      return;
+    }
+    const result = await getDemoResetRepository().resetPersona(userId);
+    res.json(result);
   } catch (error: unknown) {
     res.status(500).json({ error: getErrorMessage(error) });
   }

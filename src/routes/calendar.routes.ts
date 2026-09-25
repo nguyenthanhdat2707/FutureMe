@@ -43,9 +43,9 @@ calendarRouter.post('/events', async (req: Request, res: Response) => {
   try {
     const calendarRepo = getCalendarEventRepository();
     const userId = getUserId(req);
-    const body = req.body as { title?: unknown; startTime?: unknown; endTime?: unknown; category?: unknown; note?: unknown };
+    const body = req.body as { title?: unknown; startTime?: unknown; endTime?: unknown; category?: unknown; note?: unknown; decisionId?: unknown };
 
-    const { title, startTime, endTime, category, note } = body;
+    const { title, startTime, endTime, category, note, decisionId } = body;
 
     if (typeof title !== 'string' || title.trim().length === 0) {
       res.status(400).json({ error: 'title must be a non-empty string' });
@@ -71,12 +71,23 @@ calendarRouter.post('/events', async (req: Request, res: Response) => {
 
     const event = await calendarRepo.create({
       userId,
-      externalId: `accepted-action-${Date.now()}`,
+      externalId: typeof decisionId === 'string' && decisionId.trim().length > 0
+        ? `accepted-action-${decisionId.trim()}`
+        : `accepted-action-${Date.now()}`,
       title: title.trim(),
       startTime: start,
       endTime: end,
       status: 'CONFIRMED',
-      rawData: JSON.stringify({ category: categoryStr, note: noteStr, source: 'ai-accepted' }),
+      rawData: JSON.stringify({
+        category: categoryStr,
+        note: noteStr,
+        source: 'ai-accepted',
+        origin: 'RUNTIME',
+        flexibility: 'MOVABLE',
+        priority: 'MEDIUM',
+        consequence: 'MEDIUM',
+        ...(typeof decisionId === 'string' ? { decisionId: decisionId.trim() } : {}),
+      }),
       syncedAt: new Date(),
     });
 

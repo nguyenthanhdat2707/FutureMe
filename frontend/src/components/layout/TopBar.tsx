@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { isCognitoMode } from '../../auth/cognito';
+import { api } from '../../api/client';
 import {
   clearPersonaSessionState,
   DEMO_PERSONAS,
@@ -31,6 +32,8 @@ export function TopBar() {
   const { signOut, user } = useAuth();
   const navigate = useNavigate();
   const [selectedPersonaId, setSelectedPersonaId] = useState(() => isDemoMode ? getSelectedDemoPersonaId() : '');
+  const [resetStatus, setResetStatus] = useState<'idle' | 'resetting' | 'success' | 'error'>('idle');
+  const [resetError, setResetError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isDemoMode) return;
@@ -54,6 +57,23 @@ export function TopBar() {
     clearPersonaSessionState();
     setSelectedDemoPersonaId(personaId);
     setSelectedPersonaId(personaId);
+    setResetStatus('idle');
+    setResetError(null);
+  };
+
+  const resetPersona = async () => {
+    setResetStatus('resetting');
+    setResetError(null);
+    try {
+      await api.demo.reset();
+      clearPersonaSessionState();
+      setSelectedDemoPersonaId(selectedPersonaId);
+      window.dispatchEvent(new CustomEvent('future-me-calendar-updated'));
+      setResetStatus('success');
+    } catch (error) {
+      setResetError(error instanceof Error ? error.message : 'Failed to reset demo persona');
+      setResetStatus('error');
+    }
   };
 
   const handleSignOut = () => {
@@ -120,6 +140,18 @@ export function TopBar() {
                     </button>
                   );
                 })}
+                <div className="mt-2 border-t border-surface-border px-3 pt-3">
+                  <button
+                    type="button"
+                    onClick={() => void resetPersona()}
+                    disabled={resetStatus === 'resetting'}
+                    className="w-full rounded-xl border border-red-200 px-3 py-2 text-left text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-wait disabled:opacity-60"
+                  >
+                    {resetStatus === 'resetting' ? 'Restoring persona…' : 'Reset demo persona'}
+                  </button>
+                  {resetStatus === 'success' && <p className="mt-2 text-xs text-green-700">Persona restored.</p>}
+                  {resetStatus === 'error' && resetError && <p className="mt-2 text-xs text-red-700">{resetError}</p>}
+                </div>
               </div>
             )}
 

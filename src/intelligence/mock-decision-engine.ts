@@ -183,6 +183,10 @@ function parseTradeoffs(content: string): Tradeoff[] {
 
 function clarificationQuestions(missingData: string[]): string[] {
   return missingData.map(field => {
+    if (field.startsWith('attendanceRequirement:')) {
+      const description = field.split(':').slice(2).join(':');
+      return `Is your attendance at ${description || 'the tentative commitment'} required if it goes ahead?`;
+    }
     switch (field) {
       case 'timeCostHours':
         return 'How many hours will this candidate commitment require?';

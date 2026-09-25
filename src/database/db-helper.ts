@@ -54,6 +54,20 @@ export class DB {
     saveDatabaseToDisk();
   }
 
+  runTransaction(statements: ReadonlyArray<{ sql: string; params?: unknown[] }>): void {
+    this.db.run('BEGIN IMMEDIATE TRANSACTION');
+    try {
+      for (const statement of statements) {
+        this.db.run(statement.sql, (statement.params ?? []) as SqlValue[]);
+      }
+      this.db.run('COMMIT');
+      saveDatabaseToDisk();
+    } catch (error) {
+      this.db.run('ROLLBACK');
+      throw error;
+    }
+  }
+
   /**
    * Execute raw SQL (for table creation, etc.)
    */

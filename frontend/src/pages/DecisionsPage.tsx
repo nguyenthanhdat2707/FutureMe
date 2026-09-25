@@ -3,18 +3,24 @@ import { decisionsApi, contextApi, api } from '../api/client';
 import type { DecisionApiRequest, DecisionApiResponse, ContextUpdateObservation, ObservationSource } from '../types/domain';
 import { useInterventions } from '../hooks/useInterventions';
 import { InterventionCard } from '../components/InterventionCard';
+import { demoLocalDateTimeToIso, nextDemoDayAt } from '../utils/demo-time';
 
 interface DemoForm {
   userId: string;
   question: string;
   target: string;
   deadline: string;
+  proposedStart: string;
+  proposedEnd: string;
   timeCostHours: string;
   availableHoursBeforeDeadline: string;
   workloadHoursBeforeDeadline: string;
   energyCost: string;
   availableEnergy: string;
   goalRelevance: 'low' | 'medium' | 'high';
+  priority: '' | 'low' | 'medium' | 'high';
+  flexibility: '' | 'fixed' | 'movable' | 'optional';
+  focusRequirement: '' | 'high' | 'medium' | 'low';
   source: 'user-confirmed' | 'provided' | 'estimated';
 }
 
@@ -29,12 +35,17 @@ const INITIAL_FORM: DemoForm = {
   question: '',
   target: '',
   deadline: '',
+  proposedStart: '',
+  proposedEnd: '',
   timeCostHours: '',
   availableHoursBeforeDeadline: '',
   workloadHoursBeforeDeadline: '',
   energyCost: '',
   availableEnergy: '',
   goalRelevance: 'medium',
+  priority: '',
+  flexibility: '',
+  focusRequirement: '',
   source: 'user-confirmed',
 };
 
@@ -195,18 +206,33 @@ function DecisionsPage() {
       return;
     }
 
+    let proposedStart: string | undefined;
+    let proposedEnd: string | undefined;
+    try {
+      proposedStart = form.proposedStart ? demoLocalDateTimeToIso(form.proposedStart) : undefined;
+      proposedEnd = form.proposedEnd ? demoLocalDateTimeToIso(form.proposedEnd) : undefined;
+    } catch {
+      setError('Enter valid proposed dates and times.');
+      return;
+    }
+
     const request: DecisionApiRequest = {
       query: {
         question,
         impactProfile: {
           target: form.target.trim() || undefined,
           deadline: form.deadline || undefined,
+          proposedStart,
+          proposedEnd,
           timeCostHours: timeCost,
           availableHoursBeforeDeadline: availableHours,
           workloadHoursBeforeDeadline: workloadHours,
           energyCost: energyCost,
           availableEnergy: availableEnergy,
           goalRelevance: form.goalRelevance,
+          priority: form.priority || undefined,
+          flexibility: form.flexibility || undefined,
+          focusRequirement: form.focusRequirement || undefined,
           source: form.source,
         },
       },
@@ -320,22 +346,20 @@ function DecisionsPage() {
     setChoiceError(null);
     try {
       if (decisionId) {
-        await decisionsApi.recordChoice(decisionId, option, `Accepted: ${option}`);
+        await decisionsApi.recordChoice(decisionId, 'accept', `Accepted recommendation: ${option}`);
       }
       // Scheduling intent heuristic
       const isSchedulingIntent = /reserve|schedule|block|add.*session|focus.*time|time.*for|set aside/i.test(question);
-      if (isSchedulingIntent) {
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        tomorrow.setHours(9, 0, 0, 0);
-        const tomorrowEnd = new Date(tomorrow);
-        tomorrowEnd.setHours(11, 0, 0, 0);
+      if (isSchedulingIntent && option !== 'do-not-proceed') {
+        const tomorrow = nextDemoDayAt(9);
+        const tomorrowEnd = nextDemoDayAt(11);
         await api.calendar.createEvent({
           title: `Focus: ${question.slice(0, 60)}`,
           startTime: tomorrow.toISOString(),
           endTime: tomorrowEnd.toISOString(),
           category: 'deep_work',
           note: `AI-recommended. Decision: ${option}`,
+          decisionId,
         });
         window.dispatchEvent(new CustomEvent('future-me-calendar-updated'));
       }
@@ -354,7 +378,7 @@ function DecisionsPage() {
     setChoiceError(null);
     try {
       if (decisionId) {
-        await decisionsApi.recordChoice(decisionId, 'rejected', `Rejected: ${option}`);
+        await decisionsApi.recordChoice(decisionId, 'decline', `Rejected recommendation: ${option}`);
       }
       setChoiceState('rejected');
     } catch (err) {
@@ -520,6 +544,26 @@ function DecisionsPage() {
             </label>
 
             <label className="text-sm text-text-secondary">
+              Proposed start<span aria-hidden="true"> (Asia/Ho_Chi_Minh)</span>
+              <input
+                type="datetime-local"
+                value={form.proposedStart}
+                onChange={(event) => updateField('proposedStart', event.target.value)}
+                className={inputClassName + ' mt-1'}
+              />
+            </label>
+
+            <label className="text-sm text-text-secondary">
+              Proposed end<span aria-hidden="true"> (Asia/Ho_Chi_Minh)</span>
+              <input
+                type="datetime-local"
+                value={form.proposedEnd}
+                onChange={(event) => updateField('proposedEnd', event.target.value)}
+                className={inputClassName + ' mt-1'}
+              />
+            </label>
+
+            <label className="text-sm text-text-secondary">
               Time cost (hours)
               <input
                 type="number"
@@ -588,6 +632,48 @@ function DecisionsPage() {
                 onChange={(event) => updateField('goalRelevance', event.target.value)}
                 className={inputClassName + ' mt-1'}
               >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+            </label>
+
+            <label className="text-sm text-text-secondary">
+              Candidate priority
+              <select
+                value={form.priority}
+                onChange={(event) => updateField('priority', event.target.value)}
+                className={inputClassName + ' mt-1'}
+              >
+                <option value="">Not specified</option>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+            </label>
+
+            <label className="text-sm text-text-secondary">
+              Candidate flexibility
+              <select
+                value={form.flexibility}
+                onChange={(event) => updateField('flexibility', event.target.value)}
+                className={inputClassName + ' mt-1'}
+              >
+                <option value="">Not specified</option>
+                <option value="fixed">Fixed</option>
+                <option value="movable">Movable</option>
+                <option value="optional">Optional</option>
+              </select>
+            </label>
+
+            <label className="text-sm text-text-secondary">
+              Focus requirement
+              <select
+                value={form.focusRequirement}
+                onChange={(event) => updateField('focusRequirement', event.target.value)}
+                className={inputClassName + ' mt-1'}
+              >
+                <option value="">Not specified</option>
                 <option value="low">Low</option>
                 <option value="medium">Medium</option>
                 <option value="high">High</option>

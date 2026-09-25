@@ -1,8 +1,8 @@
 /**
  * Mock Calendar Adapter
  * Used when Google Calendar credentials not available.
- * Events are anchored to the start of the current local week so they always
- * fall at sensible daytime hours regardless of when sync is triggered.
+ * Events use a rolling horizon from the current local day so the mock remains
+ * useful on every weekday instead of expiring near the end of a calendar week.
  */
 
 import { ICalendarAdapter } from './calendar-adapter.interface';
@@ -13,11 +13,8 @@ export class MockCalendarAdapter implements ICalendarAdapter {
     console.log('[MockCalendarAdapter] Syncing events for user:', userId);
 
     const now = new Date();
-    // Monday 00:00 local time
-    const weekStart = new Date(now);
-    const dayOfWeek = (weekStart.getDay() + 6) % 7; // 0=Mon
-    weekStart.setDate(weekStart.getDate() - dayOfWeek);
-    weekStart.setHours(0, 0, 0, 0);
+    const dayStart = new Date(now);
+    dayStart.setHours(0, 0, 0, 0);
 
     const makeEvent = (
       dayOffset: number,
@@ -26,7 +23,7 @@ export class MockCalendarAdapter implements ICalendarAdapter {
       title: string,
       category: string,
     ): Omit<CalendarEvent, 'id' | 'createdAt'> => {
-      const start = new Date(weekStart);
+      const start = new Date(dayStart);
       start.setDate(start.getDate() + dayOffset);
       start.setHours(startHour, 0, 0, 0);
       const end = new Date(start);
@@ -39,7 +36,15 @@ export class MockCalendarAdapter implements ICalendarAdapter {
         startTime: start,
         endTime: end,
         status: 'confirmed',
-        rawData: JSON.stringify({ mock: true, category }),
+        rawData: JSON.stringify({
+          mock: true,
+          category,
+          flexibility: category === 'meeting' ? 'MOVABLE' : 'FIXED',
+          priority: category === 'deep_work' ? 'HIGH' : 'MEDIUM',
+          consequence: category === 'deep_work' ? 'HIGH' : 'MEDIUM',
+          origin: 'RUNTIME',
+          confidence: 1,
+        }),
         syncedAt: now,
       };
     };
