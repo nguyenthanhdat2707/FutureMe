@@ -1,6 +1,6 @@
 # Temporal Intelligence, Trade-Off Reasoning & Demo Reset
 
-State: IMPLEMENTING
+State: TESTING
 Branch: `feat/temporal-tradeoff-reset`
 Base: `origin/main` at `263aa67`
 Working tree: `/home/tdat/Documents/Learn/Code/HackathonIdea-VKU-09-2026/Future-Me-temporal`
@@ -12,11 +12,11 @@ Working tree: `/home/tdat/Documents/Learn/Code/HackathonIdea-VKU-09-2026/Future-
 3. Six coherent temporal personas — COMPLETE
 4. Deterministic persona-specific focus patterns — COMPLETE
 5. Shared accepted/rejected runtime state — COMPLETE
-6. Selected-persona canonical reset — IN PROGRESS
-7. Full tests/lint/build/browser and high-risk review — PENDING
+6. Selected-persona canonical reset — COMPLETE
+7. Full tests/lint/build/browser and high-risk review — IN PROGRESS
 8. Incremental commits pushed and READY_FOR_USER_TEST handoff — PENDING
 
-Progress: 5/8 (62.5%)
+Progress: 6/8 (75%)
 
 ## Latest verification
 
@@ -40,6 +40,13 @@ Progress: 5/8 (62.5%)
 - Accept now uses the existing valid `accept` choice contract, persists a runtime calendar event for scheduling intent, tags it with its decision and runtime origin, and broadcasts the shared calendar refresh event.
 - Reject now uses the existing valid `decline` choice contract and is covered to prove that it does not create a calendar event.
 - Accepted demo scheduling is fixed to 09:00–11:00 `Asia/Ho_Chi_Minh` independent of browser timezone; backend route integration 8/8 PASS, lint/build PASS.
+- Work Unit 6 selected-persona reset is implemented for SQLite and DynamoDB. SQLite reset is transactional; both paths delete applicable persona-owned runtime state and regenerate the canonical `temporal-demo-v1` user/context/observation/calendar/decision baseline from the existing dataset generator.
+- Reset coverage proves baseline restoration, runtime deletion, cross-persona isolation, repeated-reset idempotence, Dynamo restoration, and frontend routed-content remount after same-persona reset. Dynamo pagination is implemented in the repository but is not separately simulated by the fake-client test.
+- Calendar metadata enum parsing now accepts valid seed metadata case-insensitively while preserving conservative defaults for invalid values.
+- Advanced decision inputs now expose proposed start/end, candidate priority/flexibility, and focus requirement. Proposed times are converted from `Asia/Ho_Chi_Minh` wall time to absolute ISO instants independent of browser timezone.
+- Final backend gate after reset/parser changes: 25/25 suites, 184/184 tests PASS; lint PASS; TypeScript build PASS.
+- Final frontend gate after reset/form/timezone changes: 15/15 files, 80/80 tests PASS; lint exits 0 with the three known warnings; production build PASS with the existing bundle-size advisory.
+- Claude Opus 5 corrective high-risk reset review: PASS after repository evidence removed two initial false positives (pagination and enum validation). Remaining browser flows and the final evidence-backed review are still pending.
 
 ## Preflight decisions
 
@@ -65,3 +72,4 @@ Claude Opus 5 completed a read-only capacity-mechanism review. Accepted: optiona
 - The full backend gate currently has one pre-existing temporal failure: the mock adapter anchors all events Monday-Friday, so Friday's 09:00 event is already past when the Phase 3 sync test runs later Friday. This will be repaired in the temporal-data unit rather than hidden or treated as a Work Unit 1 regression.
 - The mock-calendar temporal failure was repaired in Work Unit 3. The first full-suite rerun then exposed a stale week-range assertion in `routes.integration.test.ts`; the targeted rolling-horizon repair now passes and awaits the final full-suite gate.
 - Antigravity was not retried for Work Units 3–4 after repeated no-edit stalls. Codex completed the bounded changes directly; an independent final review remains required before the phase gate closes.
+- Antigravity was retried for final verification and the bounded timezone repair but again stalled without producing source changes; both runs were stopped at the no-progress boundary. Claude Sonnet 4.5 then returned the same gateway 502 twice before starting a turn, so Hermes applied the four-file timezone fix directly and verified it with 14/14 focused tests and the complete frontend gate.

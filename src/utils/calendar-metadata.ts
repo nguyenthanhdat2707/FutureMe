@@ -24,6 +24,10 @@ const VALID_CATEGORY: ReadonlySet<string> = new Set<CalendarEventCategory>(['dee
 const VALID_ATTENDANCE: ReadonlySet<string> = new Set<AttendanceRequirement>(['required', 'optional', 'unknown']);
 const VALID_FOCUS_QUALITY: ReadonlySet<string> = new Set<FocusQuality>(['high', 'medium', 'low']);
 
+function normalizedEnumValue(value: unknown): string | undefined {
+  return typeof value === 'string' ? value.toLowerCase() : undefined;
+}
+
 export function parseCalendarEventMetadata(rawData?: string | null): ParsedCalendarMetadata {
   const result: ParsedCalendarMetadata = {
     flexibility: 'fixed'
@@ -46,20 +50,27 @@ export function parseCalendarEventMetadata(rawData?: string | null): ParsedCalen
 
   const record = parsed as Record<string, unknown>;
 
-  if (typeof record.flexibility === 'string' && VALID_FLEXIBILITY.has(record.flexibility)) {
-    result.flexibility = record.flexibility as CommitmentFlexibility;
+  const flexibility = normalizedEnumValue(record.flexibility);
+  const priority = normalizedEnumValue(record.priority);
+  const consequence = normalizedEnumValue(record.consequence);
+  const category = normalizedEnumValue(record.category);
+  const attendanceRequirement = normalizedEnumValue(record.attendanceRequirement);
+  const focusQuality = normalizedEnumValue(record.focusQuality);
+
+  if (flexibility && VALID_FLEXIBILITY.has(flexibility)) {
+    result.flexibility = flexibility as CommitmentFlexibility;
   }
 
-  if (typeof record.priority === 'string' && VALID_PRIORITY.has(record.priority)) {
-    result.priority = record.priority as CommitmentPriority;
+  if (priority && VALID_PRIORITY.has(priority)) {
+    result.priority = priority as CommitmentPriority;
   }
 
-  if (typeof record.consequence === 'string' && VALID_CONSEQUENCE.has(record.consequence)) {
-    result.consequence = record.consequence as CommitmentConsequence;
+  if (consequence && VALID_CONSEQUENCE.has(consequence)) {
+    result.consequence = consequence as CommitmentConsequence;
   }
 
-  if (typeof record.category === 'string' && VALID_CATEGORY.has(record.category)) {
-    result.category = record.category as CalendarEventCategory;
+  if (category && VALID_CATEGORY.has(category)) {
+    result.category = category as CalendarEventCategory;
   }
 
   const rawGoalId = typeof record.linkedGoalId === 'string'
@@ -69,12 +80,12 @@ export function parseCalendarEventMetadata(rawData?: string | null): ParsedCalen
     result.linkedGoalId = rawGoalId.trim();
   }
 
-  if (typeof record.attendanceRequirement === 'string' && VALID_ATTENDANCE.has(record.attendanceRequirement)) {
-    result.attendanceRequirement = record.attendanceRequirement as AttendanceRequirement;
+  if (attendanceRequirement && VALID_ATTENDANCE.has(attendanceRequirement)) {
+    result.attendanceRequirement = attendanceRequirement as AttendanceRequirement;
   }
 
-  if (typeof record.focusQuality === 'string' && VALID_FOCUS_QUALITY.has(record.focusQuality)) {
-    result.focusQuality = record.focusQuality as FocusQuality;
+  if (focusQuality && VALID_FOCUS_QUALITY.has(focusQuality)) {
+    result.focusQuality = focusQuality as FocusQuality;
   }
 
   return result;

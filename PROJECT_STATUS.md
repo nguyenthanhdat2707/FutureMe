@@ -2,9 +2,9 @@
 
 ## Active Phase — Temporal Intelligence, Trade-Off Reasoning & Demo Reset
 
-- **State:** IMPLEMENTING
+- **State:** TESTING
 - **Branch:** `feat/temporal-tradeoff-reset`
-- **Fixed gates:** 5/8 verified; Work Unit 6 in progress
+- **Fixed gates:** 6/8 verified; automated reset/backend/frontend gates pass, browser verification and final review in progress
 - **Detailed resumable status:** `docs/temporal/STATUS.md`
 - **Scope boundary:** deterministic temporal/capacity reasoning, six coherent demo personas, shared runtime state, focus-pattern behavior, selected-persona reset, and verification only. Landing and later phases remain out of scope.
 

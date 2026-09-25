@@ -31,18 +31,22 @@ describe('API route integration', () => {
     }
   });
 
-  it('resets, seeds, and reports the persisted demo state', async () => {
-    const resetResponse = await request(app).post('/api/demo/reset');
+  it('resets the selected persona, seeds, and reports the persisted demo state', async () => {
+    const personaId = 'temporal-demo-v1:focused-builder';
+    const resetResponse = await request(app)
+      .post('/api/demo/reset')
+      .set('X-Demo-User', personaId);
 
     expect(resetResponse.status).toBe(200);
     expect(resetResponse.body).toMatchObject({
       success: true,
-      message: 'Reset stub executed',
-      clearedUserId: 'demo-user',
+      userId: personaId,
+      seedVersion: 'temporal-demo-v1',
     });
 
     const seedResponse = await request(app)
       .post('/api/demo/seed')
+      .set('X-Demo-User', personaId)
       .send({ scenario: 'hackathon-deadline' });
 
     expect(seedResponse.status).toBe(200);
@@ -51,13 +55,14 @@ describe('API route integration', () => {
       scenario: 'hackathon-deadline',
     });
 
-    const stateResponse = await request(app).get('/api/demo/state');
+    const stateResponse = await request(app)
+      .get('/api/demo/state')
+      .set('X-Demo-User', personaId);
 
     expect(stateResponse.status).toBe(200);
     expect(stateResponse.body).toMatchObject({
       user: expect.objectContaining({
-        id: 'demo-user',
-        email: 'demo@future-me.app',
+        id: personaId,
       }),
       scenario: 'hackathon-deadline',
     });

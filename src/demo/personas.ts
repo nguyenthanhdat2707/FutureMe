@@ -67,3 +67,9 @@ export function getDemoPersonaBySlug(slug: PersonaSlug): DemoPersona {
   if (!persona) throw new Error(`Unknown demo persona: ${slug}`);
   return persona;
 }
+
+export function getDemoPersonaById(id: DemoPersonaId): DemoPersona {
+  const persona = DEMO_PERSONAS.find((candidate) => candidate.id === id);
+  if (!persona) throw new Error(`Unknown demo persona: ${id}`);
+  return persona;
+}

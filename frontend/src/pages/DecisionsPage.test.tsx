@@ -94,6 +94,32 @@ describe('DecisionsPage - RECOMMEND', () => {
     expect(screen.queryByText('AI')).not.toBeInTheDocument(); // No standalone AI badge
   });
 
+  it('submits temporal placement and candidate-value metadata from advanced inputs', async () => {
+    mockQuery.mockResolvedValueOnce(buildFixture('RECOMMEND', 'at-risk', 'proceed-with-caution'));
+
+    render(<DecisionsPage />);
+
+    fireEvent.change(screen.getByLabelText(/What decision do you need help with\?/i), { target: { value: 'Schedule a low-value sync?' } });
+    fireEvent.change(screen.getByLabelText(/Proposed start/), { target: { value: '2026-09-23T09:00' } });
+    fireEvent.change(screen.getByLabelText(/Proposed end/), { target: { value: '2026-09-23T10:00' } });
+    fireEvent.change(screen.getByLabelText('Candidate priority'), { target: { value: 'low' } });
+    fireEvent.change(screen.getByLabelText('Candidate flexibility'), { target: { value: 'movable' } });
+    fireEvent.change(screen.getByLabelText('Focus requirement'), { target: { value: 'low' } });
+    fireEvent.click(screen.getByRole('button', { name: /Ask Future Me/i }));
+
+    await waitFor(() => expect(mockQuery).toHaveBeenCalledWith(expect.objectContaining({
+      query: expect.objectContaining({
+        impactProfile: expect.objectContaining({
+          proposedStart: '2026-09-23T02:00:00.000Z',
+          proposedEnd: '2026-09-23T03:00:00.000Z',
+          priority: 'low',
+          flexibility: 'movable',
+          focusRequirement: 'low',
+        }),
+      }),
+    })));
+  });
+
   it('persists acceptance and creates one shared calendar event for scheduling intent', async () => {
     mockQuery.mockResolvedValueOnce(buildFixture('RECOMMEND', 'feasible', 'proceed', {
       decision: {

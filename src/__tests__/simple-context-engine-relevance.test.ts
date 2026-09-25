@@ -344,6 +344,20 @@ describe('SimpleContextEngine - getRelevantContext Relevance Logic', () => {
         title: 'Unknown calendar item',
         rawData: '{not-json',
       },
+      {
+        ...baseEvent,
+        id: 'calendar-3',
+        externalId: 'external-3',
+        title: 'Seeded optional planning',
+        rawData: JSON.stringify({
+          category: 'MEETING',
+          flexibility: 'OPTIONAL',
+          priority: 'LOW',
+          consequence: 'LOW',
+          attendanceRequirement: 'UNKNOWN',
+          focusQuality: 'MEDIUM',
+        }),
+      },
     ]);
 
     const context = await engine.getCurrentContext('user1');
@@ -360,6 +374,15 @@ describe('SimpleContextEngine - getRelevantContext Relevance Logic', () => {
       expect.objectContaining({
         id: 'cal-calendar-2',
         flexibility: 'fixed',
+      }),
+      expect.objectContaining({
+        id: 'cal-calendar-3',
+        flexibility: 'optional',
+        category: 'meeting',
+        priority: 'low',
+        consequence: 'low',
+        attendanceRequirement: 'unknown',
+        focusQuality: 'medium',
       }),
     ]));
   });
