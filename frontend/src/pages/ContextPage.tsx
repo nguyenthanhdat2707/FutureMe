@@ -17,12 +17,14 @@ import {
   Cell,
 } from 'recharts';
 import { api } from '../api/client';
+import { DEMO_PERSONA_CHANGED_EVENT } from '../config/demo-personas';
 import type {
   PersonalContext,
   Goal,
   Commitment,
   Preference,
   ObservationSource,
+  CalendarEvent,
 } from '../types/domain';
 
 // ─── colour palette (shared across charts) ───────────────────────────────────
@@ -176,6 +178,7 @@ function EstimatedFocusPatterns({ context }: { context: PersonalContext }) {
 function ContextPage() {
   const [context, setContext] = useState<PersonalContext | null>(null);
   const [historyData, setHistoryData] = useState<HistoryPoint[]>([]);
+  const [weekEvents, setWeekEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingItem, setEditingItem] = useState<{ type: string; id: string; value: string } | null>(null);
@@ -184,9 +187,13 @@ function ContextPage() {
   const loadContext = useCallback(async (isInitial = false, signal?: AbortSignal) => {
     try {
       if (isInitial) setLoading(true);
-      const [data, historyResult] = await Promise.all([
+      const [data, historyResult, eventsResult] = await Promise.all([
         api.context.getCurrent(),
         api.context.getHistory(30).catch(() => null),
+        api.calendar.getEvents({
+          start: (() => { const d = new Date(); const dow = (d.getDay()+6)%7; d.setDate(d.getDate()-dow); d.setHours(0,0,0,0); return d.toISOString(); })(),
+          end: (() => { const d = new Date(); const dow = (d.getDay()+6)%7; d.setDate(d.getDate()-dow+7); d.setHours(0,0,0,0); return d.toISOString(); })(),
+        }).catch(() => []),
       ]);
       if (signal?.aborted) return;
       setContext(data);
@@ -199,6 +206,7 @@ function ContextPage() {
           Decisions: p.decisions,
         })));
       }
+      if (eventsResult) setWeekEvents(eventsResult as CalendarEvent[]);
       setError(null);
     } catch (err) {
       if (signal?.aborted) return;
@@ -212,6 +220,17 @@ function ContextPage() {
     const controller = new AbortController();
     void loadContext(false, controller.signal);
     return () => controller.abort();
+  }, [loadContext]);
+
+  useEffect(() => {
+    const handler = () => {
+      setContext(null);
+      setHistoryData([]);
+      setWeekEvents([]);
+      void loadContext(false);
+    };
+    window.addEventListener(DEMO_PERSONA_CHANGED_EVENT, handler);
+    return () => window.removeEventListener(DEMO_PERSONA_CHANGED_EVENT, handler);
   }, [loadContext]);
 
   const handleConfirm = async (attributeId: string) => {
@@ -841,6 +860,28 @@ function ContextPage() {
               </p>
             </div>
           </div>
+          {weekEvents.length > 0 && (
+            <div className="mt-4 border-t border-gray-100 pt-4">
+              <p className="text-sm text-gray-400 mb-2">This week ({weekEvents.length} events)</p>
+              <ul className="space-y-1">
+                {weekEvents.slice(0, 8).map((ev) => {
+                  const raw = (() => { try { return JSON.parse(ev.rawData ?? '{}') as Record<string, unknown>; } catch { return {}; } })();
+                  const cat = typeof raw.category === 'string' ? raw.category : 'other';
+                  const catColor: Record<string, string> = { deep_work: '#6366F1', meeting: '#F97316', deadline: '#EF4444', recovery: '#10B981', other: '#9CA3AF' };
+                  return (
+                    <li key={ev.id} className="flex items-center gap-2 text-sm text-gray-700">
+                      <span className="inline-block w-2 h-2 rounded-full flex-shrink-0" style={{ background: catColor[cat] ?? '#9CA3AF' }} />
+                      <span className="truncate">{ev.title}</span>
+                      <span className="ml-auto text-xs text-gray-400 flex-shrink-0">
+                        {new Date(ev.startTime).toLocaleString(undefined, { weekday:'short', hour:'2-digit', minute:'2-digit' })}
+                      </span>
+                    </li>
+                  );
+                })}
+                {weekEvents.length > 8 && <li className="text-xs text-gray-400">+{weekEvents.length - 8} more</li>}
+              </ul>
+            </div>
+          )}
         </div>
 
       </div>

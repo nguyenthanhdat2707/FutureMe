@@ -394,6 +394,7 @@ export interface DecisionTradeoff {
 
 export interface DecisionApiResponse {
   decision: {
+    id?: string;
     recommendation: DecisionRecommendation;
     tradeoffs?: DecisionTradeoff[];
   };
