@@ -145,7 +145,7 @@ describe('temporal capacity and trade-off mechanism', () => {
 
     expect(result.focusQualityRisk).toBe(true);
     expect(result.feasibility).toBe('at-risk');
-    expect(result.recommendation.reasoning).toMatch(/morning focus|protected/i);
+    expect(result.recommendation.reasoning).toMatch(/overall capacity|focus window|lower-cost|premium/i);
   });
 
   it('keeps tentative unknown attendance as material uncertainty', () => {
@@ -265,5 +265,119 @@ describe('temporal capacity and trade-off mechanism', () => {
 
     expect(result.feasibility).toBe('not-feasible');
     expect(result.displacementCandidates).toEqual([]);
+  });
+
+  it('Test 1 — low-priority movable sync overlapping premium focus window with important nearby work triggers caution', () => {
+    // The proposed slot (09:00-10:00 ICT) overlaps an existing high-quality focus block.
+    // An active high-priority release goal is present.
+    // Candidate is LOW + MOVABLE.
+    // Expected: focusQualityRisk=true, proceed-with-caution, move guidance in reasoning.
+    const premiumBlockStart = new Date('2026-09-23T02:00:00.000Z'); // 09:00 ICT
+    const premiumBlockEnd = new Date('2026-09-23T04:00:00.000Z');   // 11:00 ICT
+    const syncStart = new Date('2026-09-23T02:30:00.000Z');         // 09:30 ICT — inside the premium block
+    const syncEnd = new Date('2026-09-23T03:30:00.000Z');           // 10:30 ICT
+
+    const result = assess({
+      timeCostHours: 1,
+      proposedStart: syncStart,
+      proposedEnd: syncEnd,
+      availableHoursBeforeDeadline: 30,
+      priority: 'low',
+      flexibility: 'movable',
+    }, {
+      goals: [goal('release', 4, 4)],  // 4h remaining, deadline in 4 days — important active work
+      commitments: [
+        commitment('release deep work', 1, 2, {
+          category: 'deep_work',
+          linkedGoalId: 'release',
+          priority: 'high',
+          flexibility: 'fixed',
+          focusQuality: 'high',
+          startTime: premiumBlockStart,
+          endTime: premiumBlockEnd,
+        })
+      ],
+      constraints: [],
+      recentHistory: [],
+      state: { state: PersonalState.FLOW, confidence: 1, evidence: [], timestamp: NOW }
+    });
+
+    expect(result.focusQualityRisk).toBe(true);
+    expect(result.recommendation.option).not.toBe('proceed');
+    expect(result.recommendation.option).toBe('proceed-with-caution');
+    expect(result.recommendation.reasoning).toMatch(/overall capacity|focus window|lower-cost|premium/i);
+  });
+
+  it('Test 2 — high-priority fixed commitment in premium focus window is not displaced by focus-quality signal', () => {
+    // Candidate is HIGH + FIXED, coincidentally overlaps a premium block.
+    // Focus quality should NOT dominate — the commitment is high priority and fixed.
+    const premiumBlockStart = new Date('2026-09-23T02:00:00.000Z'); // 09:00 ICT
+    const premiumBlockEnd = new Date('2026-09-23T04:00:00.000Z');
+
+    const result = assess({
+      timeCostHours: 2,
+      proposedStart: new Date('2026-09-23T02:00:00.000Z'),
+      proposedEnd: new Date('2026-09-23T04:00:00.000Z'),
+      availableHoursBeforeDeadline: 20,
+      priority: 'high',
+      flexibility: 'fixed',
+    }, {
+      goals: [goal('release', 4, 4)],
+      commitments: [
+        commitment('premium block', 1, 2, {
+          category: 'deep_work',
+          priority: 'high',
+          flexibility: 'fixed',
+          focusQuality: 'high',
+          startTime: premiumBlockStart,
+          endTime: premiumBlockEnd,
+        })
+      ],
+      constraints: ['work: morning'],
+      recentHistory: [],
+      state: { state: PersonalState.FLOW, confidence: 1, evidence: [], timestamp: NOW }
+    });
+
+    // HIGH + FIXED candidate: focusQualityRisk must NOT fire (priority gate blocks it)
+    expect(result.focusQualityRisk).toBe(false);
+    // With adequate capacity it should proceed
+    expect(result.recommendation.option).toBe('proceed');
+  });
+
+  it('Test 3 — low-priority movable commitment in premium focus window with no competing important work may still PROCEED', () => {
+    // LOW + MOVABLE, proposed slot overlaps a high-quality focus block,
+    // BUT no active high-priority goal in the horizon (no important work depends on this time).
+    const premiumBlockStart = new Date('2026-09-23T02:00:00.000Z'); // 09:00 ICT
+    const premiumBlockEnd = new Date('2026-09-23T04:00:00.000Z');
+    const syncStart = new Date('2026-09-23T02:30:00.000Z');
+    const syncEnd = new Date('2026-09-23T03:30:00.000Z');
+
+    const result = assess({
+      timeCostHours: 1,
+      proposedStart: syncStart,
+      proposedEnd: syncEnd,
+      availableHoursBeforeDeadline: 30,
+      priority: 'low',
+      flexibility: 'movable',
+    }, {
+      goals: [],  // No active goals — no important competing demand
+      commitments: [
+        commitment('premium block', 1, 2, {
+          category: 'deep_work',
+          priority: 'high',
+          flexibility: 'fixed',
+          focusQuality: 'high',
+          startTime: premiumBlockStart,
+          endTime: premiumBlockEnd,
+        })
+      ],
+      constraints: [],
+      recentHistory: [],
+      state: { state: PersonalState.FLOW, confidence: 1, evidence: [], timestamp: NOW }
+    });
+
+    // No important competing work → focus quality is not a universal prohibition
+    expect(result.focusQualityRisk).toBe(false);
+    expect(result.recommendation.option).toBe('proceed');
   });
 });

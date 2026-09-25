@@ -249,24 +249,52 @@ function selectDisplacements(
   return { candidates: selected, recoveredHours };
 }
 
+function hasImportantActiveGoalInHorizon(
+  context: RelevantContext | undefined,
+  horizon: Date | null
+): boolean {
+  if (!horizon) return false;
+  return (context?.goals ?? []).some(g =>
+    g.status !== 'completed' &&
+    g.priority === 'high' &&
+    isNonNegativeNumber(g.remainingEffortHours) &&
+    g.remainingEffortHours > 0 &&
+    validDate(g.deadline) !== null &&
+    (validDate(g.deadline) as Date).getTime() <= horizon.getTime()
+  );
+}
+
 function isHighQualityFocusRisk(
   profile: DecisionImpactProfile | undefined,
   context: RelevantContext | undefined,
-  urgentFocusedWork: boolean
+  urgentFocusedWork: boolean,
+  horizon: Date | null
 ): boolean {
-  if (!urgentFocusedWork || profile?.priority !== 'low') return false;
+  if (profile?.priority !== 'low') return false;
   if (profile.flexibility !== 'movable' && profile.flexibility !== 'optional') return false;
   const start = validDate(profile.proposedStart);
   const end = validDate(profile.proposedEnd);
   if (!start || !end || end <= start) return false;
+
   const localStartHour = new Date(start.getTime() + VIETNAM_OFFSET_MS).getUTCHours();
   const morningPreference = context?.constraints.some(constraint => constraint.toLowerCase().includes('morning')) ?? false;
+
+  // Direct evidence: the proposed slot overlaps a calendar block explicitly tagged as high-quality focus time.
+  // This is meaningful only when there is also materially important work that benefits from that capacity.
   const highQualityMetadata = context?.commitments.some(commitment => {
     const interval = commitmentInterval(commitment);
     return commitment.focusQuality === 'high' && interval !== null &&
       interval.start < end.getTime() && interval.end > start.getTime();
   }) ?? false;
-  return (morningPreference && localStartHour >= 8 && localStartHour < 12) || highQualityMetadata;
+  const competingImportantWork = urgentFocusedWork ||
+    hasImportantActiveGoalInHorizon(context, horizon) ||
+    (isNonNegativeNumber(profile?.workloadHoursBeforeDeadline) && (profile.workloadHoursBeforeDeadline as number) > 0);
+
+  // Morning-hour inference: soft signal, requires competing important work in the horizon.
+  if (morningPreference && localStartHour >= 8 && localStartHour < 12 && competingImportantWork) return true;
+  // Premium-block overlap: direct signal, requires any active high-priority goal in the horizon.
+  if (highQualityMetadata && competingImportantWork) return true;
+  return false;
 }
 
 function overlappingUnknownAttendance(
@@ -314,7 +342,7 @@ function recommendationFor(
     return {
       option: 'proceed-with-caution',
       confidence,
-      reasoning: 'Move this lower-value flexible commitment out of the protected morning focus window so urgent high-priority work keeps the best execution time.'
+      reasoning: 'You have enough overall capacity, but this low-priority movable commitment overlaps a high-quality focus window while important work depends on that time. Move it to a lower-cost period to preserve the premium focus capacity for higher-value execution.'
     };
   }
   if (displacementCandidates.length > 0 && recoveredCapacityHours > 0) {
@@ -488,7 +516,8 @@ export function assessDecisionFeasibility(
   const focusQualityRisk = isHighQualityFocusRisk(
     profile,
     context,
-    !explicitWorkload && workloadDerivation.urgentFocusedWork
+    !explicitWorkload && workloadDerivation.urgentFocusedWork,
+    horizon
   );
   const needsCoreInputs = timeCostHours === undefined || availableTimeBeforeDeadlineHours === null;
 
