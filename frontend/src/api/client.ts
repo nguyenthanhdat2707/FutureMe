@@ -356,7 +356,7 @@ export const calendarApi = {
     return data.events || [];
   },
 
-  async createEvent(event: { title: string; startTime: string; endTime: string; category?: string; note?: string }): Promise<CalendarEvent> {
+  async createEvent(event: { title: string; startTime: string; endTime: string; category?: string; note?: string; decisionId?: string }): Promise<CalendarEvent> {
     const response = await authFetch(`${API_BASE_URL}/calendar/events`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

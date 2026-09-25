@@ -22,6 +22,11 @@ import { IContextEngine, IStateEstimator } from './interfaces';
 import { IPersonalContextRepository, IDecisionRepository, ICalendarEventRepository, IObservationRepository } from '../repositories/interfaces';
 import { safeJsonParse } from '../utils/json';
 import { calculateUnionHours } from '../utils/interval';
+import { parseCalendarEventMetadata } from '../utils/calendar-metadata';
+
+function contextAttributeKind(attribute: string): string {
+  return attribute.split(':', 1)[0];
+}
 
 function sourceAuthority(source: ObservationSource): number {
   switch (source) {
@@ -111,8 +116,9 @@ export class SimpleContextEngine implements IContextEngine {
             observedAt: attr.observedAt,
             validUntil: attr.validUntil
           };
-          if (!isExpired(attr, now) && ['goal', 'commitment', 'preference'].includes(attr.attribute)) {
-            const key = `${attr.attribute}_${entityId}`;
+          const attributeKind = contextAttributeKind(attr.attribute);
+          if (!isExpired(attr, now) && ['goal', 'commitment', 'preference'].includes(attributeKind)) {
+            const key = `${attributeKind}_${entityId}`;
             const current = latestEntities.get(key);
             if (!current || compareContextAuthority(attr, current.attribute) > 0) {
               latestEntities.set(key, { attribute: attr, entity });
@@ -180,6 +186,7 @@ export class SimpleContextEngine implements IContextEngine {
       busyHoursThisWeek = calculateUnionHours(intervals, nowMs, weekEndMs);
 
       for (const event of upcomingEvents) {
+        const metadata = parseCalendarEventMetadata(event.rawData);
         commitments.push({
           id: `cal-${event.id}`,
           description: event.title,
@@ -190,7 +197,8 @@ export class SimpleContextEngine implements IContextEngine {
           confidence: 1.0,
           attributeId: event.id,
           observedAt: event.syncedAt,
-          validUntil: event.endTime
+          validUntil: event.endTime,
+          ...metadata
         });
       }
     }
@@ -258,17 +266,18 @@ export class SimpleContextEngine implements IContextEngine {
     deadline: Date | null,
     now: Date
   ): boolean {
-    if (attribute.attribute === 'goal') {
+    const attributeKind = contextAttributeKind(attribute.attribute);
+    if (attributeKind === 'goal') {
       return this.isLexicallyRelevant(typeof parsed.description === 'string' ? parsed.description : undefined, tokens);
     }
 
-    if (attribute.attribute === 'preference') {
+    if (attributeKind === 'preference') {
       return [parsed.description, parsed.category, parsed.value].some(value =>
         this.isLexicallyRelevant(typeof value === 'string' ? value : undefined, tokens)
       );
     }
 
-    if (attribute.attribute === 'commitment') {
+    if (attributeKind === 'commitment') {
       const start = new Date(typeof parsed.startTime === 'string' ? parsed.startTime : '');
       const end = new Date(typeof parsed.endTime === 'string' ? parsed.endTime : '');
       if (!Number.isNaN(end.getTime()) && end <= now) return false;
@@ -288,7 +297,8 @@ export class SimpleContextEngine implements IContextEngine {
     const groups = new Map<string, { attribute: ContextAttribute; parsed: Record<string, unknown> }[]>();
 
     for (const attribute of attributes) {
-      if (!['goal', 'commitment', 'preference'].includes(attribute.attribute) || isExpired(attribute, now)) {
+      const attributeKind = contextAttributeKind(attribute.attribute);
+      if (!['goal', 'commitment', 'preference'].includes(attributeKind) || isExpired(attribute, now)) {
         continue;
       }
 
@@ -297,7 +307,7 @@ export class SimpleContextEngine implements IContextEngine {
       const entityId = (parsed as Record<string, unknown>).id;
       if (typeof entityId !== 'string' || entityId.trim().length === 0) continue;
 
-      const key = `${attribute.attribute}:${entityId}`;
+      const key = `${attributeKind}:${entityId}`;
       const candidates = groups.get(key) ?? [];
       candidates.push({ attribute, parsed: parsed as Record<string, unknown> });
       groups.set(key, candidates);
@@ -335,6 +345,8 @@ export class SimpleContextEngine implements IContextEngine {
     const state = await this.stateEstimator.estimateCurrentState(context, recentObs);
 
     const tokens = this.extractTokens(decision);
+    const now = new Date();
+    const maximumHorizon = new Date(now.getTime() + 14 * 86_400_000);
     let deadline: Date | null = null;
     if (decision.impactProfile?.deadline) {
       deadline = new Date(decision.impactProfile.deadline);
@@ -342,13 +354,21 @@ export class SimpleContextEngine implements IContextEngine {
         deadline = null;
       }
     }
+    const contextHorizon = deadline
+      ? new Date(Math.min(deadline.getTime(), maximumHorizon.getTime()))
+      : new Date(now.getTime() + 7 * 86_400_000);
+    const urgentGoalHorizon = new Date(now.getTime() + 7 * 86_400_000);
 
-    const relevantGoals = context.goals.filter(g =>
-      this.isLexicallyRelevant(g.description, tokens)
-    );
+    const relevantGoals = context.goals.filter(g => {
+      if (this.isLexicallyRelevant(g.description, tokens)) return true;
+      if (g.status === 'completed' || !g.deadline) return false;
+      const goalDeadline = new Date(g.deadline);
+      return !Number.isNaN(goalDeadline.getTime()) &&
+        goalDeadline > now &&
+        goalDeadline <= urgentGoalHorizon;
+    });
 
     const relevantCommitments = context.commitments.filter(c => {
-      const now = new Date();
       const cStart = new Date(c.startTime);
       const cEnd = c.endTime ? new Date(c.endTime) : null;
 
@@ -356,10 +376,8 @@ export class SimpleContextEngine implements IContextEngine {
         return false;
       }
 
-      if (deadline) {
-        if (!isNaN(cStart.getTime()) && cStart < deadline) {
-          return true;
-        }
+      if (!isNaN(cStart.getTime()) && cStart < contextHorizon) {
+        return true;
       }
       return this.isLexicallyRelevant(c.description, tokens);
     });
@@ -389,8 +407,8 @@ export class SimpleContextEngine implements IContextEngine {
     const unresolvedConflicts = this.findUnresolvedConflicts(
       attributes,
       tokens,
-      deadline,
-      new Date()
+      contextHorizon,
+      now
     );
 
     return {

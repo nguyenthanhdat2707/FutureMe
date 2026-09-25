@@ -63,6 +63,14 @@ export interface Commitment {
   attributeId?: string;
   observedAt?: string;
   validUntil?: string;
+  status?: string;
+  priority?: 'low' | 'medium' | 'high';
+  flexibility?: 'fixed' | 'movable' | 'optional';
+  consequence?: 'low' | 'medium' | 'high';
+  category?: 'deep_work' | 'meeting' | 'deadline' | 'recovery' | 'other';
+  linkedGoalId?: string;
+  attendanceRequirement?: 'required' | 'optional' | 'unknown';
+  focusQuality?: 'high' | 'medium' | 'low';
 }
 
 export interface Preference {
@@ -165,6 +173,9 @@ export interface Goal {
   attributeId?: string; // Link to ContextAttribute for confirm/correct
   observedAt?: string;
   validUntil?: string;
+  status?: 'active' | 'paused' | 'completed';
+  progressPercent?: number;
+  remainingEffortHours?: number;
 }
 
 export enum GoalCategory {
@@ -309,11 +320,16 @@ export interface DecisionImpactProfile {
   timeCostHours?: number;
   target?: string;
   deadline?: string;
+  proposedStart?: string;
+  proposedEnd?: string;
   availableHoursBeforeDeadline?: number;
   workloadHoursBeforeDeadline?: number;
   energyCost?: number;
   availableEnergy?: number;
   goalRelevance?: 'low' | 'medium' | 'high';
+  priority?: 'low' | 'medium' | 'high';
+  flexibility?: 'fixed' | 'movable' | 'optional';
+  focusRequirement?: 'high' | 'medium' | 'low';
   source?: DecisionImpactSource;
 }
 
@@ -358,6 +374,14 @@ export interface FeasibilityEvidence {
   explanation: string;
 }
 
+export interface DisplacementCandidate {
+  commitmentId: string;
+  description: string;
+  action: 'move' | 'skip';
+  recoverableHours: number;
+  reason: string;
+}
+
 export interface DecisionFeasibilityAssessment {
   availableTimeBeforeDeadlineHours: number | null;
   projectedRemainingCapacityHours: number | null;
@@ -369,6 +393,12 @@ export interface DecisionFeasibilityAssessment {
   missingData: string[];
   invalidInputs: string[];
   evidence: FeasibilityEvidence[];
+  impactHorizonEnd?: string | null;
+  derivedWorkloadHours?: number;
+  linkedScheduledHours?: number;
+  recoveredCapacityHours?: number;
+  displacementCandidates?: DisplacementCandidate[];
+  focusQualityRisk?: boolean;
 }
 
 export enum PersonalState {

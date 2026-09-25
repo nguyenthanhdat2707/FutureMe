@@ -49,15 +49,15 @@ afterAll(() => fs.rmSync(tempRoot, { recursive: true, force: true }));
 describe('Phase 4 deterministic demo dataset', () => {
   const seededAt = new Date('2026-01-02T03:04:05.000Z');
 
-  it('produces six personas and the exact 6/28/8/94/6 = 142 contract', () => {
+  it('produces six personas and the exact 6/36/8/94/6 = 150 contract', () => {
     const dataset = generatePhase4Dataset(seededAt);
     expect(dataset.personas.map((persona) => persona.slug)).toEqual(PERSONA_SLUGS);
     expect(dataset.records.users).toHaveLength(6);
-    expect(dataset.records.personalContext).toHaveLength(28);
+    expect(dataset.records.personalContext).toHaveLength(36);
     expect(dataset.records.observations).toHaveLength(8);
     expect(dataset.records.calendarEvents).toHaveLength(94);
     expect(dataset.records.decisions).toHaveLength(6);
-    expect(Object.values(dataset.records).flat()).toHaveLength(142);
+    expect(Object.values(dataset.records).flat()).toHaveLength(150);
   });
 
   it('uses deterministic public demo IDs as every record owner', () => {
@@ -77,6 +77,9 @@ describe('Phase 4 deterministic demo dataset', () => {
     for (const record of dataset.records.calendarEvents) {
       const metadata = JSON.parse(record.raw_data as string) as Record<string, unknown>;
       expect(validCategories.has(metadata.category as string)).toBe(true);
+      expect(['FIXED', 'MOVABLE', 'OPTIONAL', 'UNKNOWN']).toContain(metadata.flexibility);
+      expect(['HIGH', 'MEDIUM', 'LOW']).toContain(metadata.priority);
+      expect(metadata.origin).toBe('BASELINE');
       if ('meetingLink' in metadata) expect(metadata.meetingLink).toMatch(/^https:\/\//);
     }
 
@@ -86,18 +89,24 @@ describe('Phase 4 deterministic demo dataset', () => {
     })).toBe(true);
   });
 
-  it('preserves authority, expiry, and stable-entity conflict fixtures', () => {
+  it('keeps persona goals coherent while preserving source authority', () => {
     const dataset = generatePhase4Dataset(seededAt);
-    const focused = dataset.records.personalContext.filter((record) => record.persona === 'focused-builder' && record.attribute === 'goal:ship');
+    const focused = dataset.records.personalContext.filter((record) => record.persona === 'focused-builder' && record.attribute === 'goal:release');
     expect(focused.map((record) => record.source)).toEqual(expect.arrayContaining(['USER_CONFIRMED', 'SYSTEM_INFERRED']));
 
-    const expired = dataset.records.personalContext.find((record) => record.persona === 'overloaded-lead' && record.attribute === 'goal:expired');
-    expect(new Date(expired?.valid_until as string).getTime()).toBeLessThan(seededAt.getTime());
+    const studentGoals = dataset.records.personalContext.filter((record) => record.persona === 'needs-clarity' && (record.attribute as string).startsWith('goal:'));
+    const remaining = studentGoals.reduce((total, record) => total + Number((JSON.parse(record.value as string) as Record<string, unknown>).remainingEffortHours ?? 0), 0);
+    expect(studentGoals).toHaveLength(3);
+    expect(remaining).toBe(13);
 
-    const conflicts = dataset.records.personalContext.filter((record) => record.persona === 'conflict-check' && record.attribute === 'goal:compete');
-    expect(conflicts).toHaveLength(2);
-    expect(new Set(conflicts.map((record) => record.observed_at)).size).toBe(1);
-    expect(new Set(conflicts.map((record) => record.value)).size).toBe(2);
+    const founderCalendar = dataset.records.calendarEvents
+      .filter((record) => record.persona === 'busy-balancer')
+      .map((record) => JSON.parse(record.raw_data as string) as Record<string, unknown>);
+    expect(founderCalendar.some((event) => event.flexibility === 'OPTIONAL' && event.priority === 'LOW')).toBe(true);
+    expect(founderCalendar.some((event) => event.linkedGoalId === 'pitch')).toBe(true);
+
+    const latestEvent = Math.max(...dataset.records.calendarEvents.map((record) => Date.parse(record.start_time as string)));
+    expect(latestEvent).toBeGreaterThanOrEqual(seededAt.getTime() + 27 * 86_400_000);
   });
 });
 
@@ -112,7 +121,7 @@ describe('Phase 4 manifest safety', () => {
     const persisted = fs.readFileSync(manifestPath, 'utf8');
     expect(persisted.toLowerCase()).not.toMatch(/password|secret|token/);
     expect(state.entries.map((entry) => entry.id)).toEqual(callerOrder);
-    expect(loadManifest(manifestPath)?.entries).toHaveLength(142);
+    expect(loadManifest(manifestPath)?.entries).toHaveLength(150);
   });
 
   it('rejects altered persona IDs and credential-bearing manifests', () => {
@@ -197,7 +206,7 @@ describe('Phase 4 exact DynamoDB protections', () => {
 });
 
 describe('Phase 4 apply, verify, and rollback', () => {
-  it('preflights all 142 keys before the first write and persists completion', async () => {
+  it('preflights all 150 keys before the first write and persists completion', async () => {
     const manifestPath = setupTemp('apply');
     const send = jest.fn().mockImplementation((command: unknown) => {
       const input = commandInput(command);
@@ -208,8 +217,8 @@ describe('Phase 4 apply, verify, and rollback', () => {
     logSpy.mockRestore();
 
     const calls = send.mock.calls as Array<[unknown]>;
-    expect(calls.slice(0, 142).every(([command]) => !commandInput(command).RequestItems)).toBe(true);
-    expect(commandInput(calls[142][0]).RequestItems).toBeDefined();
+    expect(calls.slice(0, 150).every(([command]) => !commandInput(command).RequestItems)).toBe(true);
+    expect(commandInput(calls[150][0]).RequestItems).toBeDefined();
     expect(loadManifest(manifestPath)?.entries.every((entry) => entry.completed)).toBe(true);
   });
 

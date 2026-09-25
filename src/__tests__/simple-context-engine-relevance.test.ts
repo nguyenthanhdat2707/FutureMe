@@ -284,4 +284,169 @@ describe('SimpleContextEngine - getRelevantContext Relevance Logic', () => {
     expect(result.goals[0].description).toBe('Pass the AWS exam this month');
     expect(result.unresolvedConflicts).toEqual([]);
   });
+
+  it('classifies namespaced attributes while preserving authority and expiry semantics', async () => {
+    const now = new Date('2026-09-22T10:00:00Z');
+    jest.useFakeTimers();
+    jest.setSystemTime(now);
+    mockContextRepo.findByUserId.mockResolvedValue([
+      {
+        ...createVersionedGoalAttr('confirmed', 'ship', 'Ship the payment flow', ObservationSource.USER_CONFIRMED, new Date('2026-09-20T10:00:00Z')),
+        attribute: 'goal:ship',
+      },
+      {
+        ...createVersionedGoalAttr('inferred', 'ship', 'Defer the payment flow', ObservationSource.SYSTEM_INFERRED, new Date('2026-09-22T09:00:00Z')),
+        attribute: 'goal:ship',
+      },
+      {
+        ...createVersionedGoalAttr('expired', 'old', 'Old expired goal', ObservationSource.USER_CONFIRMED, new Date('2026-09-20T10:00:00Z'), new Date('2026-09-22T09:00:00Z')),
+        attribute: 'goal:old',
+      },
+    ]);
+
+    const context = await engine.getCurrentContext('user1');
+
+    expect(context.goals).toHaveLength(1);
+    expect(context.goals[0].description).toBe('Ship the payment flow');
+  });
+
+  it('maps explicit calendar metadata and conservatively defaults malformed metadata to fixed', async () => {
+    const start = new Date(Date.now() + 3_600_000);
+    const end = new Date(start.getTime() + 3_600_000);
+    const baseEvent = {
+      userId: 'user1',
+      startTime: start,
+      endTime: end,
+      status: 'CONFIRMED',
+      syncedAt: new Date(),
+      createdAt: new Date(),
+    };
+    mockCalendarRepo.findUpcoming.mockResolvedValue([
+      {
+        ...baseEvent,
+        id: 'calendar-1',
+        externalId: 'external-1',
+        title: 'Movable release preparation',
+        rawData: JSON.stringify({
+          category: 'deep_work',
+          flexibility: 'movable',
+          priority: 'high',
+          consequence: 'high',
+          linkedGoalId: 'release',
+          attendanceRequirement: 'optional',
+          focusQuality: 'high',
+        }),
+      },
+      {
+        ...baseEvent,
+        id: 'calendar-2',
+        externalId: 'external-2',
+        title: 'Unknown calendar item',
+        rawData: '{not-json',
+      },
+      {
+        ...baseEvent,
+        id: 'calendar-3',
+        externalId: 'external-3',
+        title: 'Seeded optional planning',
+        rawData: JSON.stringify({
+          category: 'MEETING',
+          flexibility: 'OPTIONAL',
+          priority: 'LOW',
+          consequence: 'LOW',
+          attendanceRequirement: 'UNKNOWN',
+          focusQuality: 'MEDIUM',
+        }),
+      },
+    ]);
+
+    const context = await engine.getCurrentContext('user1');
+
+    expect(context.commitments).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: 'cal-calendar-1',
+        flexibility: 'movable',
+        category: 'deep_work',
+        priority: 'high',
+        linkedGoalId: 'release',
+        focusQuality: 'high',
+      }),
+      expect.objectContaining({
+        id: 'cal-calendar-2',
+        flexibility: 'fixed',
+      }),
+      expect.objectContaining({
+        id: 'cal-calendar-3',
+        flexibility: 'optional',
+        category: 'meeting',
+        priority: 'low',
+        consequence: 'low',
+        attendanceRequirement: 'unknown',
+        focusQuality: 'medium',
+      }),
+    ]));
+  });
+
+  it('includes urgent hidden workload but excludes a distant unrelated goal', async () => {
+    const now = new Date('2026-09-22T10:00:00.000Z');
+    jest.useFakeTimers();
+    jest.setSystemTime(now);
+    const urgent = createGoalAttr('urgent', 'Finish the investor update');
+    urgent.value = JSON.stringify({
+      id: 'urgent',
+      description: 'Finish the investor update',
+      priority: 'high',
+      status: 'active',
+      deadline: new Date(now.getTime() + 3 * 86_400_000),
+      remainingEffortHours: 4
+    });
+    const distant = createGoalAttr('distant', 'Prepare the board report');
+    distant.value = JSON.stringify({
+      id: 'distant',
+      description: 'Prepare the board report',
+      priority: 'high',
+      status: 'active',
+      deadline: new Date(now.getTime() + 18 * 86_400_000),
+      remainingEffortHours: 12
+    });
+    mockContextRepo.findByUserId.mockResolvedValue([urgent, distant]);
+
+    const result = await engine.getRelevantContext('user1', {
+      question: 'Can I accept a partnership meeting?'
+    });
+
+    expect(result.goals.map(item => item.id)).toEqual(['urgent']);
+  });
+
+  it('requires lexical relevance for goals beyond the seven-day urgent horizon', async () => {
+    const now = new Date('2026-09-22T10:00:00.000Z');
+    jest.useFakeTimers();
+    jest.setSystemTime(now);
+    const partnership = createGoalAttr('partnership', 'Prepare the partnership proposal');
+    partnership.value = JSON.stringify({
+      id: 'partnership',
+      description: 'Prepare the partnership proposal',
+      priority: 'high',
+      status: 'active',
+      deadline: new Date(now.getTime() + 12 * 86_400_000),
+      remainingEffortHours: 5
+    });
+    const unrelated = createGoalAttr('legal', 'Review unrelated legal contracts');
+    unrelated.value = JSON.stringify({
+      id: 'legal',
+      description: 'Review unrelated legal contracts',
+      priority: 'high',
+      status: 'active',
+      deadline: new Date(now.getTime() + 12 * 86_400_000),
+      remainingEffortHours: 10
+    });
+    mockContextRepo.findByUserId.mockResolvedValue([partnership, unrelated]);
+
+    const result = await engine.getRelevantContext('user1', {
+      question: 'Should I accept the partnership meeting?',
+      impactProfile: { deadline: new Date(now.getTime() + 14 * 86_400_000) }
+    });
+
+    expect(result.goals.map(item => item.id)).toEqual(['partnership']);
+  });
 });

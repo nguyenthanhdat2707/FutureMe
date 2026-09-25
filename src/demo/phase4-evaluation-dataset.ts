@@ -74,11 +74,11 @@ export interface DynamoTableItems {
 
 export const EXPECTED_COUNTS: ExpectedCounts = {
   users: 6,
-  personalContext: 28,
+  personalContext: 36,
   observations: 8,
   calendarEvents: 94,
   decisions: 6,
-  total: 142,
+  total: 150,
 };
 
 const MAX_BATCH_SIZE = 25;
@@ -114,6 +114,38 @@ export function generatePhase4Dataset(seededAt: Date): GeneratedDataset {
     users: [], personalContext: [], observations: [], calendarEvents: [], decisions: [],
   };
   const timestamp = seededAt.toISOString();
+  const decisionFixtures: Record<PersonaSlug, { question: string; option: string; reasoning: string }> = {
+    'focused-builder': {
+      question: 'Should I put a low-priority internal sync in my strongest focus window before release?',
+      option: 'proceed-with-caution',
+      reasoning: 'Move the sync to protect scarce release focus time.',
+    },
+    'busy-balancer': {
+      question: 'My week is already packed. Should I skip the competition Friday?',
+      option: 'proceed-with-caution',
+      reasoning: 'Preserve the pitch and move weaker optional commitments.',
+    },
+    'overloaded-lead': {
+      question: 'Can I take a three-hour partnership meeting in the open afternoon?',
+      option: 'do-not-proceed',
+      reasoning: 'Protect the last useful window for investor and customer deliverables.',
+    },
+    'needs-clarity': {
+      question: 'Can I accept a four-hour freelance task this week?',
+      option: 'do-not-proceed',
+      reasoning: 'Known unscheduled study and presentation work already consumes the apparent gap.',
+    },
+    'uncertain-skipper': {
+      question: 'Should I accept the guest lecture Thursday afternoon?',
+      option: 'needs-clarification',
+      reasoning: 'Committee attendance is unknown and materially changes the answer.',
+    },
+    'conflict-check': {
+      question: 'Should I decline the research workshop because Thursday looks full?',
+      option: 'proceed-with-caution',
+      reasoning: 'Keep fixed teaching and move lower-value institutional work.',
+    },
+  };
 
   for (const persona of personas) {
     const owner = persona.userId;
@@ -122,11 +154,12 @@ export function generatePhase4Dataset(seededAt: Date): GeneratedDataset {
       ...base, id: owner, email: persona.email, display_name: persona.displayName,
       created_at: timestamp, updated_at: timestamp,
     });
+    const decisionFixture = decisionFixtures[persona.slug];
     records.decisions.push({
       ...base, id: generatePhase4Id('decisions', persona.slug, 'default'), user_id: owner,
-      question: 'Should I take on this new project?',
+      question: decisionFixture.question,
       context_snapshot: JSON.stringify({ capturedAt: timestamp, goals: [], commitments: [], constraints: [], relevantHistory: [] }),
-      recommendation: JSON.stringify({ option: 'proceed', confidence: 0.8, reasoning: 'Synthetic evaluation fixture.' }),
+      recommendation: JSON.stringify({ option: decisionFixture.option, confidence: 0.8, reasoning: decisionFixture.reasoning }),
       user_choice: null, status: 'PENDING', created_at: timestamp,
     });
 
@@ -152,62 +185,74 @@ export function generatePhase4Dataset(seededAt: Date): GeneratedDataset {
       category: 'deep_work' | 'meeting' | 'deadline' | 'recovery' | 'other',
       meetingLink?: string,
       status = 'CONFIRMED',
+      calendarMetadata: Record<string, unknown> = {},
     ) => records.calendarEvents.push({
       ...base, id: generatePhase4Id('calendar-events', persona.slug, purpose), user_id: owner,
       external_id: `phase4-${persona.slug}-${purpose}`, title,
       start_time: absoluteStart.toISOString(),
       end_time: absoluteEnd.toISOString(), status,
-      raw_data: JSON.stringify({ summary: title, category, ...(meetingLink ? { meetingLink } : {}) }),
+      raw_data: JSON.stringify({
+        summary: title,
+        category,
+        flexibility: category === 'meeting' || category === 'deadline' ? 'FIXED' : category === 'recovery' ? 'OPTIONAL' : 'MOVABLE',
+        priority: category === 'deadline' || category === 'deep_work' ? 'HIGH' : category === 'recovery' ? 'LOW' : 'MEDIUM',
+        consequence: category === 'deadline' ? 'HIGH' : category === 'recovery' ? 'LOW' : 'MEDIUM',
+        origin: 'BASELINE',
+        confidence: status === 'TENTATIVE' ? 0.45 : 1,
+        ...(meetingLink ? { meetingLink } : {}),
+        ...calendarMetadata,
+      }),
       synced_at: timestamp, created_at: timestamp,
     });
 
-    // Week anchor: Monday 00:00 UTC of the seeded week
-    const weekStart = ((): Date => {
-      const d = new Date(seededAt);
-      const dow = (d.getUTCDay() + 6) % 7; // 0=Mon
-      d.setUTCDate(d.getUTCDate() - dow);
-      d.setUTCHours(0, 0, 0, 0);
-      return d;
+    // Rolling Asia/Ho_Chi_Minh timeline anchored to the persona seed date.
+    const localDayStartUtc = ((): Date => {
+      const localClock = new Date(seededAt.getTime() + 7 * 3_600_000);
+      return new Date(Date.UTC(
+        localClock.getUTCFullYear(),
+        localClock.getUTCMonth(),
+        localClock.getUTCDate(),
+        -7,
+      ));
     })();
-    // Helper: day D at UTC hour H minute M
-    // Vietnam UTC+7: store UTC hour = local_hour - 7
-    // e.g. 09:00 VN = 02:00 UTC, 14:00 VN = 07:00 UTC
+    // Helper: relative day D at UTC time H:M. UTC 02:00 displays as 09:00 in Vietnam.
     const wd = (day: number, utcH: number, utcM = 0): Date =>
-      new Date(weekStart.getTime() + day * 86_400_000 + utcH * 3_600_000 + utcM * 60_000);
+      new Date(localDayStartUtc.getTime() + day * 86_400_000 + utcH * 3_600_000 + utcM * 60_000);
 
     const old = new Date(seededAt.getTime() - 86_400_000);
     const recent = new Date(seededAt.getTime() - 3_600_000);
-    const expired = new Date(seededAt.getTime() - 10 * 86_400_000);
+
     addContext('setup', 'setup_completed', 'true', ObservationSource.USER_CONFIRMED, 1, seededAt);
     addContext('calendar-sync', 'calendar_last_sync', timestamp, ObservationSource.SYSTEM_OBSERVED, 1, seededAt);
 
     if (persona.slug === 'focused-builder') {
-      addContext('goal-user', 'goal:ship', { id: 'ship', priority: 'high', value: 'ship-v1' }, ObservationSource.USER_CONFIRMED, 1, old);
-      addContext('goal-inferred', 'goal:ship', { id: 'ship', priority: 'low', value: 'defer-v1' }, ObservationSource.SYSTEM_INFERRED, 0.5, recent);
-      addContext('preference', 'preference:work', { id: 'deep-work', value: 'morning' }, ObservationSource.USER_CONFIRMED, 1, old);
-      addContext('commitment', 'commitment:launch', { id: 'launch', value: 'v1' }, ObservationSource.USER_CONFIRMED, 1, old);
+      addContext('goal-user', 'goal:release', { id: 'release', description: 'Ship the production release before Friday launch review', priority: 'HIGH', status: 'ACTIVE', deadline: wd(4, 10).toISOString(), remainingEffortHours: 4, progress: 70 }, ObservationSource.USER_CONFIRMED, 1, old);
+      addContext('goal-inferred', 'goal:release', { id: 'release', description: 'Release preparation inferred from recent schedule', priority: 'MEDIUM', status: 'ACTIVE', deadline: wd(4, 10).toISOString(), remainingEffortHours: 6 }, ObservationSource.SYSTEM_INFERRED, 0.5, recent);
+      addContext('preference', 'preference:focus-window', { id: 'focus-window', category: 'work', description: 'Strongest focus conditions are in the morning', value: 'morning' }, ObservationSource.USER_CONFIRMED, 1, old);
+      addContext('commitment', 'commitment:launch', { id: 'launch', description: 'Friday release review', start: wd(4, 9).toISOString(), end: wd(4, 10).toISOString(), priority: 'HIGH', flexibility: 'FIXED', consequence: 'HIGH', linkedGoalId: 'release' }, ObservationSource.USER_CONFIRMED, 1, old);
       addObservation('focus', 'Started deep work focus.', recent);
       // Mon – 12 events
-      addCalendar('mon-dw1', 'Deep Work', wd(0,2), wd(0,4), 'deep_work');                          // 09-11 VN
+      addCalendar('mon-dw1', 'Release deep work', wd(0,2), wd(0,4), 'deep_work', undefined, 'CONFIRMED', { linkedGoalId: 'release', focusQuality: 'HIGH' });
       addCalendar('mon-sync', 'Team Sync', wd(0,4), wd(0,4,30), 'meeting', 'https://meet.example.com/phase4-focused-builder-sync'); // 11-11:30 VN
       addCalendar('mon-cr', 'Code Review', wd(0,7), wd(0,8), 'meeting');                           // 14-15 VN
       // Tue
-      addCalendar('tue-dw', 'Deep Work', wd(1,2), wd(1,5), 'deep_work');                          // 09-12 VN
+      addCalendar('tue-dw', 'Release deep work', wd(1,2), wd(1,5), 'deep_work', undefined, 'CONFIRMED', { linkedGoalId: 'release', focusQuality: 'HIGH' });
       addCalendar('tue-1on1', '1:1 with Manager', wd(1,7), wd(1,8), 'meeting', 'https://meet.example.com/phase4-focused-builder-1on1');
       // Wed
-      addCalendar('wed-arch', 'Focus: Architecture Planning', wd(2,2), wd(2,4), 'deep_work');     // 09-11 VN
-      addCalendar('wed-sprint', 'Sprint Planning', wd(2,7), wd(2,9), 'meeting', 'https://meet.example.com/phase4-focused-builder-sprint');
+      addCalendar('wed-arch', 'Release implementation', wd(2,7), wd(2,9), 'deep_work', undefined, 'CONFIRMED', { linkedGoalId: 'release', focusQuality: 'MEDIUM' });
+      addCalendar('wed-sprint', 'Sprint Planning', wd(2,9), wd(2,10), 'meeting', 'https://meet.example.com/phase4-focused-builder-sprint', 'CONFIRMED', { flexibility: 'MOVABLE', priority: 'LOW', consequence: 'LOW' });
       // Thu
-      addCalendar('thu-dw', 'Deep Work', wd(3,2), wd(3,4), 'deep_work');                         // 09-11 VN
+      addCalendar('thu-dw', 'Release deep work', wd(3,2), wd(3,4), 'deep_work', undefined, 'CONFIRMED', { linkedGoalId: 'release', focusQuality: 'HIGH' });
       addCalendar('thu-demo', 'Feature Demo', wd(3,8), wd(3,9), 'meeting', 'https://meet.example.com/phase4-focused-builder-demo');
-      addCalendar('thu-run', 'Evening Run', wd(3,11), wd(3,12), 'recovery');                      // 18-19 VN
+      addCalendar('thu-run', 'Recovery before quarterly planning', wd(28,11), wd(28,12), 'recovery');
       // Fri
       addCalendar('fri-review', 'Weekly Review', wd(4,2), wd(4,3), 'meeting');                   // 09-10 VN
-      addCalendar('fri-dw', 'Deep Work', wd(4,3), wd(4,5), 'deep_work');                         // 10-12 VN
+      addCalendar('fri-dw', 'Final release preparation', wd(4,3), wd(4,5), 'deep_work', undefined, 'CONFIRMED', { linkedGoalId: 'release', focusQuality: 'HIGH' });
     } else if (persona.slug === 'busy-balancer') {
-      addContext('goal-health', 'goal:health', { id: 'health', priority: 'high' }, ObservationSource.USER_CONFIRMED, 1, old);
-      addContext('goal-balance', 'goal:balance', { id: 'balance', priority: 'medium' }, ObservationSource.USER_CONFIRMED, 1, old);
-      addContext('preference', 'preference:work', { id: 'pace', value: 'steady' }, ObservationSource.USER_CONFIRMED, 1, old);
+      addContext('goal-pitch', 'goal:pitch', { id: 'pitch', description: 'Prepare and deliver the high-value competition pitch Friday', priority: 'HIGH', status: 'ACTIVE', deadline: wd(4, 10).toISOString(), remainingEffortHours: 5, progress: 45 }, ObservationSource.USER_CONFIRMED, 1, old);
+      addContext('goal-growth', 'goal:growth', { id: 'growth', description: 'Complete investor follow-up before the monthly review', priority: 'MEDIUM', status: 'ACTIVE', deadline: wd(21, 9).toISOString(), remainingEffortHours: 8, progress: 25 }, ObservationSource.USER_CONFIRMED, 1, old);
+      addContext('preference', 'preference:work', { id: 'pace', category: 'work', description: 'Preserve two focused preparation blocks and avoid late-night work', value: 'steady' }, ObservationSource.USER_CONFIRMED, 1, old);
+      addContext('commitment', 'commitment:family', { id: 'family-dinner', description: 'Family dinner', start: wd(3, 11).toISOString(), end: wd(3, 13).toISOString(), priority: 'HIGH', flexibility: 'FIXED', consequence: 'HIGH' }, ObservationSource.USER_CONFIRMED, 1, old);
       addObservation('meetings', 'Meeting volume increased.', old);
       addObservation('capacity', 'Capacity constrained.', recent);
       // Mon – 18 events total
@@ -218,24 +263,25 @@ export function generatePhase4Dataset(seededAt: Date): GeneratedDataset {
       addCalendar('mon-gym', 'Gym', wd(0,11), wd(0,12), 'recovery');                             // 18-19 VN
       // Tue
       addCalendar('tue-standup', 'Daily Standup', wd(1,2), wd(1,2,30), 'meeting', 'https://meet.example.com/phase4-busy-standup');
-      addCalendar('tue-planning', 'Planning Session', wd(1,3), wd(1,5), 'meeting');
-      addCalendar('tue-lunchl', 'Lunch & Learn', wd(1,5,30), wd(1,6,30), 'meeting');
+      addCalendar('tue-planning', 'Internal planning', wd(1,3), wd(1,5), 'meeting', undefined, 'CONFIRMED', { flexibility: 'MOVABLE', priority: 'LOW', consequence: 'LOW' });
+      addCalendar('tue-lunchl', 'Informal networking lunch', wd(1,5,30), wd(1,6,30), 'meeting', undefined, 'CONFIRMED', { flexibility: 'OPTIONAL', priority: 'LOW', consequence: 'LOW' });
       addCalendar('tue-cr', 'Code Review', wd(1,7), wd(1,8,30), 'meeting');
-      addCalendar('tue-reading', 'Reading Time', wd(1,14), wd(1,15), 'recovery');                // 21-22 VN
+      addCalendar('tue-reading', 'Founder community catch-up', wd(14,10), wd(14,11), 'recovery');
       // Wed
       addCalendar('wed-standup', 'Daily Standup', wd(2,2), wd(2,2,30), 'meeting', 'https://meet.example.com/phase4-busy-standup');
       addCalendar('wed-dw', 'Deep Work', wd(2,3), wd(2,5), 'deep_work');
-      addCalendar('wed-allhands', 'All-hands', wd(2,6), wd(2,7), 'meeting', 'https://meet.example.com/phase4-busy-allhands');
-      addCalendar('wed-budget', 'Budget Review', wd(2,8), wd(2,9), 'meeting');
+      addCalendar('wed-allhands', 'Optional founder coordination', wd(2,6), wd(2,7), 'meeting', 'https://meet.example.com/phase4-busy-allhands', 'CONFIRMED', { flexibility: 'OPTIONAL', priority: 'LOW', consequence: 'LOW' });
+      addCalendar('wed-budget', 'Monthly budget review', wd(21,8), wd(21,9), 'meeting', undefined, 'CONFIRMED', { flexibility: 'MOVABLE', priority: 'MEDIUM' });
       // Thu
       addCalendar('thu-standup', 'Daily Standup', wd(3,2), wd(3,2,30), 'meeting', 'https://meet.example.com/phase4-busy-standup');
       addCalendar('thu-interview', 'Customer Interview', wd(3,3), wd(3,4), 'meeting');
       addCalendar('thu-dw', 'Deep Work', wd(3,6), wd(3,8), 'deep_work');
-      addCalendar('thu-doctor', 'Doctor Appointment', wd(3,10), wd(3,11), 'other');              // 17-18 VN
+      addCalendar('fri-pitch', 'Competition pitch', wd(4,7), wd(4,10), 'deadline', undefined, 'CONFIRMED', { linkedGoalId: 'pitch', flexibility: 'FIXED', priority: 'HIGH', consequence: 'HIGH' });
     } else if (persona.slug === 'overloaded-lead') {
-      addContext('goal-delivery', 'goal:delivery', { id: 'delivery', priority: 'high' }, ObservationSource.USER_CONFIRMED, 1, old);
-      addContext('preference', 'preference:work', { id: 'pace', value: 'fast' }, ObservationSource.USER_CONFIRMED, 1, old);
-      addContext('expired', 'goal:expired', { id: 'expired', priority: 'low' }, ObservationSource.USER_CONFIRMED, 1, expired, old);
+      addContext('goal-investor', 'goal:investor-update', { id: 'investor-update', description: 'Finish the investor update before Thursday board commitments', priority: 'HIGH', status: 'ACTIVE', deadline: wd(3, 2).toISOString(), remainingEffortHours: 4, progress: 35 }, ObservationSource.USER_CONFIRMED, 1, old);
+      addContext('goal-proposal', 'goal:customer-proposal', { id: 'customer-proposal', description: 'Complete the customer proposal before Friday', priority: 'HIGH', status: 'ACTIVE', deadline: wd(4, 10).toISOString(), remainingEffortHours: 3, progress: 55 }, ObservationSource.USER_CONFIRMED, 1, old);
+      addContext('preference', 'preference:work', { id: 'execution-window', category: 'work', description: 'Protect open afternoons for proposal and investor writing', value: 'afternoon' }, ObservationSource.USER_CONFIRMED, 1, old);
+      addContext('commitment', 'commitment:board', { id: 'board-commitment', description: 'Thursday board commitments', start: wd(3, 2).toISOString(), end: wd(3, 5).toISOString(), priority: 'HIGH', flexibility: 'FIXED', consequence: 'HIGH' }, ObservationSource.USER_CONFIRMED, 1, old);
       addObservation('interruptions', 'Heavy interruptions.', old);
       addObservation('burnout', 'Burnout risk detected.', recent);
       // Mon – 30 events total
@@ -261,10 +307,10 @@ export function generatePhase4Dataset(seededAt: Date): GeneratedDataset {
       addCalendar('wed-allhands', 'All-hands Meeting', wd(2,2,30), wd(2,4), 'meeting', 'https://meet.example.com/phase4-lead-allhands');
       addCalendar('wed-leads', 'Engineering Leads', wd(2,4), wd(2,5), 'meeting');
       addCalendar('wed-budget', 'Budget Sync', wd(2,5), wd(2,6), 'meeting');
-      addCalendar('wed-roadmap', 'Product Roadmap', wd(2,6), wd(2,8), 'meeting');
-      addCalendar('wed-1on1c', '1:1 Gamma', wd(2,8), wd(2,9), 'meeting');
-      addCalendar('wed-perf', 'Perf Review Prep', wd(2,9), wd(2,10), 'other');
-      addCalendar('wed-oncall', 'On-call Check', wd(2,10), wd(2,11), 'other');
+      addCalendar('wed-roadmap', 'Product Roadmap', wd(8,6), wd(8,8), 'meeting');
+      addCalendar('wed-1on1c', '1:1 Gamma', wd(14,8), wd(14,9), 'meeting');
+      addCalendar('wed-perf', 'Performance review milestone', wd(21,9), wd(21,10), 'other', undefined, 'CONFIRMED', { flexibility: 'FIXED', priority: 'HIGH', consequence: 'HIGH' });
+      addCalendar('wed-oncall', 'Quarterly operating review', wd(28,9), wd(28,11), 'meeting', undefined, 'CONFIRMED', { priority: 'HIGH', consequence: 'HIGH' });
       // Thu
       addCalendar('thu-standup', 'Daily Standup', wd(3,2), wd(3,2,30), 'meeting');
       addCalendar('thu-vendor', 'Vendor Call', wd(3,2,30), wd(3,3,30), 'meeting');
@@ -273,8 +319,11 @@ export function generatePhase4Dataset(seededAt: Date): GeneratedDataset {
       addCalendar('thu-crossteam', 'Cross-team Sync', wd(3,7), wd(3,8,30), 'meeting');
       addCalendar('thu-emergency', 'Emergency Deploy', wd(3,10), wd(3,11,30), 'meeting', 'https://meet.example.com/phase4-lead-deploy');
     } else if (persona.slug === 'needs-clarity') {
-      addContext('goal', 'goal:needs-clarity', { id: 'needs-clarity', priority: 'medium', deadline: wd(4,10).toISOString() }, ObservationSource.USER_CONFIRMED, 1, old);
-      addObservation('uncertainty', 'Availability is unresolved.', old);
+      addContext('goal-certification', 'goal:certification', { id: 'certification', description: 'Complete certification preparation before Friday', priority: 'HIGH', status: 'ACTIVE', deadline: wd(4, 10).toISOString(), remainingEffortHours: 4, progress: 50 }, ObservationSource.USER_CONFIRMED, 1, old);
+      addContext('goal-assignment', 'goal:assignment', { id: 'assignment', description: 'Submit the university assignment by Sunday', priority: 'HIGH', status: 'ACTIVE', deadline: wd(6, 10).toISOString(), remainingEffortHours: 6, progress: 30 }, ObservationSource.USER_CONFIRMED, 1, old);
+      addContext('goal-hackathon', 'goal:hackathon', { id: 'hackathon', description: 'Prepare the hackathon presentation for Monday', priority: 'MEDIUM', status: 'ACTIVE', deadline: wd(7, 2).toISOString(), remainingEffortHours: 3, progress: 40 }, ObservationSource.USER_CONFIRMED, 1, old);
+      addContext('preference', 'preference:recovery', { id: 'recovery', category: 'work', description: 'Avoid converting study buffer into late-night work', value: 'protect-evenings' }, ObservationSource.USER_CONFIRMED, 1, old);
+      addObservation('uncertainty', 'Thirteen hours of important work remain largely unscheduled.', old);
       // 9 events
       addCalendar('mon-focus', 'Focus Block', wd(0,3), wd(0,5), 'deep_work');                   // 10-12 VN
       addCalendar('tue-sync', 'Team Sync', wd(1,3), wd(1,3,30), 'meeting', 'https://meet.example.com/phase4-clarity-sync');
@@ -283,18 +332,21 @@ export function generatePhase4Dataset(seededAt: Date): GeneratedDataset {
       addCalendar('thu-review', 'Stakeholder Review', wd(3,7), wd(3,9), 'meeting', 'https://meet.example.com/phase4-clarity-review');
       addCalendar('fri-dw', 'Deep Work', wd(4,2), wd(4,4), 'deep_work');
       addCalendar('fri-deadline', 'Deadline: Submit Q3 Report', wd(4,10), wd(4,10,30), 'deadline');
-      addCalendar('sat-rest', 'Recovery / Rest', wd(5,3), wd(5,5), 'recovery');
+      addCalendar('sat-rest', 'Recovery / Rest', wd(14,3), wd(14,5), 'recovery');
       addCalendar('fri-prep', 'Report Prep', wd(4,5), wd(4,7), 'deep_work');
       addCalendar('tue-plan', 'Planning Notes', wd(1,9), wd(1,9,30), 'other');
     } else if (persona.slug === 'uncertain-skipper') {
-      addContext('goal', 'goal:uncertain-skipper', { id: 'uncertain-skipper', priority: 'medium' }, ObservationSource.USER_CONFIRMED, 1, old);
-      addObservation('uncertainty', 'Availability is unresolved.', old);
+      addContext('goal-grading', 'goal:grading', { id: 'grading', description: 'Complete grading before Friday faculty deadline', priority: 'HIGH', status: 'ACTIVE', deadline: wd(4, 10).toISOString(), remainingEffortHours: 5, progress: 55 }, ObservationSource.USER_CONFIRMED, 1, old);
+      addContext('goal-research', 'goal:research', { id: 'research', description: 'Strengthen the research network through relevant guest lectures', priority: 'MEDIUM', status: 'ACTIVE', deadline: wd(21, 9).toISOString(), remainingEffortHours: 2, progress: 20 }, ObservationSource.USER_CONFIRMED, 0.85, old);
+      addContext('preference', 'preference:teaching', { id: 'teaching-focus', category: 'work', description: 'Protect Friday morning for focused grading', value: 'morning' }, ObservationSource.USER_CONFIRMED, 1, old);
+      addContext('commitment', 'commitment:committee', { id: 'committee', description: 'Faculty review / committee meeting', start: wd(3, 7).toISOString(), end: wd(3, 9).toISOString(), priority: 'MEDIUM', flexibility: 'UNKNOWN', consequence: 'MEDIUM', status: 'TENTATIVE', attendanceRequirement: 'UNKNOWN' }, ObservationSource.USER_CONFIRMED, 0.45, recent);
+      addObservation('uncertainty', 'Committee attendance requirement is unresolved.', old);
       // 11 events
       addCalendar('mon-standup', 'Team Standup', wd(0,2), wd(0,2,30), 'meeting', 'https://meet.example.com/phase4-skip-standup');
       addCalendar('mon-confprep', 'Conference Talk Prep (Tentative)', wd(0,3), wd(0,5), 'other', undefined, 'TENTATIVE');
       addCalendar('mon-lunch', 'Lunch with Client (Optional)', wd(0,5), wd(0,6), 'other', undefined, 'TENTATIVE');
       addCalendar('tue-standup', 'Team Standup', wd(1,2), wd(1,2,30), 'meeting', 'https://meet.example.com/phase4-skip-standup');
-      addCalendar('tue-demo', 'Product Demo (Tentative)', wd(1,7), wd(1,8), 'meeting', 'https://meet.example.com/phase4-skip-demo', 'TENTATIVE');
+      addCalendar('committee', 'Faculty review / committee meeting', wd(3,7), wd(3,9), 'meeting', 'https://meet.example.com/phase4-skip-demo', 'TENTATIVE', { flexibility: 'UNKNOWN', attendanceRequirement: 'UNKNOWN', priority: 'MEDIUM', consequence: 'MEDIUM', confidence: 0.45 });
       addCalendar('tue-side', 'Side Project', wd(1,12), wd(1,14), 'deep_work');                 // 19-21 VN
       addCalendar('wed-workshop', 'Workshop Attendance (Tentative)', wd(2,2), wd(2,5), 'other', undefined, 'TENTATIVE');
       addCalendar('thu-standup', 'Team Standup', wd(3,2), wd(3,2,30), 'meeting', 'https://meet.example.com/phase4-skip-standup');
@@ -302,31 +354,31 @@ export function generatePhase4Dataset(seededAt: Date): GeneratedDataset {
       addCalendar('fri-retro', 'Weekly Retro', wd(4,3), wd(4,4), 'meeting', 'https://meet.example.com/phase4-skip-retro');
       addCalendar('fri-dw', 'Deep Work', wd(4,6), wd(4,8), 'deep_work');
     } else {
-      // conflict-check – 14 events with deliberate overlaps
-      addContext('conflict-a', 'goal:compete', { id: 'compete', priority: 'high', value: 'win' }, ObservationSource.USER_CONFIRMED, 1, old);
-      addContext('conflict-b', 'goal:compete', { id: 'compete', priority: 'low', value: 'lose' }, ObservationSource.USER_CONFIRMED, 1, old);
-      addContext('other-goal', 'goal:other', { id: 'other', priority: 'medium' }, ObservationSource.USER_CONFIRMED, 1, old);
-      addContext('preference', 'preference:color', { id: 'color', value: 'blue' }, ObservationSource.USER_CONFIRMED, 1, old);
-      addObservation('conflict', 'Competing priorities detected.', old);
+      // research lecturer – 14 events balancing fixed teaching with movable institutional work
+      addContext('goal-proposal', 'goal:proposal', { id: 'proposal', description: 'Submit the research proposal before Friday', priority: 'HIGH', status: 'ACTIVE', deadline: wd(4, 10).toISOString(), remainingEffortHours: 5, progress: 45 }, ObservationSource.USER_CONFIRMED, 1, old);
+      addContext('goal-workshop', 'goal:workshop', { id: 'workshop', description: 'Build a collaboration through the Thursday research workshop', priority: 'HIGH', status: 'ACTIVE', deadline: wd(3, 9).toISOString(), remainingEffortHours: 2, progress: 60 }, ObservationSource.USER_CONFIRMED, 0.9, old);
+      addContext('preference', 'preference:focus', { id: 'proposal-focus', category: 'work', description: 'Use morning blocks for proposal writing', value: 'morning' }, ObservationSource.USER_CONFIRMED, 1, old);
+      addContext('commitment', 'commitment:teaching', { id: 'teaching', description: 'Fixed undergraduate teaching', start: wd(3, 2).toISOString(), end: wd(3, 5).toISOString(), priority: 'HIGH', flexibility: 'FIXED', consequence: 'HIGH' }, ObservationSource.USER_CONFIRMED, 1, old);
+      addObservation('conflict', 'Institutional coordination is crowding proposal preparation.', old);
       // Mon
       addCalendar('mon-dw', 'Important Deep Work', wd(0,2), wd(0,5), 'deep_work');              // 09-12 VN
       addCalendar('mon-allhands', 'All-hands (Overlap)', wd(0,4), wd(0,5,30), 'meeting', 'https://meet.example.com/phase4-conflict-allhands'); // 11-12:30 VN overlaps DW
       addCalendar('mon-lunch', 'Lunch', wd(0,5,30), wd(0,6,30), 'other');
       // Tue – back-to-back, no gap
-      addCalendar('tue-sprint', 'Sprint Planning', wd(1,2), wd(1,4), 'meeting', 'https://meet.example.com/phase4-conflict-sprint');
-      addCalendar('tue-design', 'Design Review', wd(1,4), wd(1,6), 'meeting');
-      addCalendar('tue-impl', 'Implementation Work', wd(1,6), wd(1,10), 'deep_work');           // 13-17 VN
+      addCalendar('tue-sprint', 'Department planning', wd(1,2), wd(1,4), 'meeting', 'https://meet.example.com/phase4-conflict-sprint', 'CONFIRMED', { flexibility: 'MOVABLE', priority: 'LOW', consequence: 'LOW' });
+      addCalendar('tue-design', 'Administrative review', wd(1,4), wd(1,6), 'meeting', undefined, 'CONFIRMED', { flexibility: 'MOVABLE', priority: 'LOW', consequence: 'LOW' });
+      addCalendar('tue-impl', 'Proposal writing', wd(1,6), wd(1,10), 'deep_work', undefined, 'CONFIRMED', { linkedGoalId: 'proposal' });
       // Wed
       addCalendar('wed-client', 'Client Call', wd(2,2), wd(2,3,30), 'meeting', 'https://meet.example.com/phase4-conflict-client');
-      addCalendar('wed-internal', 'Internal Sync (Overlap)', wd(2,3), wd(2,4), 'meeting');     // overlaps client call end
-      addCalendar('wed-focus', 'Deep Focus', wd(2,6), wd(2,9), 'deep_work');
+      addCalendar('wed-internal', 'Optional faculty coordination', wd(2,3), wd(2,4), 'meeting', undefined, 'CONFIRMED', { flexibility: 'OPTIONAL', priority: 'LOW', consequence: 'LOW' });
+      addCalendar('wed-focus', 'Proposal deep work', wd(2,6), wd(2,9), 'deep_work', undefined, 'CONFIRMED', { linkedGoalId: 'proposal' });
       addCalendar('wed-late', 'Late Meeting', wd(2,10), wd(2,12), 'meeting', 'https://meet.example.com/phase4-conflict-late'); // 17-19 VN
       // Thu – deadline pressure
-      addCalendar('thu-crunch', 'Pre-deadline Crunch', wd(3,2), wd(3,10), 'deep_work');        // 09-17 VN full day
-      addCalendar('thu-emergency', 'Emergency Meeting (During Crunch)', wd(3,8), wd(3,9), 'meeting', 'https://meet.example.com/phase4-conflict-emergency');
+      addCalendar('thu-teaching', 'Fixed undergraduate teaching', wd(3,2), wd(3,5), 'meeting', undefined, 'CONFIRMED', { flexibility: 'FIXED', priority: 'HIGH', consequence: 'HIGH' });
+      addCalendar('thu-workshop', 'Research collaboration workshop', wd(3,6), wd(3,9), 'meeting', 'https://meet.example.com/phase4-conflict-emergency', 'TENTATIVE', { flexibility: 'MOVABLE', priority: 'HIGH', consequence: 'MEDIUM', linkedGoalId: 'workshop' });
       // Fri
       addCalendar('fri-retro', 'Retrospective', wd(4,2), wd(4,3), 'meeting');
-      addCalendar('fri-deploy', 'Release Deployment', wd(4,3), wd(4,6), 'meeting', 'https://meet.example.com/phase4-conflict-deploy');
+      addCalendar('fri-proposal', 'Research proposal deadline', wd(4,3), wd(4,6), 'deadline', 'https://meet.example.com/phase4-conflict-deploy', 'CONFIRMED', { linkedGoalId: 'proposal' });
     }
   }
 
@@ -521,12 +573,8 @@ export function runPlan(dataset: GeneratedDataset): void {
   console.log(`Personas: ${dataset.personas.length}`);
   for (const persona of dataset.personas) console.log(` - ${persona.slug} (${persona.userId})`);
   console.log('Table counts:');
-  console.log(' - users: 6');
-  console.log(' - personalContext: 28');
-  console.log(' - observations: 8');
-  console.log(' - calendarEvents: 16');
-  console.log(' - decisions: 6');
-  console.log('Total records: 64');
+  for (const table of TABLE_KEYS) console.log(` - ${table}: ${dataset.records[table].length}`);
+  console.log(`Total records: ${Object.values(dataset.records).flat().length}`);
 }
 
 function exactOwner(item: Record<string, unknown>, table: TableKey): string | undefined {

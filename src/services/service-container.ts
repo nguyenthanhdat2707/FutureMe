@@ -34,6 +34,7 @@ import { SqliteFeedbackRepository } from '../repositories/feedback.repository';
 import { SqliteInterventionRepository } from '../repositories/intervention.repository';
 import { SqliteDecisionChoiceRepository } from '../repositories/decision-choice.repository';
 import { SqliteCheckInScheduleRepository } from '../repositories/check-in-schedule.repository';
+import { IDemoResetRepository, SqliteDemoResetRepository } from '../repositories/demo-reset.repository';
 
 import { DynamoPersonalContextRepository } from '../repositories/dynamo/personal-context.repository';
 import { DynamoDecisionRepository } from '../repositories/dynamo/decision.repository';
@@ -43,6 +44,7 @@ import { DynamoUserRepository } from '../repositories/dynamo/user.repository';
 import { DynamoOutcomeRepository } from '../repositories/dynamo/outcome.repository';
 import { DynamoFeedbackRepository } from '../repositories/dynamo/feedback.repository';
 import { DynamoInterventionRepository } from '../repositories/dynamo/intervention.repository';
+import { DynamoDemoResetRepository } from '../repositories/dynamo/demo-reset.repository';
 
 // Singleton instances
 let contextEngine: IContextEngine | null = null;
@@ -63,6 +65,7 @@ let feedbackRepo: IFeedbackRepository | null = null;
 let interventionRepo: IInterventionRepository | null = null;
 let decisionChoiceRepo: IDecisionChoiceRepository | null = null;
 let checkInScheduleRepo: ICheckInScheduleRepository | null = null;
+let demoResetRepo: IDemoResetRepository | null = null;
 
 
 const isDynamo = process.env.PERSISTENCE_PROVIDER === 'dynamodb';
@@ -115,6 +118,11 @@ export function getDecisionChoiceRepository(): IDecisionChoiceRepository {
 export function getCheckInScheduleRepository(): ICheckInScheduleRepository {
   if (!checkInScheduleRepo) checkInScheduleRepo = new SqliteCheckInScheduleRepository();
   return checkInScheduleRepo;
+}
+
+export function getDemoResetRepository(): IDemoResetRepository {
+  if (!demoResetRepo) demoResetRepo = isDynamo ? new DynamoDemoResetRepository() : new SqliteDemoResetRepository();
+  return demoResetRepo;
 }
 
 

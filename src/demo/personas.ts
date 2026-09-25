@@ -1,53 +1,53 @@
-export const DEMO_SEED_VERSION = 'phase4-eval-v2';
+export const DEMO_SEED_VERSION = 'temporal-demo-v1';
 
 export const DEMO_PERSONAS = [
   {
     slug: 'focused-builder',
     id: `${DEMO_SEED_VERSION}:focused-builder`,
     email: `${DEMO_SEED_VERSION}-focused-builder@example.com`,
-    displayName: 'Focused Builder',
-    scenario: 'Clear priorities with strong confirmed evidence.',
-    expectedJourney: 'RECOMMEND · proceed',
+    displayName: 'Product Engineer',
+    scenario: 'Protects a scarce morning focus window before a Friday release.',
+    expectedJourney: 'MOVE LOW-VALUE SYNC',
   },
   {
     slug: 'busy-balancer',
     id: `${DEMO_SEED_VERSION}:busy-balancer`,
     email: `${DEMO_SEED_VERSION}-busy-balancer@example.com`,
-    displayName: 'Busy Balancer',
-    scenario: 'Limited capacity and a recent workload increase.',
-    expectedJourney: 'RECOMMEND · proceed with caution',
+    displayName: 'Pitch-Week Founder',
+    scenario: 'A packed week still supports a valuable pitch after weaker commitments move.',
+    expectedJourney: 'FULL CALENDAR → YES',
   },
   {
     slug: 'overloaded-lead',
     id: `${DEMO_SEED_VERSION}:overloaded-lead`,
     email: `${DEMO_SEED_VERSION}-overloaded-lead@example.com`,
-    displayName: 'Overloaded Lead',
-    scenario: 'An overloaded calendar with consequential disruption.',
-    expectedJourney: 'RECOMMEND · do not proceed',
+    displayName: 'Deadline-Pressed Founder',
+    scenario: 'An empty-looking afternoon is reserved by unscheduled investor and proposal work.',
+    expectedJourney: 'EMPTY SLOT → NO',
   },
   {
     slug: 'needs-clarity',
     id: `${DEMO_SEED_VERSION}:needs-clarity`,
     email: `${DEMO_SEED_VERSION}-needs-clarity@example.com`,
-    displayName: 'Needs Clarity',
-    scenario: 'Availability is missing but can be clarified.',
-    expectedJourney: 'ASK → RECOMMEND',
+    displayName: 'Working Student',
+    scenario: 'A visually free afternoon is already consumed by certification, assignment, and hackathon work.',
+    expectedJourney: 'HIDDEN WORKLOAD → NO',
   },
   {
     slug: 'uncertain-skipper',
     id: `${DEMO_SEED_VERSION}:uncertain-skipper`,
     email: `${DEMO_SEED_VERSION}-uncertain-skipper@example.com`,
-    displayName: 'Uncertain Skipper',
-    scenario: 'Critical availability remains unresolved.',
-    expectedJourney: 'ASK → ABSTAIN',
+    displayName: 'Lecturer — Committee Unclear',
+    scenario: 'A tentative faculty review conflicts with a guest lecture and attendance is unknown.',
+    expectedJourney: 'UNCERTAINTY → ASK',
   },
   {
     slug: 'conflict-check',
     id: `${DEMO_SEED_VERSION}:conflict-check`,
     email: `${DEMO_SEED_VERSION}-conflict-check@example.com`,
-    displayName: 'Conflict Check',
-    scenario: 'Equal-authority evidence contains a material conflict.',
-    expectedJourney: 'ASK → ABSTAIN',
+    displayName: 'Research Lecturer',
+    scenario: 'Fixed teaching and a proposal deadline coexist with movable institutional work.',
+    expectedJourney: 'FULL CALENDAR → YES',
   },
 ] as const;
 
@@ -65,5 +65,11 @@ export function isDemoPersonaId(value: string): value is DemoPersonaId {
 export function getDemoPersonaBySlug(slug: PersonaSlug): DemoPersona {
   const persona = DEMO_PERSONAS.find((candidate) => candidate.slug === slug);
   if (!persona) throw new Error(`Unknown demo persona: ${slug}`);
+  return persona;
+}
+
+export function getDemoPersonaById(id: DemoPersonaId): DemoPersona {
+  const persona = DEMO_PERSONAS.find((candidate) => candidate.id === id);
+  if (!persona) throw new Error(`Unknown demo persona: ${id}`);
   return persona;
 }
