@@ -49,15 +49,15 @@ afterAll(() => fs.rmSync(tempRoot, { recursive: true, force: true }));
 describe('Phase 4 deterministic demo dataset', () => {
   const seededAt = new Date('2026-01-02T03:04:05.000Z');
 
-  it('produces six personas and the exact 6/72/36/390/6 = 510 contract', () => {
+  it('produces six personas and the exact 6/72/36/555/6 = 675 contract', () => {
     const dataset = generatePhase4Dataset(seededAt);
     expect(dataset.personas.map((persona) => persona.slug)).toEqual(PERSONA_SLUGS);
     expect(dataset.records.users).toHaveLength(6);
     expect(dataset.records.personalContext).toHaveLength(72);
     expect(dataset.records.observations).toHaveLength(36);
-    expect(dataset.records.calendarEvents).toHaveLength(390);
+    expect(dataset.records.calendarEvents).toHaveLength(555);
     expect(dataset.records.decisions).toHaveLength(6);
-    expect(Object.values(dataset.records).flat()).toHaveLength(510);
+    expect(Object.values(dataset.records).flat()).toHaveLength(675);
   });
 
   it('busy-balancer has at least 60 calendar events and multiple displaceable commitments', () => {
@@ -184,7 +184,7 @@ describe('Phase 4 manifest safety', () => {
     const persisted = fs.readFileSync(manifestPath, 'utf8');
     expect(persisted.toLowerCase()).not.toMatch(/password|secret|token/);
     expect(state.entries.map((entry) => entry.id)).toEqual(callerOrder);
-    expect(loadManifest(manifestPath)?.entries).toHaveLength(510);
+    expect(loadManifest(manifestPath)?.entries).toHaveLength(675);
   });
 
   it('rejects altered persona IDs and credential-bearing manifests', () => {
@@ -269,7 +269,7 @@ describe('Phase 4 exact DynamoDB protections', () => {
 });
 
 describe('Phase 4 apply, verify, and rollback', () => {
-  it('preflights all 510 keys before the first write and persists completion', async () => {
+  it('preflights all 675 keys before the first write and persists completion', async () => {
     const manifestPath = setupTemp('apply');
     const send = jest.fn().mockImplementation((command: unknown) => {
       const input = commandInput(command);
@@ -280,8 +280,8 @@ describe('Phase 4 apply, verify, and rollback', () => {
     logSpy.mockRestore();
 
     const calls = send.mock.calls as Array<[unknown]>;
-    expect(calls.slice(0, 510).every(([command]) => !commandInput(command).RequestItems)).toBe(true);
-    expect(commandInput(calls[510][0]).RequestItems).toBeDefined();
+    expect(calls.slice(0, 675).every(([command]) => !commandInput(command).RequestItems)).toBe(true);
+    expect(commandInput(calls[675][0]).RequestItems).toBeDefined();
     expect(loadManifest(manifestPath)?.entries.every((entry) => entry.completed)).toBe(true);
   });
 
