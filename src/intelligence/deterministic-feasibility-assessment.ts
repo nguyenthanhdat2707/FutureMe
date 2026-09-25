@@ -288,7 +288,7 @@ function isHighQualityFocusRisk(
   }) ?? false;
   const competingImportantWork = urgentFocusedWork ||
     hasImportantActiveGoalInHorizon(context, horizon) ||
-    (isNonNegativeNumber(profile?.workloadHoursBeforeDeadline) && (profile.workloadHoursBeforeDeadline as number) > 0);
+    (isNonNegativeNumber(profile?.workloadHoursBeforeDeadline) && profile.workloadHoursBeforeDeadline > 0);
 
   // Morning-hour inference: soft signal, requires competing important work in the horizon.
   if (morningPreference && localStartHour >= 8 && localStartHour < 12 && competingImportantWork) return true;
