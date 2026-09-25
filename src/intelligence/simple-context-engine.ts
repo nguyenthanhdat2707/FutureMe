@@ -345,6 +345,8 @@ export class SimpleContextEngine implements IContextEngine {
     const state = await this.stateEstimator.estimateCurrentState(context, recentObs);
 
     const tokens = this.extractTokens(decision);
+    const now = new Date();
+    const maximumHorizon = new Date(now.getTime() + 14 * 86_400_000);
     let deadline: Date | null = null;
     if (decision.impactProfile?.deadline) {
       deadline = new Date(decision.impactProfile.deadline);
@@ -352,13 +354,21 @@ export class SimpleContextEngine implements IContextEngine {
         deadline = null;
       }
     }
+    const contextHorizon = deadline
+      ? new Date(Math.min(deadline.getTime(), maximumHorizon.getTime()))
+      : new Date(now.getTime() + 7 * 86_400_000);
+    const urgentGoalHorizon = new Date(now.getTime() + 7 * 86_400_000);
 
-    const relevantGoals = context.goals.filter(g =>
-      this.isLexicallyRelevant(g.description, tokens)
-    );
+    const relevantGoals = context.goals.filter(g => {
+      if (this.isLexicallyRelevant(g.description, tokens)) return true;
+      if (g.status === 'completed' || !g.deadline) return false;
+      const goalDeadline = new Date(g.deadline);
+      return !Number.isNaN(goalDeadline.getTime()) &&
+        goalDeadline > now &&
+        goalDeadline <= urgentGoalHorizon;
+    });
 
     const relevantCommitments = context.commitments.filter(c => {
-      const now = new Date();
       const cStart = new Date(c.startTime);
       const cEnd = c.endTime ? new Date(c.endTime) : null;
 
@@ -366,10 +376,8 @@ export class SimpleContextEngine implements IContextEngine {
         return false;
       }
 
-      if (deadline) {
-        if (!isNaN(cStart.getTime()) && cStart < deadline) {
-          return true;
-        }
+      if (!isNaN(cStart.getTime()) && cStart < contextHorizon) {
+        return true;
       }
       return this.isLexicallyRelevant(c.description, tokens);
     });
@@ -399,8 +407,8 @@ export class SimpleContextEngine implements IContextEngine {
     const unresolvedConflicts = this.findUnresolvedConflicts(
       attributes,
       tokens,
-      deadline,
-      new Date()
+      contextHorizon,
+      now
     );
 
     return {

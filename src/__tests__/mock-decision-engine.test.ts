@@ -297,4 +297,48 @@ describe('MockDecisionEngine Integration', () => {
     expect(result.clarificationNeeded).toContain('How much energy will the candidate commitment require?');
     expect(llm.callCount).toBe(0);
   });
+
+  it('asks one concise attendance question for a materially overlapping tentative commitment', async () => {
+    class TentativeContextEngine extends FakeContextEngine {
+      // eslint-disable-next-line @typescript-eslint/require-await
+      async getRelevantContext(): Promise<RelevantContext> {
+        return {
+          goals: [],
+          commitments: [{
+            id: 'faculty-review',
+            description: 'Faculty review',
+            startTime: new Date('2026-09-24T07:00:00.000Z'),
+            endTime: new Date('2026-09-24T08:00:00.000Z'),
+            status: 'tentative',
+            flexibility: 'movable',
+            attendanceRequirement: 'unknown'
+          }],
+          constraints: [],
+          recentHistory: [],
+          state: { state: PersonalState.FLOW, timestamp: new Date(), confidence: 1, evidence: [] }
+        };
+      }
+    }
+
+    engine = new MockDecisionEngine(llm, new TentativeContextEngine(), decisionRepo, choiceRepo, outcomeRepo);
+    const result = await engine.supportDecision('user1', {
+      question: 'Should I accept the guest lecture?',
+      impactProfile: {
+        timeCostHours: 1,
+        proposedStart: '2026-09-24T07:00:00.000Z',
+        proposedEnd: '2026-09-24T08:00:00.000Z',
+        deadline: '2026-09-25T10:00:00.000Z',
+        availableHoursBeforeDeadline: 4,
+        workloadHoursBeforeDeadline: 1,
+        priority: 'high'
+      }
+    });
+
+    expect(result.policy.outcome).toBe('ASK');
+    expect(result.clarificationNeeded).toEqual([
+      'Is your attendance at Faculty review required if it goes ahead?'
+    ]);
+    expect(result.decision.tradeoffs).toEqual([]);
+    expect(llm.callCount).toBe(0);
+  });
 });

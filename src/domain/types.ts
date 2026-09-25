@@ -195,11 +195,16 @@ export interface DecisionImpactProfile {
   timeCostHours?: number;
   target?: string;
   deadline?: Date | string;
+  proposedStart?: Date | string;
+  proposedEnd?: Date | string;
   availableHoursBeforeDeadline?: number;
   workloadHoursBeforeDeadline?: number;
   energyCost?: number;
   availableEnergy?: number;
   goalRelevance?: 'low' | 'medium' | 'high';
+  priority?: CommitmentPriority;
+  flexibility?: CommitmentFlexibility;
+  focusRequirement?: FocusQuality;
   source?: DecisionImpactSource;
 }
 
@@ -214,6 +219,14 @@ export interface FeasibilityEvidence {
   explanation: string;
 }
 
+export interface DisplacementCandidate {
+  commitmentId: string;
+  description: string;
+  action: 'move' | 'skip';
+  recoverableHours: number;
+  reason: string;
+}
+
 export interface DecisionFeasibilityAssessment {
   availableTimeBeforeDeadlineHours: number | null;
   projectedRemainingCapacityHours: number | null;
@@ -225,6 +238,12 @@ export interface DecisionFeasibilityAssessment {
   missingData: string[];
   invalidInputs: string[];
   evidence: FeasibilityEvidence[];
+  impactHorizonEnd?: Date | null;
+  derivedWorkloadHours?: number;
+  linkedScheduledHours?: number;
+  recoveredCapacityHours?: number;
+  displacementCandidates?: DisplacementCandidate[];
+  focusQualityRisk?: boolean;
 }
 
 export interface ContextSnapshot {

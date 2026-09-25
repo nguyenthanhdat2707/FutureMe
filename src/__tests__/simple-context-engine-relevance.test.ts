@@ -363,4 +363,67 @@ describe('SimpleContextEngine - getRelevantContext Relevance Logic', () => {
       }),
     ]));
   });
+
+  it('includes urgent hidden workload but excludes a distant unrelated goal', async () => {
+    const now = new Date('2026-09-22T10:00:00.000Z');
+    jest.useFakeTimers();
+    jest.setSystemTime(now);
+    const urgent = createGoalAttr('urgent', 'Finish the investor update');
+    urgent.value = JSON.stringify({
+      id: 'urgent',
+      description: 'Finish the investor update',
+      priority: 'high',
+      status: 'active',
+      deadline: new Date(now.getTime() + 3 * 86_400_000),
+      remainingEffortHours: 4
+    });
+    const distant = createGoalAttr('distant', 'Prepare the board report');
+    distant.value = JSON.stringify({
+      id: 'distant',
+      description: 'Prepare the board report',
+      priority: 'high',
+      status: 'active',
+      deadline: new Date(now.getTime() + 18 * 86_400_000),
+      remainingEffortHours: 12
+    });
+    mockContextRepo.findByUserId.mockResolvedValue([urgent, distant]);
+
+    const result = await engine.getRelevantContext('user1', {
+      question: 'Can I accept a partnership meeting?'
+    });
+
+    expect(result.goals.map(item => item.id)).toEqual(['urgent']);
+  });
+
+  it('requires lexical relevance for goals beyond the seven-day urgent horizon', async () => {
+    const now = new Date('2026-09-22T10:00:00.000Z');
+    jest.useFakeTimers();
+    jest.setSystemTime(now);
+    const partnership = createGoalAttr('partnership', 'Prepare the partnership proposal');
+    partnership.value = JSON.stringify({
+      id: 'partnership',
+      description: 'Prepare the partnership proposal',
+      priority: 'high',
+      status: 'active',
+      deadline: new Date(now.getTime() + 12 * 86_400_000),
+      remainingEffortHours: 5
+    });
+    const unrelated = createGoalAttr('legal', 'Review unrelated legal contracts');
+    unrelated.value = JSON.stringify({
+      id: 'legal',
+      description: 'Review unrelated legal contracts',
+      priority: 'high',
+      status: 'active',
+      deadline: new Date(now.getTime() + 12 * 86_400_000),
+      remainingEffortHours: 10
+    });
+    mockContextRepo.findByUserId.mockResolvedValue([partnership, unrelated]);
+
+    const result = await engine.getRelevantContext('user1', {
+      question: 'Should I accept the partnership meeting?',
+      impactProfile: { deadline: new Date(now.getTime() + 14 * 86_400_000) }
+    });
+
+    expect(result.goals.map(item => item.id)).toEqual(['partnership']);
+  });
 });
