@@ -3,6 +3,7 @@ import { decisionsApi, contextApi, api } from '../api/client';
 import type { DecisionApiRequest, DecisionApiResponse, ContextUpdateObservation, ObservationSource } from '../types/domain';
 import { useInterventions } from '../hooks/useInterventions';
 import { InterventionCard } from '../components/InterventionCard';
+import { nextDemoDayAt } from '../utils/demo-time';
 
 interface DemoForm {
   userId: string;
@@ -320,22 +321,20 @@ function DecisionsPage() {
     setChoiceError(null);
     try {
       if (decisionId) {
-        await decisionsApi.recordChoice(decisionId, option, `Accepted: ${option}`);
+        await decisionsApi.recordChoice(decisionId, 'accept', `Accepted recommendation: ${option}`);
       }
       // Scheduling intent heuristic
       const isSchedulingIntent = /reserve|schedule|block|add.*session|focus.*time|time.*for|set aside/i.test(question);
-      if (isSchedulingIntent) {
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        tomorrow.setHours(9, 0, 0, 0);
-        const tomorrowEnd = new Date(tomorrow);
-        tomorrowEnd.setHours(11, 0, 0, 0);
+      if (isSchedulingIntent && option !== 'do-not-proceed') {
+        const tomorrow = nextDemoDayAt(9);
+        const tomorrowEnd = nextDemoDayAt(11);
         await api.calendar.createEvent({
           title: `Focus: ${question.slice(0, 60)}`,
           startTime: tomorrow.toISOString(),
           endTime: tomorrowEnd.toISOString(),
           category: 'deep_work',
           note: `AI-recommended. Decision: ${option}`,
+          decisionId,
         });
         window.dispatchEvent(new CustomEvent('future-me-calendar-updated'));
       }
@@ -354,7 +353,7 @@ function DecisionsPage() {
     setChoiceError(null);
     try {
       if (decisionId) {
-        await decisionsApi.recordChoice(decisionId, 'rejected', `Rejected: ${option}`);
+        await decisionsApi.recordChoice(decisionId, 'decline', `Rejected recommendation: ${option}`);
       }
       setChoiceState('rejected');
     } catch (err) {

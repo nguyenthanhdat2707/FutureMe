@@ -1,7 +1,7 @@
 import type { CalendarEvent, PersonalContext, Preference } from '../types/domain';
+import { DEMO_TIME_ZONE } from './demo-time';
 
 export const FOCUS_HOURS = [6, 8, 10, 12, 14, 16, 18, 20, 22] as const;
-export const DEMO_TIME_ZONE = 'Asia/Ho_Chi_Minh';
 
 export interface FocusPatternPoint {
   hour: number;

@@ -3,21 +3,27 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 import type { MockedFunction } from 'vitest';
 import '@testing-library/jest-dom';
 import DecisionsPage from './DecisionsPage';
-import { decisionsApi, contextApi } from '../api/client';
+import { api, decisionsApi, contextApi } from '../api/client';
 import type { DecisionApiResponse, DecisionPolicyOutcome, DecisionFeasibility, PersonalContext } from '../types/domain';
 
 vi.mock('../api/client', () => ({
   decisionsApi: {
     query: vi.fn(),
-    getHistory: vi.fn()
+    getHistory: vi.fn(),
+    recordChoice: vi.fn(),
   },
   contextApi: {
     update: vi.fn()
-  }
+  },
+  api: {
+    calendar: { createEvent: vi.fn() },
+  },
 }));
 
 const mockQuery = decisionsApi.query as MockedFunction<typeof decisionsApi.query>;
 const mockContextUpdate = contextApi.update as MockedFunction<typeof contextApi.update>;
+const mockRecordChoice = decisionsApi.recordChoice as MockedFunction<typeof decisionsApi.recordChoice>;
+const mockCreateEvent = api.calendar.createEvent as MockedFunction<typeof api.calendar.createEvent>;
 
 const dummyContext: PersonalContext = {
   userId: 'test-user',
@@ -86,6 +92,51 @@ describe('DecisionsPage - RECOMMEND', () => {
     expect(screen.getByText(/What will you do\?/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Accept & Add to Schedule/i })).toBeInTheDocument();
     expect(screen.queryByText('AI')).not.toBeInTheDocument(); // No standalone AI badge
+  });
+
+  it('persists acceptance and creates one shared calendar event for scheduling intent', async () => {
+    mockQuery.mockResolvedValueOnce(buildFixture('RECOMMEND', 'feasible', 'proceed', {
+      decision: {
+        id: 'decision-1',
+        recommendation: { option: 'proceed', confidence: 0.9, reasoning: 'Reason' },
+        tradeoffs: [],
+      },
+    }));
+    mockRecordChoice.mockResolvedValueOnce({ choice: {} as never, checkInScheduledAt: null });
+    mockCreateEvent.mockResolvedValueOnce({} as never);
+
+    render(<DecisionsPage />);
+    fireEvent.change(screen.getByLabelText(/What decision do you need help with\?/i), { target: { value: 'Schedule focus time for the release' } });
+    fireEvent.click(screen.getByRole('button', { name: /Ask Future Me/i }));
+    await screen.findByRole('button', { name: /Accept & Add to Schedule/i });
+    fireEvent.click(screen.getByRole('button', { name: /Accept & Add to Schedule/i }));
+
+    await waitFor(() => expect(mockRecordChoice).toHaveBeenCalledWith('decision-1', 'accept', 'Accepted recommendation: proceed'));
+    expect(mockCreateEvent).toHaveBeenCalledTimes(1);
+    expect(mockCreateEvent.mock.calls[0][0]).toEqual(expect.objectContaining({
+      decisionId: 'decision-1',
+      category: 'deep_work',
+    }));
+  });
+
+  it('persists rejection without mutating the calendar', async () => {
+    mockQuery.mockResolvedValueOnce(buildFixture('RECOMMEND', 'feasible', 'proceed', {
+      decision: {
+        id: 'decision-2',
+        recommendation: { option: 'proceed', confidence: 0.9, reasoning: 'Reason' },
+        tradeoffs: [],
+      },
+    }));
+    mockRecordChoice.mockResolvedValueOnce({ choice: {} as never, checkInScheduledAt: null });
+
+    render(<DecisionsPage />);
+    fireEvent.change(screen.getByLabelText(/What decision do you need help with\?/i), { target: { value: 'Schedule focus time for the release' } });
+    fireEvent.click(screen.getByRole('button', { name: /Ask Future Me/i }));
+    await screen.findByRole('button', { name: /Not now/i });
+    fireEvent.click(screen.getByRole('button', { name: /Not now/i }));
+
+    await waitFor(() => expect(mockRecordChoice).toHaveBeenCalledWith('decision-2', 'decline', 'Rejected recommendation: proceed'));
+    expect(mockCreateEvent).not.toHaveBeenCalled();
   });
 
   it('renders ASK structured-field clarification and submits correct structure', async () => {

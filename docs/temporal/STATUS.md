@@ -11,12 +11,12 @@ Working tree: `/home/tdat/Documents/Learn/Code/HackathonIdea-VKU-09-2026/Future-
 2. Capacity and trade-off reasoning — COMPLETE
 3. Six coherent temporal personas — COMPLETE
 4. Deterministic persona-specific focus patterns — COMPLETE
-5. Shared accepted/rejected runtime state — IN PROGRESS
-6. Selected-persona canonical reset — PENDING
+5. Shared accepted/rejected runtime state — COMPLETE
+6. Selected-persona canonical reset — IN PROGRESS
 7. Full tests/lint/build/browser and high-risk review — PENDING
 8. Incremental commits pushed and READY_FOR_USER_TEST handoff — PENDING
 
-Progress: 4/8 (50%)
+Progress: 5/8 (62.5%)
 
 ## Latest verification
 
@@ -36,6 +36,10 @@ Progress: 4/8 (50%)
 - Seed contract is now `temporal-demo-v1`: six coherent personas, 36 context records, 94 calendar records, eight observations and six decisions across a rolling 30-day narrative.
 - The mock calendar's stale current-week anchoring was repaired and its rolling-horizon integration test passes.
 - Focus patterns deterministically use persona preferences, shared calendar events, fragmentation, and `Asia/Ho_Chi_Minh`; the UI keeps the required estimation label.
+- Work Unit 5 frontend: 14 files / 75 tests PASS; lint and production build PASS.
+- Accept now uses the existing valid `accept` choice contract, persists a runtime calendar event for scheduling intent, tags it with its decision and runtime origin, and broadcasts the shared calendar refresh event.
+- Reject now uses the existing valid `decline` choice contract and is covered to prove that it does not create a calendar event.
+- Accepted demo scheduling is fixed to 09:00–11:00 `Asia/Ho_Chi_Minh` independent of browser timezone; backend route integration 8/8 PASS, lint/build PASS.
 
 ## Preflight decisions
 
