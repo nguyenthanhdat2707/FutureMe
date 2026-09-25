@@ -2,9 +2,10 @@
 
 ## Active Phase — Temporal Intelligence, Trade-Off Reasoning & Demo Reset
 
-- **State:** TESTING
+- **State:** READY_FOR_USER_TEST
 - **Branch:** `feat/temporal-tradeoff-reset`
-- **Fixed gates:** 6/8 verified; automated reset/backend/frontend gates pass, browser verification and final review in progress
+- **Fixed gates:** 8/8 verified — focus-quality reasoning repair complete
+- **Commit:** 8171585 — fix(reasoning): focus-quality trades off against competing work, not just unscheduled hours
 - **Detailed resumable status:** `docs/temporal/STATUS.md`
 - **Scope boundary:** deterministic temporal/capacity reasoning, six coherent demo personas, shared runtime state, focus-pattern behavior, selected-persona reset, and verification only. Landing and later phases remain out of scope.
 
