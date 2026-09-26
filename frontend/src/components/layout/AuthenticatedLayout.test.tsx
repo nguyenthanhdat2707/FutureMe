@@ -1,10 +1,9 @@
 import '@testing-library/jest-dom/vitest';
-import { act, render, screen, waitFor } from '@testing-library/react';
-import { useEffect } from 'react';
+import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { AuthContext } from '../../auth/AuthContext';
-import { getSelectedDemoPersonaId, setSelectedDemoPersonaId } from '../../config/demo-personas';
+import { DemoWorldProvider } from '../../demo-world';
 import { AuthenticatedLayout } from './AuthenticatedLayout';
 
 vi.mock('../../config/demo-personas', async (importOriginal) => ({
@@ -22,31 +21,23 @@ function renderLayout(child: React.ReactNode) {
       signOut: vi.fn(),
       refreshSession: vi.fn().mockResolvedValue(undefined),
     }}>
-      <MemoryRouter initialEntries={['/dashboard']}>
-        <Routes>
-          <Route element={<AuthenticatedLayout />}>
-            <Route path="/dashboard" element={child} />
-          </Route>
-        </Routes>
-      </MemoryRouter>
+      <DemoWorldProvider>
+        <MemoryRouter initialEntries={['/dashboard']}>
+          <Routes>
+            <Route element={<AuthenticatedLayout />}>
+              <Route path="/dashboard" element={child} />
+            </Route>
+          </Routes>
+        </MemoryRouter>
+      </DemoWorldProvider>
     </AuthContext.Provider>,
   );
 }
 
-describe('AuthenticatedLayout demo refresh', () => {
-  it('remounts shared page state when the current persona is refreshed without changing IDs', async () => {
-    let mounts = 0;
-    function Page() {
-      useEffect(() => { mounts += 1; }, []);
-      return <p>Shared page</p>;
-    }
-
-    renderLayout(<Page />);
+describe('AuthenticatedLayout pitch demo', () => {
+  it('renders the shared Persona A page inside the presenter layout', () => {
+    renderLayout(<p>Shared page</p>);
     expect(screen.getByText('Shared page')).toBeInTheDocument();
-    expect(mounts).toBe(1);
-
-    act(() => { setSelectedDemoPersonaId(getSelectedDemoPersonaId()); });
-
-    await waitFor(() => expect(mounts).toBe(2));
+    expect(screen.getByText('Persona A · Oct 5–18, 2026')).toBeInTheDocument();
   });
 });

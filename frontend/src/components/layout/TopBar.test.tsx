@@ -3,13 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AuthContext } from '../../auth/AuthContext';
+import { DEMO_WORLD_STORAGE_KEY, DemoWorldProvider } from '../../demo-world';
 import { TopBar } from './TopBar';
-
-const { resetDemo } = vi.hoisted(() => ({ resetDemo: vi.fn() }));
-
-vi.mock('../../api/client', () => ({
-  api: { demo: { reset: resetDemo } },
-}));
 
 vi.mock('../../config/demo-personas', async (importOriginal) => ({
   ...await importOriginal<typeof import('../../config/demo-personas')>(),
@@ -26,9 +21,11 @@ function renderTopBar() {
       signOut: vi.fn(),
       refreshSession: vi.fn().mockResolvedValue(undefined),
     }}>
-      <MemoryRouter initialEntries={['/dashboard']}>
-        <TopBar />
-      </MemoryRouter>
+      <DemoWorldProvider>
+        <MemoryRouter initialEntries={['/dashboard']}>
+          <TopBar />
+        </MemoryRouter>
+      </DemoWorldProvider>
     </AuthContext.Provider>,
   );
 }
@@ -37,7 +34,7 @@ describe('TopBar', () => {
   beforeEach(() => {
     localStorage.clear();
     sessionStorage.clear();
-    resetDemo.mockReset().mockResolvedValue(undefined);
+
   });
 
   it('shows the authenticated navigation and active dashboard route', () => {
@@ -50,36 +47,15 @@ describe('TopBar', () => {
     expect(screen.getByRole('link', { name: 'Understanding' })).toHaveAttribute('href', '/understanding');
   });
 
-  it('resets the selected persona, clears derived session state, and broadcasts shared refresh events', async () => {
-    sessionStorage.setItem('decisions_result', 'runtime decision');
-    sessionStorage.setItem('unrelated', 'keep');
-    const personaChanged = vi.fn();
-    const calendarUpdated = vi.fn();
-    window.addEventListener('future-me-demo-persona-changed', personaChanged);
-    window.addEventListener('future-me-calendar-updated', calendarUpdated);
+  it('shows Persona A presenter controls and restores the pristine shared baseline', async () => {
     renderTopBar();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Reset demo persona' }));
+    expect(screen.getByText('Persona A · Oct 5–18, 2026')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Reset Demo' }));
 
-    await waitFor(() => expect(resetDemo).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(screen.getByText('Persona restored.')).toBeInTheDocument());
-    expect(sessionStorage.getItem('decisions_result')).toBeNull();
-    expect(sessionStorage.getItem('unrelated')).toBe('keep');
-    expect(personaChanged).toHaveBeenCalledTimes(1);
-    expect(calendarUpdated).toHaveBeenCalledTimes(1);
-
-    window.removeEventListener('future-me-demo-persona-changed', personaChanged);
-    window.removeEventListener('future-me-calendar-updated', calendarUpdated);
-  });
-
-  it('preserves local derived state when reset fails', async () => {
-    resetDemo.mockRejectedValueOnce(new Error('Reset unavailable'));
-    sessionStorage.setItem('decisions_result', 'runtime decision');
-    renderTopBar();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Reset demo persona' }));
-
-    await waitFor(() => expect(screen.getByText('Reset unavailable')).toBeInTheDocument());
-    expect(sessionStorage.getItem('decisions_result')).toBe('runtime decision');
+    await waitFor(() => expect(screen.getByText('Pristine baseline restored.')).toBeInTheDocument());
+    const persisted = JSON.parse(localStorage.getItem(DEMO_WORLD_STORAGE_KEY) ?? '{}') as { persona?: { id?: string }; decisions?: unknown[] };
+    expect(persisted.persona?.id).toBe('persona-a');
+    expect(persisted.decisions).toEqual([]);
   });
 });

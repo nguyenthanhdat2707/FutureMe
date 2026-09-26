@@ -1,16 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { isCognitoMode } from '../../auth/cognito';
-import { api } from '../../api/client';
 import {
-  clearPersonaSessionState,
-  DEMO_PERSONAS,
-  DEMO_PERSONA_CHANGED_EVENT,
-  getSelectedDemoPersonaId,
   isDemoMode,
-  setSelectedDemoPersonaId,
 } from '../../config/demo-personas';
+import { useDemoWorld } from '../../demo-world';
 
 const NAV_ITEMS = [
   { label: 'Dashboard', to: '/dashboard' },
@@ -30,45 +25,23 @@ function initials(value: string): string {
 
 export function TopBar() {
   const { signOut, user } = useAuth();
+  const { resetDemo } = useDemoWorld();
   const navigate = useNavigate();
-  const [selectedPersonaId, setSelectedPersonaId] = useState(() => isDemoMode ? getSelectedDemoPersonaId() : '');
   const [resetStatus, setResetStatus] = useState<'idle' | 'resetting' | 'success' | 'error'>('idle');
   const [resetError, setResetError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!isDemoMode) return;
-    const syncPersona = () => setSelectedPersonaId(getSelectedDemoPersonaId());
-    window.addEventListener(DEMO_PERSONA_CHANGED_EVENT, syncPersona);
-    window.addEventListener('storage', syncPersona);
-    return () => {
-      window.removeEventListener(DEMO_PERSONA_CHANGED_EVENT, syncPersona);
-      window.removeEventListener('storage', syncPersona);
-    };
-  }, []);
-
   const profileName = useMemo(() => {
     if (isDemoMode) {
-      return DEMO_PERSONAS.find((persona) => persona.id === selectedPersonaId)?.displayName ?? 'Demo profile';
+      return 'Persona A';
     }
     return user?.getUsername() ?? 'Profile';
-  }, [selectedPersonaId, user]);
-
-  const changePersona = (personaId: string) => {
-    clearPersonaSessionState();
-    setSelectedDemoPersonaId(personaId);
-    setSelectedPersonaId(personaId);
-    setResetStatus('idle');
-    setResetError(null);
-  };
+  }, [user]);
 
   const resetPersona = async () => {
     setResetStatus('resetting');
     setResetError(null);
     try {
-      await api.demo.reset();
-      clearPersonaSessionState();
-      setSelectedDemoPersonaId(selectedPersonaId);
-      window.dispatchEvent(new CustomEvent('future-me-calendar-updated'));
+      resetDemo();
       setResetStatus('success');
     } catch (error) {
       setResetError(error instanceof Error ? error.message : 'Failed to reset demo persona');
@@ -122,24 +95,8 @@ export function TopBar() {
 
             {isDemoMode && (
               <div className="py-2" aria-label="Switch demo persona">
-                <p className="px-3 pb-1 text-xs text-text-secondary">Demo persona</p>
-                {DEMO_PERSONAS.map((persona) => {
-                  const selected = persona.id === selectedPersonaId;
-                  return (
-                    <button
-                      key={persona.id}
-                      type="button"
-                      aria-pressed={selected}
-                      onClick={() => changePersona(persona.id)}
-                      className={`w-full rounded-xl px-3 py-2 text-left transition ${
-                        selected ? 'bg-primary/10 text-primary' : 'text-text-primary hover:bg-surface-hover'
-                      }`}
-                    >
-                      <span className="block text-sm font-semibold">{persona.displayName}</span>
-                      <span className="mt-0.5 block text-xs text-text-secondary">{persona.scenario}</span>
-                    </button>
-                  );
-                })}
+                <p className="px-3 pb-1 text-xs text-text-secondary">Presentation controls</p>
+                <div className="rounded-xl bg-primary/5 px-3 py-2 text-sm font-semibold text-primary">Persona A · Oct 5–18, 2026</div>
                 <div className="mt-2 border-t border-surface-border px-3 pt-3">
                   <button
                     type="button"
@@ -147,9 +104,9 @@ export function TopBar() {
                     disabled={resetStatus === 'resetting'}
                     className="w-full rounded-xl border border-red-200 px-3 py-2 text-left text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-wait disabled:opacity-60"
                   >
-                    {resetStatus === 'resetting' ? 'Restoring persona…' : 'Reset demo persona'}
+                    {resetStatus === 'resetting' ? 'Restoring demo…' : 'Reset Demo'}
                   </button>
-                  {resetStatus === 'success' && <p className="mt-2 text-xs text-green-700">Persona restored.</p>}
+                  {resetStatus === 'success' && <p className="mt-2 text-xs text-green-700">Pristine baseline restored.</p>}
                   {resetStatus === 'error' && resetError && <p className="mt-2 text-xs text-red-700">{resetError}</p>}
                 </div>
               </div>

@@ -9,12 +9,14 @@ import AuthPage from './pages/AuthPage';
 import LandingPage from './pages/LandingPage';
 import { AuthProvider } from './auth/AuthProvider';
 import { RequireAuth } from './auth/RequireAuth';
+import { DemoWorldProvider } from './demo-world';
 
 function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <Routes>
+    <DemoWorldProvider>
+      <AuthProvider>
+        <BrowserRouter>
+          <Routes>
           <Route path="/auth" element={<AuthPage />} />
           <Route path="/landing" element={<LandingPage />} />
           <Route path="/" element={<RequireAuth><AuthenticatedLayout /></RequireAuth>}>
@@ -29,9 +31,10 @@ function App() {
             <Route path="demo" element={<DemoPage />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Route>
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
+    </DemoWorldProvider>
   );
 }
 
