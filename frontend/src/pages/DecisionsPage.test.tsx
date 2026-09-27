@@ -1,656 +1,278 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { vi, describe, it, expect, beforeEach } from 'vitest';
-import type { MockedFunction } from 'vitest';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import '@testing-library/jest-dom';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
+import {
+  createDemoWorldBaseline,
+  demoWorldReducer,
+  DEMO_WORLD_STORAGE_KEY,
+  DemoWorldProvider,
+  MENTORING_PROMPT,
+  useDemoWorld,
+  type DemoWorldAction,
+} from '../demo-world';
 import DecisionsPage from './DecisionsPage';
-import { api, decisionsApi, contextApi } from '../api/client';
-import type { DecisionApiResponse, DecisionPolicyOutcome, DecisionFeasibility, PersonalContext } from '../types/domain';
 
-vi.mock('../api/client', () => ({
-  decisionsApi: {
-    query: vi.fn(),
-    getHistory: vi.fn(),
-    recordChoice: vi.fn(),
-  },
-  contextApi: {
-    update: vi.fn()
-  },
-  api: {
-    calendar: { createEvent: vi.fn() },
-  },
-}));
+const EXPECTED_OUTCOME = 'I want to contribute meaningfully, even if my involvement is limited.';
+const FLEXIBILITY = 'The scope and schedule can be adjusted.';
+const FLEXIBLE_TEAM = 'They are flexible — choose the best fit';
 
-const mockQuery = decisionsApi.query as MockedFunction<typeof decisionsApi.query>;
-const mockContextUpdate = contextApi.update as MockedFunction<typeof contextApi.update>;
-const mockRecordChoice = decisionsApi.recordChoice as MockedFunction<typeof decisionsApi.recordChoice>;
-const mockCreateEvent = api.calendar.createEvent as MockedFunction<typeof api.calendar.createEvent>;
-
-const dummyContext: PersonalContext = {
-  userId: 'test-user',
-  setupCompleted: true,
-  goals: [],
-  commitments: [],
-  preferences: [],
-  calendar: { status: 'unknown', lastSync: null, upcomingEvents: 0, busyHoursToday: null, busyHoursThisWeek: null },
-  recentDecisions: [],
-  lastUpdated: new Date().toISOString()
-};
-
-function buildFixture(
-  outcome: DecisionPolicyOutcome,
-  feasibility: DecisionFeasibility,
-  option: 'proceed' | 'proceed-with-caution' | 'do-not-proceed' | '',
-  overrides: Partial<DecisionApiResponse> = {}
-): DecisionApiResponse {
-  return {
-    decision: {
-      recommendation: { option, confidence: outcome === 'RECOMMEND' ? 0.9 : 0, reasoning: 'Reason' },
-      tradeoffs: []
-    },
-    assessment: {
-      feasibility,
-      deadlinePressure: 'low',
-      energyFit: 'good',
-      projectedRemainingCapacityHours: 10,
-      availableTimeBeforeDeadlineHours: 20,
-      assumptions: ['Assumed true'],
-      missingData: [],
-      invalidInputs: [],
-      evidence: [
-        { fact: 'Confirmed cost', value: 10, source: 'user-confirmed', explanation: '' },
-        { fact: 'Derived speed', value: 'fast', source: 'calculated', explanation: '' }
-      ],
-      recommendation: { option, confidence: outcome === 'RECOMMEND' ? 0.9 : 0, reasoning: 'Reason' }
-    },
-    policy: {
-      outcome,
-      reason: outcome === 'ABSTAIN' ? 'I do not know enough to make a useful recommendation.' : 'Sufficient evidence.'
-    },
-    ...overrides
-  };
+function ResetControl() {
+  const { resetDemo } = useDemoWorld();
+  return <button onClick={resetDemo}>Reset fixture</button>;
 }
 
-describe('DecisionsPage - RECOMMEND', () => {
+function renderPage(withReset = false) {
+  return render(
+    <MemoryRouter>
+      <DemoWorldProvider>
+        {withReset && <ResetControl />}
+        <DecisionsPage />
+      </DemoWorldProvider>
+    </MemoryRouter>,
+  );
+}
+
+function startDecision() {
+  fireEvent.change(screen.getByLabelText('What decision do you need help with?'), {
+    target: { value: MENTORING_PROMPT },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'High' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Ask Future Me' }));
+}
+
+function answerCanonicalClarifications() {
+  fireEvent.click(screen.getByRole('button', { name: EXPECTED_OUTCOME }));
+  fireEvent.click(screen.getByRole('button', { name: FLEXIBILITY }));
+}
+
+function reachPlanPreview() {
+  startDecision();
+  answerCanonicalClarifications();
+  fireEvent.click(screen.getByRole('button', { name: 'Use this plan' }));
+  fireEvent.click(screen.getByRole('button', { name: FLEXIBLE_TEAM }));
+}
+
+describe('DecisionsPage Scenario A', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    sessionStorage.clear();
+    localStorage.clear();
   });
 
-  it('renders recommendation option, reason, and boundary clearly, without choice persistence', async () => {
-    const mockResponse = buildFixture('RECOMMEND', 'feasible', 'proceed');
-    mockQuery.mockResolvedValueOnce(mockResponse);
+  it('asks exactly two material clarifications sequentially and supports Something else', () => {
+    renderPage();
+    startDecision();
 
-    render(<DecisionsPage />);
+    expect(screen.getByRole('heading', { name: 'Expected Outcome' })).toBeInTheDocument();
+    expect(screen.getByText('What matters most to you about this opportunity?')).toBeInTheDocument();
+    expect(screen.queryByText('How flexible is the mentoring commitment?')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Something else...' })).toHaveLength(1);
 
-    fireEvent.change(screen.getByLabelText(/What decision do you need help with\?/i), { target: { value: 'Should I work?' } });
-    fireEvent.click(screen.getByRole('button', { name: /Ask Future Me/i }));
-
-    await waitFor(() => {
-      expect(screen.getByText(/proceed/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Something else...' }));
+    fireEvent.change(screen.getByLabelText('Your expected outcome'), {
+      target: { value: 'I can contribute through one high-impact session.' },
     });
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
 
-    expect(screen.getByText(/What will you do\?/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Accept & Add to Schedule/i })).toBeInTheDocument();
-    expect(screen.queryByText('AI')).not.toBeInTheDocument(); // No standalone AI badge
+    expect(screen.getByRole('heading', { name: 'Commitment Flexibility' })).toBeInTheDocument();
+    expect(screen.getByText('How flexible is the mentoring commitment?')).toBeInTheDocument();
+    expect(screen.queryByText('What matters most to you about this opportunity?')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: FLEXIBILITY }));
+    expect(screen.queryByRole('heading', { name: 'Expected Outcome' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Commitment Flexibility' })).not.toBeInTheDocument();
   });
 
-  it('submits temporal placement and candidate-value metadata from advanced inputs', async () => {
-    mockQuery.mockResolvedValueOnce(buildFixture('RECOMMEND', 'at-risk', 'proceed-with-caution'));
+  it('shows exactly three alternatives, recommends Strong Fit, and hides scheduling until Use this plan', () => {
+    renderPage();
+    startDecision();
+    answerCanonicalClarifications();
 
-    render(<DecisionsPage />);
+    const alternatives = screen.getByTestId('decision-alternatives');
+    expect(within(alternatives).getAllByRole('article')).toHaveLength(3);
+    expect(within(alternatives).getByRole('heading', { name: 'Reject' })).toBeInTheDocument();
+    expect(within(alternatives).getByRole('heading', { name: 'Full two-week mentoring' })).toBeInTheDocument();
+    expect(within(alternatives).getByRole('heading', { name: 'Focused Mentoring Session' })).toBeInTheDocument();
+    expect(within(alternatives).getByText('Strong Fit')).toBeInTheDocument();
+    expect(within(alternatives).getByText('Recommended')).toBeInTheDocument();
+    expect(screen.queryByText('When could the student team attend the focused session?')).not.toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText(/What decision do you need help with\?/i), { target: { value: 'Schedule a low-value sync?' } });
-    fireEvent.change(screen.getByLabelText(/Proposed start/), { target: { value: '2026-09-23T09:00' } });
-    fireEvent.change(screen.getByLabelText(/Proposed end/), { target: { value: '2026-09-23T10:00' } });
-    fireEvent.change(screen.getByLabelText('Candidate priority'), { target: { value: 'low' } });
-    fireEvent.change(screen.getByLabelText('Candidate flexibility'), { target: { value: 'movable' } });
-    fireEvent.change(screen.getByLabelText('Focus requirement'), { target: { value: 'low' } });
-    fireEvent.click(screen.getByRole('button', { name: /Ask Future Me/i }));
-
-    await waitFor(() => expect(mockQuery).toHaveBeenCalledWith(expect.objectContaining({
-      query: expect.objectContaining({
-        impactProfile: expect.objectContaining({
-          proposedStart: '2026-09-23T02:00:00.000Z',
-          proposedEnd: '2026-09-23T03:00:00.000Z',
-          priority: 'low',
-          flexibility: 'movable',
-          focusRequirement: 'low',
-        }),
-      }),
-    })));
+    fireEvent.click(screen.getByRole('button', { name: 'Use this plan' }));
+    expect(screen.getByText('When could the student team attend the focused session?')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Thursday afternoon' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Friday afternoon' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: FLEXIBLE_TEAM })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Another time...' })).toBeInTheDocument();
   });
 
-  it('persists acceptance and creates one shared calendar event for scheduling intent', async () => {
-    mockQuery.mockResolvedValueOnce(buildFixture('RECOMMEND', 'feasible', 'proceed', {
-      decision: {
-        id: 'decision-1',
-        recommendation: { option: 'proceed', confidence: 0.9, reasoning: 'Reason' },
-        tradeoffs: [],
-      },
-    }));
-    mockRecordChoice.mockResolvedValueOnce({ choice: {} as never, checkInScheduledAt: null });
-    mockCreateEvent.mockResolvedValueOnce({} as never);
+  it('shows a reversible Before / After preview and applies only after explicit confirmation', () => {
+    renderPage();
+    reachPlanPreview();
 
-    render(<DecisionsPage />);
-    fireEvent.change(screen.getByLabelText(/What decision do you need help with\?/i), { target: { value: 'Schedule focus time for the release' } });
-    fireEvent.click(screen.getByRole('button', { name: /Ask Future Me/i }));
-    await screen.findByRole('button', { name: /Accept & Add to Schedule/i });
-    fireEvent.click(screen.getByRole('button', { name: /Accept & Add to Schedule/i }));
+    const before = screen.getByRole('heading', { name: 'Before' }).closest('section')!;
+    const after = screen.getByRole('heading', { name: 'After' }).closest('section')!;
+    const scheduleRows = (section: HTMLElement) =>
+      within(section)
+        .getAllByRole('listitem')
+        .map((row) => row.textContent?.replace(/(Fixed|Flexible|Consolidated|Relocated|Inserted)$/, ''));
 
-    await waitFor(() => expect(mockRecordChoice).toHaveBeenCalledWith('decision-1', 'accept', 'Accepted recommendation: proceed'));
-    expect(mockCreateEvent).toHaveBeenCalledTimes(1);
-    expect(mockCreateEvent.mock.calls[0][0]).toEqual(expect.objectContaining({
-      decisionId: 'decision-1',
-      category: 'deep_work',
-    }));
+    expect(within(before).getByText('Teaching remains fixed and protected.')).toBeInTheDocument();
+    expect(within(before).getAllByRole('heading', { name: 'Tuesday, October 13' })).toHaveLength(1);
+    expect(within(before).getAllByRole('heading', { name: 'Friday, October 16' })).toHaveLength(1);
+    expect(scheduleRows(before)).toEqual([
+      '14:00–15:00 · Teaching Preparation',
+      '15:00–16:00 · Low-focus spare capacity',
+      '08:00–11:00 · Teaching',
+      '11:00–13:00 · Lunch / Recovery',
+      '13:00–14:00 · Monthly Report',
+      '14:00–15:00 · Flexible Work',
+      '15:00–16:00 · Weekly Planning',
+      '16:00–17:00 · Buffer / Flexible Capacity',
+    ]);
+    expect(within(before).getByText('Fixed')).toBeInTheDocument();
+
+    expect(scheduleRows(after)).toEqual([
+      '14:00–15:00 · Teaching Preparation',
+      '15:00–16:00 · Weekly Planning — moved from Friday',
+      '08:00–11:00 · Teaching + Monthly Report — Consolidated Morning Block',
+      '11:00–13:00 · Lunch / Recovery',
+      '13:00–13:30 · Mentoring Preparation',
+      '13:30–15:00 · Focused Mentoring Session',
+      '15:00–16:00 · Buffer / Recovery',
+      '16:00–17:00 · Flexible Work',
+    ]);
+    ['Flexible', 'Consolidated', 'Relocated'].forEach((label) =>
+      expect(within(after).getByText(label)).toBeInTheDocument(),
+    );
+    expect(within(after).getAllByText('Inserted')).toHaveLength(2);
+    expect(screen.getByRole('heading', { name: 'Why this plan works' })).toBeInTheDocument();
+    expect(screen.getByText('Review the proposed changes. Nothing is applied until you confirm.')).toBeInTheDocument();
+    expect(screen.queryByText('Plan applied')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm & Apply Plan' }));
+    expect(screen.getByText('Plan applied')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'View Calendar' })).toHaveAttribute('href', '/calendar');
+    expect(screen.getByRole('link', { name: 'View Tasks' })).toHaveAttribute('href', '/tasks');
+    expect(screen.getByRole('link', { name: 'View History' })).toHaveAttribute('href', '/history');
   });
 
-  it('persists rejection without mutating the calendar', async () => {
-    mockQuery.mockResolvedValueOnce(buildFixture('RECOMMEND', 'feasible', 'proceed', {
-      decision: {
-        id: 'decision-2',
-        recommendation: { option: 'proceed', confidence: 0.9, reasoning: 'Reason' },
-        tradeoffs: [],
-      },
-    }));
-    mockRecordChoice.mockResolvedValueOnce({ choice: {} as never, checkInScheduledAt: null });
+  it('builds the canonical plan for Friday afternoon and records the selected availability', () => {
+    renderPage();
+    startDecision();
+    answerCanonicalClarifications();
+    fireEvent.click(screen.getByRole('button', { name: 'Use this plan' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Friday afternoon' }));
 
-    render(<DecisionsPage />);
-    fireEvent.change(screen.getByLabelText(/What decision do you need help with\?/i), { target: { value: 'Schedule focus time for the release' } });
-    fireEvent.click(screen.getByRole('button', { name: /Ask Future Me/i }));
-    await screen.findByRole('button', { name: /Not now/i });
-    fireEvent.click(screen.getByRole('button', { name: /Not now/i }));
-
-    await waitFor(() => expect(mockRecordChoice).toHaveBeenCalledWith('decision-2', 'decline', 'Rejected recommendation: proceed'));
-    expect(mockCreateEvent).not.toHaveBeenCalled();
+    expect(screen.getByRole('heading', { name: 'Before' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Confirm & Apply Plan' })).toBeInTheDocument();
+    expect(localStorage.getItem(DEMO_WORLD_STORAGE_KEY)).toContain('"availability":"friday-afternoon"');
   });
 
-  it('renders ASK structured-field clarification and submits correct structure', async () => {
-    const mockResponse = buildFixture('ASK', 'needs-info', '', {
-      policy: {
-        outcome: 'ASK',
-        reason: 'Missing material information.',
-        unresolvedMaterialFields: ['timeCostHours', 'availableHoursBeforeDeadline']
-      }
-    });
+  it('keeps Thursday and another-time honest and non-mutating', () => {
+    renderPage();
+    startDecision();
+    answerCanonicalClarifications();
+    fireEvent.click(screen.getByRole('button', { name: 'Use this plan' }));
 
-    mockQuery.mockResolvedValueOnce(mockResponse);
-
-    render(<DecisionsPage />);
-
-    fireEvent.change(screen.getByLabelText(/What decision do you need help with\?/i), { target: { value: 'Should I work?' } });
-    fireEvent.click(screen.getByRole('button', { name: /Ask Future Me/i }));
-
-    await waitFor(() => {
-      expect(screen.getByText('Needs your input')).toBeInTheDocument();
-    });
-
-    const timeCostInput = screen.getByRole('spinbutton', { name: 'timeCostHours' });
-    const availableHoursInput = screen.getByRole('spinbutton', { name: 'availableHoursBeforeDeadline' });
-
-    expect(timeCostInput).toBeInTheDocument();
-    expect(availableHoursInput).toBeInTheDocument();
-
-    fireEvent.change(timeCostInput, { target: { value: '2' } });
-    fireEvent.change(availableHoursInput, { target: { value: '10' } });
-
-    const submitBtn = screen.getByRole('button', { name: /Re-assess with Clarifications/i });
-
-    const mockResolvedResponse = buildFixture('RECOMMEND', 'feasible', 'proceed');
-    mockQuery.mockResolvedValueOnce(mockResolvedResponse);
-
-    fireEvent.click(submitBtn);
-
-    await waitFor(() => {
-      expect(mockQuery).toHaveBeenCalledTimes(2);
-    });
-
-    expect(mockQuery).toHaveBeenLastCalledWith(expect.objectContaining({
-      query: expect.objectContaining({
-        impactProfile: expect.objectContaining({
-          timeCostHours: 2,
-          availableHoursBeforeDeadline: 10
-        }),
-        clarification: {
-          attempted: true,
-          unresolvedFields: [],
-          unresolvedConflicts: undefined
-        }
-      })
-    }));
+    fireEvent.click(screen.getByRole('button', { name: 'Thursday afternoon' }));
+    expect(screen.getByText(/Thursday afternoon is not compatible.*Choose “They are flexible/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Another time...' }));
+    expect(screen.queryByRole('button', { name: 'Build plan' })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Another time'), { target: { value: 'Wednesday at 10:00' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Record availability' }));
+    expect(screen.getByText(/Availability noted: Wednesday at 10:00.*Choose “They are flexible/i)).toBeInTheDocument();
+    expect(screen.getByText('When could the student team attend the focused session?')).toBeInTheDocument();
+    expect(localStorage.getItem(DEMO_WORLD_STORAGE_KEY)).not.toContain('"activePlan"');
   });
 
-  it('submits unresolved fields and renders ABSTAIN when skipping clarification', async () => {
-    const mockAskResponse = buildFixture('ASK', 'needs-info', '', {
-      policy: { outcome: 'ASK', reason: 'Missing info', unresolvedMaterialFields: ['timeCostHours'] }
-    });
-
-    const mockAbstainResponse = buildFixture('ABSTAIN', 'needs-info', '');
-
-    mockQuery.mockResolvedValueOnce(mockAskResponse);
-
-    render(<DecisionsPage />);
-
-    fireEvent.change(screen.getByLabelText(/What decision do you need help with\?/i), { target: { value: 'Should I work?' } });
-    fireEvent.click(screen.getByRole('button', { name: /Ask Future Me/i }));
-
-    await waitFor(() => {
-      expect(screen.getByText('Needs your input')).toBeInTheDocument();
-    });
-
-    mockQuery.mockResolvedValueOnce(mockAbstainResponse);
-
-    const skipBtn = screen.getByRole('button', { name: /I'm not sure \/ continue without resolving/i });
-    fireEvent.click(skipBtn);
-
-    await waitFor(() => {
-      expect(mockQuery).toHaveBeenCalledTimes(2);
-    });
-
-    expect(mockQuery).toHaveBeenLastCalledWith(expect.objectContaining({
-      query: expect.objectContaining({
-        clarification: {
-          attempted: true,
-          unresolvedFields: ['timeCostHours'],
-          unresolvedConflicts: undefined
-        }
-      })
-    }));
-
-    await waitFor(() => {
-      expect(screen.getByText('I do not know enough to make a useful recommendation.')).toBeInTheDocument();
-    });
-
-    expect(screen.queryByRole('heading', { name: 'Recommendation' })).not.toBeInTheDocument();
+  it('builds the approved preview when the team is flexible', () => {
+    renderPage();
+    startDecision();
+    answerCanonicalClarifications();
+    fireEvent.click(screen.getByRole('button', { name: 'Use this plan' }));
+    fireEvent.click(screen.getByRole('button', { name: FLEXIBLE_TEAM }));
+    expect(screen.getByRole('heading', { name: 'Before' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Confirm & Apply Plan' })).toBeInTheDocument();
   });
 
-  it('RECOMMEND explanation separates confirmed facts, derived context, assumptions, uncertainty, and trade-offs', async () => {
-    const mockResponse = buildFixture('RECOMMEND', 'feasible', 'proceed-with-caution', {
-      decision: {
-        recommendation: { option: 'proceed-with-caution', confidence: 0.8, reasoning: 'Looks okay' },
-        tradeoffs: [
-          { option: 'proceed-with-caution', gains: ['Fast'], costs: ['Risk'] }
-        ]
-      }
-    });
+  it('clears mounted local question, priority, and error when the shared world resets', () => {
+    renderPage(true);
+    const question = screen.getByLabelText('What decision do you need help with?');
+    fireEvent.change(question, { target: { value: 'A local draft question' } });
+    fireEvent.click(screen.getByRole('button', { name: 'High' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ask Future Me' }));
+    expect(screen.getByText(/Use the Scenario A mentoring question/i)).toBeInTheDocument();
 
-    mockQuery.mockResolvedValueOnce(mockResponse);
-    render(<DecisionsPage />);
-
-    fireEvent.change(screen.getByLabelText(/What decision do you need help with\?/i), { target: { value: 'Should I work?' } });
-    fireEvent.click(screen.getByRole('button', { name: /Ask Future Me/i }));
-
-    await waitFor(() => {
-      expect(screen.getByText('Trade-offs')).toBeInTheDocument();
-    });
-
-    expect(screen.getByRole('heading', { name: 'Confirmed facts' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Derived context' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Assumptions' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Uncertainty' })).toBeInTheDocument();
-
-    expect(screen.getByText('Confirmed cost')).toBeInTheDocument();
-    expect(screen.getByText('Derived speed')).toBeInTheDocument();
-    expect(screen.getByText('Assumed true')).toBeInTheDocument();
-    expect(screen.getByText('No missing data.')).toBeInTheDocument();
-
-    expect(screen.getByRole('heading', { name: 'Trade-offs' })).toBeInTheDocument();
-    expect(screen.getByText('Gains')).toBeInTheDocument();
-    expect(screen.getByText('Costs')).toBeInTheDocument();
-    expect(screen.getByText(/Input Completeness & Trustworthiness - not chance of success/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Reset fixture' }));
+    expect(screen.getByLabelText('What decision do you need help with?')).toHaveValue('');
+    expect(screen.getByRole('button', { name: 'High' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.queryByText(/Use the Scenario A mentoring question/i)).not.toBeInTheDocument();
   });
 
-  it('renders conflict ASK display and includes unresolvedConflicts in payload when skipping', async () => {
-    const mockAskResponse = buildFixture('ASK', 'needs-info', '', {
-      policy: {
-        outcome: 'ASK',
-        reason: 'You have conflicting information.',
-        unresolvedMaterialConflicts: ['Your deadline is today, but time cost is 100 hours.']
-      }
-    });
+  it('records the exact completion reflection and restores completed state from persistence', () => {
+    const first = renderPage();
+    reachPlanPreview();
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm & Apply Plan' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Mark mentoring complete' }));
 
-    const mockAbstainResponse = buildFixture('ABSTAIN', 'needs-info', '');
+    expect(screen.getByText('Mentoring completed')).toBeInTheDocument();
+    expect(screen.getByText(/Estimated preparation: 30–45 minutes/)).toBeInTheDocument();
+    expect(screen.getByText(/Actual preparation: 75 minutes/)).toBeInTheDocument();
+    expect(screen.getByText('Similar mentoring commitments have required more preparation than previously expected.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'View Understanding' })).toHaveAttribute('href', '/understanding');
 
-    mockQuery.mockResolvedValueOnce(mockAskResponse);
-
-    render(<DecisionsPage />);
-    fireEvent.change(screen.getByLabelText(/What decision do you need help with\?/i), { target: { value: 'Should I do this?' } });
-    fireEvent.click(screen.getByRole('button', { name: /Ask Future Me/i }));
-
-    await waitFor(() => {
-      expect(screen.getByText('Needs your input')).toBeInTheDocument();
-    });
-
-    expect(screen.getByText('Your deadline is today, but time cost is 100 hours.')).toBeInTheDocument();
-
-    mockQuery.mockResolvedValueOnce(mockAbstainResponse);
-
-    const skipBtn = screen.getByRole('button', { name: /I'm not sure \/ continue without resolving/i });
-    fireEvent.click(skipBtn);
-
-    await waitFor(() => {
-      expect(mockQuery).toHaveBeenCalledTimes(2);
-    });
-
-    expect(mockQuery).toHaveBeenLastCalledWith(expect.objectContaining({
-      query: expect.objectContaining({
-        clarification: {
-          attempted: true,
-          unresolvedFields: [],
-          unresolvedConflicts: ['Your deadline is today, but time cost is 100 hours.']
-        }
-      })
-    }));
+    expect(localStorage.getItem(DEMO_WORLD_STORAGE_KEY)).toContain('"stage":"completed"');
+    first.unmount();
+    renderPage();
+    expect(screen.getByText('Mentoring completed')).toBeInTheDocument();
+    expect(screen.getByText(/Actual preparation: 75 minutes/)).toBeInTheDocument();
   });
 
-  it('keeps unknown metadata fields in unresolvedFields and does not mutate form state on clarification submit', async () => {
-    const mockResponse = buildFixture('ASK', 'needs-info', '', {
-      policy: {
-        outcome: 'ASK',
-        reason: 'Missing material information.',
-        unresolvedMaterialFields: ['timeCostHours', 'unknownMetadataField']
-      }
-    });
+  it('renders a corrected completed outcome and learned signal from shared state', () => {
+    let world = createDemoWorldBaseline();
+    const actions: DemoWorldAction[] = [
+      { type:'start-mentoring-decision' },
+      { type:'answer-expected-outcome', answer:EXPECTED_OUTCOME },
+      { type:'answer-commitment-flexibility', answer:FLEXIBILITY },
+      { type:'use-mentoring-plan' },
+      { type:'set-team-availability', availability:'flexible-best-fit' },
+      { type:'apply-active-plan' },
+      { type:'complete-mentoring-with-reflection', actualPreparationMinutes:75 },
+      { type:'correct-mentoring-preparation', actualPreparationMinutes:40 },
+    ];
+    world = actions.reduce(demoWorldReducer, world);
+    localStorage.setItem(DEMO_WORLD_STORAGE_KEY, JSON.stringify(world));
 
-    mockQuery.mockResolvedValueOnce(mockResponse);
-
-    render(<DecisionsPage />);
-
-    fireEvent.change(screen.getByLabelText(/What decision do you need help with\?/i), { target: { value: 'Test unknown field' } });
-    fireEvent.click(screen.getByRole('button', { name: /Ask Future Me/i }));
-
-    await waitFor(() => {
-      expect(screen.getByText('Needs your input')).toBeInTheDocument();
-    });
-
-    const timeCostInput = screen.getByRole('spinbutton', { name: 'timeCostHours' });
-    const unknownInput = screen.getByRole('textbox', { name: 'unknownMetadataField' });
-
-    fireEvent.change(timeCostInput, { target: { value: '3' } });
-    fireEvent.change(unknownInput, { target: { value: 'some value' } });
-
-    const submitBtn = screen.getByRole('button', { name: /Re-assess with Clarifications/i });
-
-    const mockResolvedResponse = buildFixture('ABSTAIN', 'needs-info', '');
-    mockQuery.mockResolvedValueOnce(mockResolvedResponse);
-
-    fireEvent.click(submitBtn);
-
-    await waitFor(() => {
-      expect(mockQuery).toHaveBeenCalledTimes(2);
-    });
-
-    expect(mockQuery).toHaveBeenLastCalledWith(expect.objectContaining({
-      query: expect.objectContaining({
-        impactProfile: expect.objectContaining({
-          timeCostHours: 3
-        }),
-        clarification: {
-          attempted: true,
-          unresolvedFields: ['unknownMetadataField'],
-          unresolvedConflicts: undefined
-        }
-      })
-    }));
-
-    const lastCallQuery = mockQuery.mock.calls[1][0].query;
-    expect(lastCallQuery.impactProfile).not.toHaveProperty('unknownMetadataField');
-  });
-  it('handles context change and before/after reassessment comparison', async () => {
-    // Arrange: Initial result with facts to be changed, removed, and kept
-    const initialResponse = buildFixture('RECOMMEND', 'feasible', 'proceed', {
-      decision: {
-        recommendation: { option: 'proceed', confidence: 0.9, reasoning: 'Initial reason' },
-        tradeoffs: []
-      },
-      policy: { outcome: 'RECOMMEND', reason: 'ok' },
-      assessment: {
-        feasibility: 'feasible',
-        deadlinePressure: 'low',
-        energyFit: 'good',
-        projectedRemainingCapacityHours: 10,
-        availableTimeBeforeDeadlineHours: 20,
-        assumptions: [],
-        missingData: [],
-        invalidInputs: [],
-        recommendation: { option: 'proceed', confidence: 1.0, reasoning: 'Assessment reason' },
-        evidence: [
-          { fact: 'Stable fact', value: 'yes', source: 'user-confirmed', explanation: 'ok' },
-          { fact: 'Value change fact', value: 'old-val', source: 'user-confirmed', explanation: 'ok' },
-          { fact: 'Source change fact', value: 'same-val', source: 'estimated', explanation: 'ok' },
-          { fact: 'Explanation change fact', value: 'same-val', source: 'user-confirmed', explanation: 'old explanation' },
-          { fact: 'Removed fact', value: 'gone', source: 'estimated', explanation: 'old' }
-        ]
-      }
-    });
-
-    mockQuery.mockResolvedValueOnce(initialResponse);
-
-    render(<DecisionsPage />);
-
-    // Act: Request initial decision
-    fireEvent.change(screen.getByLabelText(/What decision do you need help with\?/i), { target: { value: 'Should I work?' } });
-    fireEvent.click(screen.getByRole('button', { name: /Ask Future Me/i }));
-
-    await waitFor(() => {
-      expect(screen.getAllByText('Initial reason')[0]).toBeInTheDocument();
-    });
-
-    // Act: Submit observation causing stale context
-    fireEvent.click(screen.getByRole('button', { name: /Add Context Change/i }));
-
-    const obsCategory = screen.getByLabelText(/Change category/i);
-    const obsDesc = screen.getByLabelText(/Description/i);
-    const obsSev = screen.getByLabelText(/Severity/i);
-
-    fireEvent.change(obsCategory, { target: { value: 'workload-increase' } });
-    fireEvent.change(obsDesc, { target: { value: 'Urgent production task' } });
-    fireEvent.change(obsSev, { target: { value: 'high' } });
-
-    mockContextUpdate.mockResolvedValueOnce(dummyContext);
-
-    fireEvent.click(screen.getByRole('button', { name: /Submit Observation/i }));
-
-    await waitFor(() => {
-      expect(mockContextUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'workload-increase',
-          data: { description: 'Urgent production task', severity: 'high' },
-          source: 'USER_CONFIRMED',
-          confidence: 1.0
-        })
-      );
-    });
-
-    // Assert: Verify stale status and button
-    await waitFor(() => {
-      expect(screen.getByText(/Context changed. Your current result is stale./i)).toBeInTheDocument();
-    });
-
-    const reassessBtn = screen.getByRole('button', { name: /Re-assess same decision/i });
-    expect(reassessBtn).toBeInTheDocument();
-
-    // Arrange: Updated result with added, changed, and removed facts
-    const updatedResponse = buildFixture('RECOMMEND', 'at-risk', 'proceed-with-caution', {
-      decision: {
-        recommendation: { option: 'proceed-with-caution', confidence: 0.8, reasoning: 'New reason due to workload' },
-        tradeoffs: []
-      },
-      policy: { outcome: 'RECOMMEND', reason: 'ok' },
-      assessment: {
-        feasibility: 'at-risk',
-        deadlinePressure: 'high',
-        energyFit: 'good',
-        projectedRemainingCapacityHours: 10,
-        availableTimeBeforeDeadlineHours: 20,
-        assumptions: [],
-        missingData: [],
-        invalidInputs: [],
-        recommendation: { option: 'proceed-with-caution', confidence: 1.0, reasoning: 'Assessment reason' },
-        evidence: [
-          { fact: 'Stable fact', value: 'yes', source: 'user-confirmed', explanation: 'ok' },
-          { fact: 'Value change fact', value: 'new-val', source: 'user-confirmed', explanation: 'ok' },
-          { fact: 'Source change fact', value: 'same-val', source: 'user-confirmed', explanation: 'ok' },
-          { fact: 'Explanation change fact', value: 'same-val', source: 'user-confirmed', explanation: 'new explanation' },
-          { fact: 'Added fact', value: 'new-val', source: 'provided', explanation: 'new' }
-        ]
-      }
-    });
-
-    // Act: Re-assess decision
-    mockQuery.mockResolvedValueOnce(updatedResponse);
-    fireEvent.click(reassessBtn);
-
-    // Assert: Verify before/after comparison and delta
-    await waitFor(() => {
-      expect(screen.getByText(/Recommendation changed/i)).toBeInTheDocument();
-    });
-
-    expect(screen.getAllByText('Initial reason')[0]).toBeInTheDocument();
-    expect(screen.getAllByText('New reason due to workload')[0]).toBeInTheDocument();
-
-    expect(screen.getByText(/Value change fact:/i).parentElement).toHaveTextContent(/Changed from old-val \(user-confirmed\) -> new-val \(user-confirmed\)/);
-    expect(screen.getByText(/Source change fact:/i).parentElement).toHaveTextContent(/Changed from same-val \(estimated\) -> same-val \(user-confirmed\)/);
-    expect(screen.getByText(/Explanation change fact:/i).parentElement).toHaveTextContent(/Changed from same-val \(user-confirmed\) -> same-val \(user-confirmed\)/);
-    expect(screen.getByText(/Added fact:/i).parentElement).toHaveTextContent(/Added: new-val \(provided\)/);
-    expect(screen.getByText(/Removed fact:/i).parentElement).toHaveTextContent(/Removed gone \(estimated\)/);
+    renderPage();
+    expect(screen.getByText(/Actual preparation: 40 minutes/)).toBeInTheDocument();
+    expect(screen.getByText(/stayed within the estimated 30–45 minute preparation range/i)).toBeInTheDocument();
+    expect(screen.queryByText(/more preparation than previously expected/i)).not.toBeInTheDocument();
   });
 
-  it('handles reassessment with unchanged recommendation option but updated reasoning', async () => {
-    // Arrange: Initial result with facts to be changed, removed, and kept
-    const initialResponse = buildFixture('RECOMMEND', 'feasible', 'proceed', {
-      decision: {
-        recommendation: { option: 'proceed', confidence: 0.9, reasoning: 'Initial reason' },
-        tradeoffs: []
-      },
-      policy: { outcome: 'RECOMMEND', reason: 'ok' },
-      assessment: {
-        feasibility: 'feasible',
-        deadlinePressure: 'low',
-        energyFit: 'good',
-        projectedRemainingCapacityHours: 10,
-        availableTimeBeforeDeadlineHours: 20,
-        assumptions: [],
-        missingData: [],
-        invalidInputs: [],
-        recommendation: { option: 'proceed', confidence: 1.0, reasoning: 'Assessment reason' },
-        evidence: [
-          { fact: 'Stable fact', value: 'yes', source: 'user-confirmed', explanation: 'ok' },
-          { fact: 'Value change fact', value: 'old-val', source: 'user-confirmed', explanation: 'ok' },
-          { fact: 'Source change fact', value: 'same-val', source: 'estimated', explanation: 'ok' },
-          { fact: 'Explanation change fact', value: 'same-val', source: 'user-confirmed', explanation: 'old explanation' },
-          { fact: 'Removed fact', value: 'gone', source: 'estimated', explanation: 'old' }
-        ]
-      }
-    });
+  it.each([
+    [['start-mentoring-decision'], 'Expected Outcome'],
+    [['start-mentoring-decision', 'answer-expected-outcome'], 'Commitment Flexibility'],
+    [['start-mentoring-decision', 'answer-expected-outcome', 'answer-commitment-flexibility'], 'Use this plan'],
+    [['start-mentoring-decision', 'answer-expected-outcome', 'answer-commitment-flexibility', 'use-mentoring-plan'], 'When could the student team attend the focused session?'],
+    [['start-mentoring-decision', 'answer-expected-outcome', 'answer-commitment-flexibility', 'use-mentoring-plan', 'set-team-availability'], 'Confirm & Apply Plan'],
+    [['start-mentoring-decision', 'answer-expected-outcome', 'answer-commitment-flexibility', 'use-mentoring-plan', 'set-team-availability', 'apply-active-plan'], 'Plan applied'],
+    [['start-mentoring-decision', 'answer-expected-outcome', 'answer-commitment-flexibility', 'use-mentoring-plan', 'set-team-availability', 'apply-active-plan', 'complete-mentoring-with-reflection'], 'Mentoring completed'],
+  ] as const)('recovers the persisted %s stage', (actionTypes, visibleCopy) => {
+    const actions: Record<string, DemoWorldAction> = {
+      'start-mentoring-decision': { type: 'start-mentoring-decision' },
+      'answer-expected-outcome': { type: 'answer-expected-outcome', answer: EXPECTED_OUTCOME },
+      'answer-commitment-flexibility': { type: 'answer-commitment-flexibility', answer: FLEXIBILITY },
+      'use-mentoring-plan': { type: 'use-mentoring-plan' },
+      'set-team-availability': { type: 'set-team-availability', availability: 'flexible-best-fit' },
+      'apply-active-plan': { type: 'apply-active-plan' },
+      'complete-mentoring-with-reflection': { type: 'complete-mentoring-with-reflection', actualPreparationMinutes: 75 },
+    };
+    const world = actionTypes.reduce(
+      (current, actionType) => demoWorldReducer(current, actions[actionType]),
+      createDemoWorldBaseline(),
+    );
+    localStorage.setItem(DEMO_WORLD_STORAGE_KEY, JSON.stringify(world));
 
-    mockQuery.mockResolvedValueOnce(initialResponse);
-
-    render(<DecisionsPage />);
-
-    fireEvent.change(screen.getByLabelText(/What decision do you need help with\?/i), { target: { value: 'Should I work?' } });
-    fireEvent.click(screen.getByRole('button', { name: /Ask Future Me/i }));
-
-    await waitFor(() => {
-      expect(screen.getAllByText('Initial reason')[0]).toBeInTheDocument();
-    });
-
-    // Act: Submit observation causing stale context
-    fireEvent.click(screen.getByRole('button', { name: /Add Context Change/i }));
-    fireEvent.change(screen.getByLabelText(/Change category/i), { target: { value: 'workload-increase' } });
-    fireEvent.change(screen.getByLabelText(/Description/i), { target: { value: 'Minor extra task' } });
-    fireEvent.change(screen.getByLabelText(/Severity/i), { target: { value: 'low' } });
-
-    mockContextUpdate.mockResolvedValueOnce(dummyContext);
-    fireEvent.click(screen.getByRole('button', { name: /Submit Observation/i }));
-
-    // Assert: Verify stale status
-    await waitFor(() => {
-      expect(screen.getByText(/Context changed. Your current result is stale./i)).toBeInTheDocument();
-    });
-
-    // Arrange: Updated result with same option but new reasoning
-    const updatedResponse = buildFixture('RECOMMEND', 'feasible', 'proceed', {
-      decision: {
-        recommendation: { option: 'proceed', confidence: 0.9, reasoning: 'Still ok but keep an eye on it' },
-        tradeoffs: []
-      },
-      policy: { outcome: 'RECOMMEND', reason: 'ok' },
-      assessment: {
-        feasibility: 'feasible',
-        deadlinePressure: 'low',
-        energyFit: 'good',
-        projectedRemainingCapacityHours: 10,
-        availableTimeBeforeDeadlineHours: 20,
-        assumptions: [],
-        missingData: [],
-        invalidInputs: [],
-        recommendation: { option: 'proceed', confidence: 1.0, reasoning: 'Assessment reason' },
-        evidence: [
-          { fact: 'Stable fact', value: 'yes', source: 'user-confirmed', explanation: 'ok' }
-        ]
-      }
-    });
-
-    // Act: Re-assess decision
-    mockQuery.mockResolvedValueOnce(updatedResponse);
-    fireEvent.click(screen.getByRole('button', { name: /Re-assess same decision/i }));
-
-    // Assert: Verify unchanged recommendation handling
-    await waitFor(() => {
-      expect(screen.getByText(/Recommendation unchanged/i)).toBeInTheDocument();
-    });
-
-    expect(screen.getAllByText('Initial reason')[0]).toBeInTheDocument();
-    expect(screen.getAllByText('Still ok but keep an eye on it')[0]).toBeInTheDocument();
-  });
-
-
-  it('keeps prior result visible and leaves comparison unset on reassessment failure', async () => {
-    const initialResponse = buildFixture('RECOMMEND', 'feasible', 'proceed', {
-      decision: {
-        recommendation: { option: 'proceed', confidence: 0.9, reasoning: 'Initial reason' },
-        tradeoffs: []
-      }
-    });
-
-    mockQuery.mockResolvedValueOnce(initialResponse);
-    render(<DecisionsPage />);
-
-    fireEvent.change(screen.getByLabelText(/What decision do you need help with\?/i), { target: { value: 'Should I work?' } });
-    fireEvent.click(screen.getByRole('button', { name: /Ask Future Me/i }));
-
-    await waitFor(() => {
-      expect(screen.getAllByText('Initial reason')[0]).toBeInTheDocument();
-    });
-
-    // Act: Submit observation causing stale context
-    fireEvent.click(screen.getByRole('button', { name: /Add Context Change/i }));
-    fireEvent.change(screen.getByLabelText(/Change category/i), { target: { value: 'workload-increase' } });
-    fireEvent.change(screen.getByLabelText(/Description/i), { target: { value: 'Urgent production task' } });
-    fireEvent.change(screen.getByLabelText(/Severity/i), { target: { value: 'high' } });
-
-    mockContextUpdate.mockResolvedValueOnce(dummyContext);
-    fireEvent.click(screen.getByRole('button', { name: /Submit Observation/i }));
-
-    await waitFor(() => {
-      expect(screen.getByText(/Context changed. Your current result is stale./i)).toBeInTheDocument();
-    });
-
-    const reassessBtn = screen.getByRole('button', { name: /Re-assess same decision/i });
-
-    // Act: Attempt to re-assess and fail
-    mockQuery.mockRejectedValueOnce(new Error('Network error'));
-    fireEvent.click(reassessBtn);
-
-    // Assert: Verify error state and preserved prior context
-    await waitFor(() => {
-      expect(screen.getByText('Network error')).toBeInTheDocument();
-    });
-
-    expect(screen.getAllByText('Initial reason')[0]).toBeInTheDocument();
-    expect(screen.getByText(/Context changed. Your current result is stale./i)).toBeInTheDocument();
-    expect(screen.queryByText('Assessment Updated')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Re-assess same decision/i })).toBeInTheDocument();
+    renderPage();
+    expect(screen.getByText(visibleCopy, { exact: false })).toBeInTheDocument();
   });
 });

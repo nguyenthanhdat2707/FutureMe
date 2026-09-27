@@ -34,17 +34,19 @@ describe('TopBar', () => {
   beforeEach(() => {
     localStorage.clear();
     sessionStorage.clear();
-
   });
 
-  it('shows the authenticated navigation and active dashboard route', () => {
+  it('shows pitch navigation with Dashboard, Calendar, Tasks, Ask Future Me, Understanding, History and no duplicate Decisions', () => {
     renderTopBar();
 
     const dashboard = screen.getByRole('link', { name: 'Dashboard' });
     expect(dashboard).toHaveClass('bg-primary/10');
+    expect(screen.getByRole('link', { name: 'Calendar' })).toHaveAttribute('href', '/calendar');
+    expect(screen.getByRole('link', { name: 'Tasks' })).toHaveAttribute('href', '/tasks');
     expect(screen.getByRole('link', { name: 'Ask Future Me' })).toHaveAttribute('href', '/ask-future-me');
-    expect(screen.getByRole('link', { name: 'Decisions' })).toHaveAttribute('href', '/decisions');
     expect(screen.getByRole('link', { name: 'Understanding' })).toHaveAttribute('href', '/understanding');
+    expect(screen.getByRole('link', { name: 'History' })).toHaveAttribute('href', '/history');
+    expect(screen.queryByRole('link', { name: 'Decisions' })).not.toBeInTheDocument();
   });
 
   it('shows Persona A presenter controls and restores the pristine shared baseline', async () => {

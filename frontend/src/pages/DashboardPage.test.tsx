@@ -1,110 +1,115 @@
 import '@testing-library/jest-dom/vitest';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { api } from '../api/client';
-import { ObservationSource, type CalendarEvent, type PersonalContext } from '../types/domain';
+import { DemoWorldProvider, useDemoWorld } from '../demo-world';
 import DashboardPage from './DashboardPage';
 
-vi.mock('../api/client', () => ({
-  api: {
-    calendar: { getStatus: vi.fn(), getEvents: vi.fn(), sync: vi.fn() },
-    context: { getCurrent: vi.fn() },
-  },
-}));
+function Controls() {
+  const { dispatch, resetDemo } = useDemoWorld();
+  return <><button onClick={() => dispatch({ type:'update-mental-wellbeing', value:'steady' })}>Set steady</button><button onClick={() => dispatch({ type:'override-opportunity-value', opportunityId:'opportunity.professional-workshop', value:'low' })}>Lower workshop value</button><button onClick={() => dispatch({ type:'override-opportunity-value', opportunityId:'opportunity.student-startup-mentoring', value:'moderate' })}>Lower mentoring value</button><button onClick={resetDemo}>Reset fixture</button></>;
+}
 
-vi.mock('../hooks/useInterventions', () => ({
-  useInterventions: () => ({
-    intervention: null,
-    error: null,
-    refresh: vi.fn(),
-    respond: vi.fn(),
-    dismiss: vi.fn(),
-  }),
-}));
-
-const event = (
-  id: string,
-  title: string,
-  day: number,
-  startHour: number,
-  endHour: number,
-  category: string,
-  meetingLink?: string,
-): CalendarEvent => ({
-  id,
-  title,
-  startTime: new Date(2026, 8, day, startHour).toISOString(),
-  endTime: new Date(2026, 8, day, endHour).toISOString(),
-  source: ObservationSource.CALENDAR,
-  status: 'CONFIRMED',
-  rawData: JSON.stringify({ category, meetingLink }),
-});
-
-const events = [
-  event('focus', 'Deep Work — Future Me MVP', 24, 9, 12, 'deep_work'),
-  event('meeting', 'CloudThinker sync', 25, 14, 15, 'meeting', 'https://meet.google.com/future-me'),
-  event('personal', 'Run & reflect', 26, 16, 17, 'recovery'),
-];
-
-const context: PersonalContext = {
-  userId: 'demo-user',
-  setupCompleted: true,
-  goals: [{ id: 'goal-1', description: 'Ship dashboard', deadline: new Date(2026, 8, 26, 17).toISOString(), priority: 'high' }],
-  commitments: [],
-  preferences: [{ id: 'preference-1', category: 'focus', description: 'Deep work', value: 'morning' }],
-  calendar: { status: 'synced', lastSync: null, upcomingEvents: 3, busyHoursToday: null, busyHoursThisWeek: null },
-  recentDecisions: [],
-  lastUpdated: new Date(2026, 8, 24).toISOString(),
-};
+function renderDashboard(withControls = false) {
+  return render(
+    <DemoWorldProvider>
+      <MemoryRouter initialEntries={['/dashboard']}>
+        {withControls && <Controls />}
+        <DashboardPage />
+      </MemoryRouter>
+    </DemoWorldProvider>,
+  );
+}
 
 describe('DashboardPage', () => {
   beforeEach(() => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    vi.setSystemTime(new Date(2026, 8, 24, 10));
-    vi.clearAllMocks();
-    vi.mocked(api.calendar.getStatus).mockResolvedValue({ status: 'synced', lastSync: null });
-    vi.mocked(api.calendar.getEvents).mockResolvedValue(events);
-    vi.mocked(api.calendar.sync).mockResolvedValue({ success: true, synced: 3, timestamp: new Date().toISOString() });
-    vi.mocked(api.context.getCurrent).mockResolvedValue(context);
+    localStorage.clear();
+    sessionStorage.clear();
   });
 
-  afterEach(() => vi.useRealTimers());
+  it('renders fixed Oct 5–18, 2026 timeline and current state summary from shared world', () => {
+    renderDashboard();
 
-  const renderPage = () => render(<MemoryRouter><DashboardPage /></MemoryRouter>);
-
-  it('renders the approved hierarchy and exactly three duration bubbles', async () => {
-    renderPage();
-
-    expect(await screen.findByRole('heading', { name: 'Plan your week with more clarity.' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Your week at a glance.' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Deadlines' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Task type' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Upcoming & Suggestions' })).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: /percent, .* hours/i })).toHaveLength(3);
+    expect(screen.getByText(/Oct 5–18, 2026/i)).toBeInTheDocument();
+    expect(screen.getByText(/High workload/i)).toBeInTheDocument();
+    expect(screen.getByText(/Limited/i)).toBeInTheDocument();
+    expect(screen.getByText(/Slightly strained/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Client Proposal/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Student Startup Mentoring/i)).toBeInTheDocument();
   });
 
-  it('opens event details, exposes a valid meeting link, and highlights a selected category', async () => {
-    renderPage();
-    await screen.findByRole('heading', { name: 'Plan your week with more clarity.' });
+  it('displays a compact 14-day capacity view across the fixed two-week period', () => {
+    renderDashboard();
 
-    fireEvent.click(screen.getAllByRole('button', { name: /CloudThinker sync/i })[0]);
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Join meeting' })).toHaveAttribute('href', 'https://meet.google.com/future-me');
-    fireEvent.click(screen.getByRole('button', { name: 'Close event details' }));
-
-    const meetingBubble = screen.getByRole('button', { name: /Meetings, .* percent/i });
-    fireEvent.click(meetingBubble);
-    expect(meetingBubble).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByText('Highlighting Meetings events')).toBeInTheDocument();
+    // 14-day capacity section header and date blocks
+    expect(screen.getByText(/14-Day Capacity/i)).toBeInTheDocument();
+    expect(screen.getByText(/Mon Oct 5/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Thu Oct 8/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Fri Oct 16/i)).toBeInTheDocument();
+    expect(screen.getByText(/Sun Oct 18/i)).toBeInTheDocument();
   });
 
-  it('syncs and reloads dashboard data', async () => {
-    renderPage();
-    await screen.findByRole('heading', { name: 'Plan your week with more clarity.' });
-    fireEvent.click(screen.getByRole('button', { name: 'Sync now' }));
+  it('displays upcoming commitments, deadlines, and personal direction snapshot', () => {
+    renderDashboard();
 
-    await waitFor(() => expect(api.calendar.sync).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(api.calendar.getEvents).toHaveBeenCalledTimes(2));
+    expect(screen.getByText(/Upcoming Commitments & Deadlines/i)).toBeInTheDocument();
+    expect(screen.getByText(/Personal Direction Snapshot/i)).toBeInTheDocument();
+    expect(screen.getByText(/Deliver current teaching responsibilities/i)).toBeInTheDocument();
+    expect(screen.getByText(/Protect important business and project deadlines/i)).toBeInTheDocument();
+  });
+
+  it('displays proactive Scenario B insight at baseline and opens reasoning without clarification UI', () => {
+    renderDashboard();
+
+    // Proactive insight headline
+    expect(screen.getByText(/4:00 PM looks free/i)).toBeInTheDocument();
+    const viewReasoningBtn = screen.getByRole('button', { name: /View reasoning/i });
+    expect(viewReasoningBtn).toBeInTheDocument();
+
+    // Open reasoning
+    fireEvent.click(viewReasoningBtn);
+
+    // Verify all reasoning criteria
+    expect(screen.getAllByText(/Thursday Oct 8.*16:00–17:00.*FREE/i)).toHaveLength(2);
+    expect(screen.getByText(/19:00 deadline/i)).toBeInTheDocument();
+    expect(screen.getByText(/90 min focused work remains/i)).toBeInTheDocument();
+    expect(screen.getByText(/16:00–18:00 strong focus window/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/High workload/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Slightly strained/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Optional Professional Development Workshop/i)).toBeInTheDocument();
+    expect(screen.getByText(/recording available/i)).toBeInTheDocument();
+    expect(screen.getByText(/Calendar availability:.*Yes/i)).toBeInTheDocument();
+    expect(screen.getByText(/Usable capacity:.*Low/i)).toBeInTheDocument();
+    expect(screen.getByText('Skip the live workshop and review the recording later.')).toBeInTheDocument();
+
+    // Verify NO clarification UI is present
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Which option fits your schedule best/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Please clarify/i)).not.toBeInTheDocument();
+
+    // Verify "Use recording instead" dispatches action and updates state
+    const useRecordingBtn = screen.getByRole('button', { name: /Use recording instead/i });
+    fireEvent.click(useRecordingBtn);
+    expect(screen.getByText(/Declined live session · Recording flagged for later/i)).toBeInTheDocument();
+  });
+
+  it('derives reasoning and opportunity summaries from corrected shared understanding', () => {
+    renderDashboard(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Set steady' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Lower workshop value' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Lower mentoring value' }));
+    fireEvent.click(screen.getByRole('button', { name: /View reasoning/i }));
+
+    expect(screen.getAllByText(/Steady/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/optional, low value, with recording available later/i)).toBeInTheDocument();
+    expect(screen.getByText('Current opportunity').closest('article')).toHaveTextContent(/high priority · moderate alignment with startup and advisory direction/i);
+  });
+
+  it('closes mounted reasoning when the shared world resets', () => {
+    renderDashboard(true);
+    fireEvent.click(screen.getByRole('button', { name: /View reasoning/i }));
+    expect(screen.getByRole('region', { name: 'Workshop reasoning' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Reset fixture' }));
+    expect(screen.queryByRole('region', { name: 'Workshop reasoning' })).not.toBeInTheDocument();
   });
 });

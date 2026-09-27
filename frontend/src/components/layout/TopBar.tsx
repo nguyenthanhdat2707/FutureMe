@@ -1,17 +1,16 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { isCognitoMode } from '../../auth/cognito';
-import {
-  isDemoMode,
-} from '../../config/demo-personas';
 import { useDemoWorld } from '../../demo-world';
 
 const NAV_ITEMS = [
   { label: 'Dashboard', to: '/dashboard' },
+  { label: 'Calendar', to: '/calendar' },
+  { label: 'Tasks', to: '/tasks' },
   { label: 'Ask Future Me', to: '/ask-future-me' },
-  { label: 'Decisions', to: '/decisions' },
   { label: 'Understanding', to: '/understanding' },
+  { label: 'History', to: '/history' },
 ] as const;
 
 function initials(value: string): string {
@@ -24,18 +23,13 @@ function initials(value: string): string {
 }
 
 export function TopBar() {
-  const { signOut, user } = useAuth();
+  const { signOut } = useAuth();
   const { resetDemo } = useDemoWorld();
   const navigate = useNavigate();
   const [resetStatus, setResetStatus] = useState<'idle' | 'resetting' | 'success' | 'error'>('idle');
   const [resetError, setResetError] = useState<string | null>(null);
 
-  const profileName = useMemo(() => {
-    if (isDemoMode) {
-      return 'Persona A';
-    }
-    return user?.getUsername() ?? 'Profile';
-  }, [user]);
+  const profileName = 'Persona A';
 
   const resetPersona = async () => {
     setResetStatus('resetting');
@@ -62,7 +56,7 @@ export function TopBar() {
           <span className="font-serif text-lg font-semibold tracking-tight">Future Me</span>
         </NavLink>
 
-        <nav className="order-3 mt-3 grid w-full grid-cols-4 gap-1 sm:order-2 sm:mt-0 sm:flex sm:w-auto sm:flex-1 sm:justify-center" aria-label="Primary navigation">
+        <nav className="order-3 mt-3 grid w-full grid-cols-3 gap-1 sm:order-2 sm:mt-0 sm:flex sm:w-auto sm:flex-1 sm:justify-center" aria-label="Primary navigation">
           {NAV_ITEMS.map((item) => (
             <NavLink
               key={item.to}
@@ -93,8 +87,7 @@ export function TopBar() {
               <p className="mt-1 truncate text-sm font-semibold text-text-primary">{profileName}</p>
             </div>
 
-            {isDemoMode && (
-              <div className="py-2" aria-label="Switch demo persona">
+            <div className="py-2" aria-label="Pitch demo controls">
                 <p className="px-3 pb-1 text-xs text-text-secondary">Presentation controls</p>
                 <div className="rounded-xl bg-primary/5 px-3 py-2 text-sm font-semibold text-primary">Persona A · Oct 5–18, 2026</div>
                 <div className="mt-2 border-t border-surface-border px-3 pt-3">
@@ -110,7 +103,6 @@ export function TopBar() {
                   {resetStatus === 'error' && resetError && <p className="mt-2 text-xs text-red-700">{resetError}</p>}
                 </div>
               </div>
-            )}
 
             {isCognitoMode && (
               <button

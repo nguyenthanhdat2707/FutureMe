@@ -152,6 +152,7 @@ export type DemoWorldAction =
   | { type: 'override-opportunity-value'; opportunityId: string; value: 'high' | 'moderate' | 'low' }
   | { type: 'correct-historical-preference'; preferenceId: string; text: string }
   | { type: 'complete-mentoring-with-reflection'; actualPreparationMinutes: 75 }
+  | { type: 'correct-mentoring-preparation'; actualPreparationMinutes: number }
   | { type: 'reset-demo-world' };
 
 export interface StorageAdapter {

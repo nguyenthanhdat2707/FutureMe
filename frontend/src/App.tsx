@@ -7,6 +7,9 @@ import DashboardPage from './pages/DashboardPage';
 import DemoPage from './pages/DemoPage';
 import AuthPage from './pages/AuthPage';
 import LandingPage from './pages/LandingPage';
+import CalendarPage from './pages/CalendarPage';
+import TasksPage from './pages/TasksPage';
+import HistoryPage from './pages/HistoryPage';
 import { AuthProvider } from './auth/AuthProvider';
 import { RequireAuth } from './auth/RequireAuth';
 import { DemoWorldProvider } from './demo-world';
@@ -22,11 +25,13 @@ function App() {
           <Route path="/" element={<RequireAuth><AuthenticatedLayout /></RequireAuth>}>
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<DashboardPage />} />
-            <Route path="calendar" element={<Navigate to="/dashboard" replace />} />
+            <Route path="calendar" element={<CalendarPage />} />
+            <Route path="tasks" element={<TasksPage />} />
             <Route path="onboarding" element={<HomePage />} />
             <Route path="ask-future-me" element={<DecisionsPage />} />
             <Route path="decisions" element={<DecisionsPage />} />
             <Route path="understanding" element={<ContextPage />} />
+            <Route path="history" element={<HistoryPage />} />
             <Route path="context" element={<Navigate to="/understanding" replace />} />
             <Route path="demo" element={<DemoPage />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />

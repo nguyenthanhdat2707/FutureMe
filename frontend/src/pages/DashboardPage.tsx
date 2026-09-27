@@ -1,230 +1,83 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { api } from '../api/client';
-import { DEMO_PERSONA_CHANGED_EVENT } from '../config/demo-personas';
-import { InterventionCard } from '../components/InterventionCard';
-import {
-  DashboardHeader,
-  DashboardInsightGrid,
-  DeadlinesCard,
-  EventDetailDialog,
-  GanttCalendar,
-  TaskTypeBubbleCard,
-  UpcomingAndSuggestionsCard,
-  type AllocationRange,
-} from '../components/dashboard/DashboardComponents';
-import { useInterventions } from '../hooks/useInterventions';
-import type { CalendarEvent, CalendarStatusResponse, PersonalContext } from '../types/domain';
-import {
-  addDays,
-  buildDashboardRange,
-  buildDeadlines,
-  buildSuggestions,
-  calculateWorkload,
-  filterEventsToRange,
-  parseEventMetadata,
-  startOfDay,
-  startOfWeek,
-  type WorkloadCategory,
-} from './dashboard-utils';
+import { Link } from 'react-router-dom';
+import { selectCapacitySummary, selectScenarioBReasoning, useDemoWorld } from '../demo-world';
 
-function isWithin(value: Date, start: Date, end: Date): boolean {
-  return value.getTime() >= start.getTime() && value.getTime() < end.getTime();
+const DAYS = [
+  ['Mon Oct 5','Busy'],['Tue Oct 6','Focused'],['Wed Oct 7','Busy'],['Thu Oct 8','Deadline'],['Fri Oct 9','Busy'],['Sat Oct 10','Protected'],['Sun Oct 11','Protected'],
+  ['Mon Oct 12','Busy'],['Tue Oct 13','Capacity'],['Wed Oct 14','Busy'],['Thu Oct 15','Busy'],['Fri Oct 16','Restructurable'],['Sat Oct 17','Protected'],['Sun Oct 18','Protected'],
+] as const;
+
+function tone(label: string) {
+  if (label === 'Protected') return 'bg-emerald-100 text-emerald-800';
+  if (label === 'Deadline') return 'bg-red-100 text-red-800';
+  if (label === 'Capacity' || label === 'Restructurable') return 'bg-violet-100 text-violet-800';
+  if (label === 'Focused') return 'bg-blue-100 text-blue-800';
+  return 'bg-amber-100 text-amber-800';
 }
 
 export function DashboardPage() {
-  const [now] = useState(() => new Date());
-  const dashboardBounds = useMemo(() => buildDashboardRange(now), [now]);
-  const currentWeekStart = useMemo(() => startOfWeek(now), [now]);
-  const boundStart = useMemo(() => startOfWeek(dashboardBounds.min), [dashboardBounds.min]);
-  const boundEnd = useMemo(() => addDays(startOfWeek(dashboardBounds.max), 7), [dashboardBounds.max]);
-  const [rangeStart, setRangeStart] = useState(currentWeekStart);
-  const [allocationRange, setAllocationRange] = useState<AllocationRange>('this-week');
-  const [selectedCategory, setSelectedCategory] = useState<WorkloadCategory | null>(null);
-  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
-  const [status, setStatus] = useState<CalendarStatusResponse | null>(null);
-  const [events, setEvents] = useState<CalendarEvent[]>([]);
-  const [context, setContext] = useState<PersonalContext | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const { intervention, error: interventionError, refresh: refreshInterventions, respond, dismiss } = useInterventions();
+  const { world, dispatch } = useDemoWorld();
+  const capacity = selectCapacitySummary(world);
+  const capacityDays = DAYS.map(([day,label]) => [day, world.activePlan?.status === 'applied' && day === 'Tue Oct 13' ? 'Relocated work' : world.activePlan?.status === 'applied' && day === 'Fri Oct 16' ? 'Focused plan' : label] as const);
+  const reasoning = selectScenarioBReasoning(world);
+  const workshop = world.opportunities.find((item) => item.id === 'opportunity.professional-workshop');
+  const mentoring = world.opportunities.find((item) => item.id === 'opportunity.student-startup-mentoring');
+  const upcoming = world.calendarEvents.filter((event) => event.kind === 'deadline' || event.kind === 'fixed').slice(0, 6);
 
-  const loadData = useCallback(async (weekStart: Date, signal?: AbortSignal) => {
-    setLoading(true);
-    try {
-      const weekEnd = addDays(weekStart, 7);
-      const [statusData, eventsData, contextData] = await Promise.all([
-        api.calendar.getStatus(),
-        api.calendar.getEvents({
-          start: weekStart.toISOString(),
-          end: weekEnd.toISOString(),
-        }),
-        api.context.getCurrent(),
-      ]);
-      if (signal?.aborted) return;
-      setStatus(statusData);
-      setEvents(eventsData);
-      setContext(contextData);
-      setError(null);
-    } catch (caught) {
-      if (signal?.aborted) return;
-      setError(caught instanceof Error ? caught.message : 'Failed to load dashboard data');
-    } finally {
-      if (!signal?.aborted) setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    void loadData(rangeStart, controller.signal);
-    return () => controller.abort();
-  }, [loadData, rangeStart]);
-
-  useEffect(() => {
-    const handler = () => {
-      setEvents([]);
-      setContext(null);
-      void loadData(startOfWeek(new Date()));
-    };
-    window.addEventListener(DEMO_PERSONA_CHANGED_EVENT, handler);
-    return () => window.removeEventListener(DEMO_PERSONA_CHANGED_EVENT, handler);
-  }, [loadData]);
-
-  // Reload calendar when an AI-accepted action creates a new event
-  useEffect(() => {
-    const handler = () => { void loadData(rangeStart); };
-    window.addEventListener('future-me-calendar-updated', handler);
-    return () => window.removeEventListener('future-me-calendar-updated', handler);
-  }, [loadData, rangeStart]);
-
-  // Reload when tab regains focus (catches navigation back from Ask Future Me)
-  useEffect(() => {
-    const handler = () => {
-      if (document.visibilityState === 'visible') void loadData(rangeStart);
-    };
-    document.addEventListener('visibilitychange', handler);
-    return () => document.removeEventListener('visibilitychange', handler);
-  }, [loadData, rangeStart]);
-
-  const handleSync = async () => {
-    setSyncing(true);
-    setError(null);
-    try {
-      await api.calendar.sync();
-      await loadData(rangeStart);
-      await refreshInterventions();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Failed to sync calendar');
-    } finally {
-      setSyncing(false);
-    }
+  const openReasoning = () => {
+    dispatch({ type:'toggle-scenario-b-insight', open:true });
   };
-
-  const visibleDays = useMemo(() => Array.from({ length: 7 }, (_, index) => addDays(rangeStart, index)), [rangeStart]);
-  const rangeEnd = useMemo(() => addDays(rangeStart, 7), [rangeStart]);
-  const visibleEvents = useMemo(() => filterEventsToRange(events, rangeStart, rangeEnd), [events, rangeEnd, rangeStart]);
-  const deadlines = useMemo(() => buildDeadlines(context, rangeStart, now), [context, now, rangeStart]);
-  const suggestionNow = isWithin(now, rangeStart, rangeEnd) ? now : rangeStart;
-  const suggestions = useMemo(
-    () => buildSuggestions(visibleEvents, context, suggestionNow),
-    [context, suggestionNow, visibleEvents],
-  );
-
-  const allocationEvents = useMemo(() => {
-    if (allocationRange === 'today') {
-      const today = startOfDay(now);
-      return filterEventsToRange(events, today, addDays(today, 1));
-    }
-    if (allocationRange === 'next-week') {
-      return filterEventsToRange(events, rangeEnd, addDays(rangeEnd, 7));
-    }
-    return visibleEvents;
-  }, [allocationRange, events, now, rangeEnd, visibleEvents]);
-  const allocation = useMemo(() => calculateWorkload(allocationEvents), [allocationEvents]);
-
-  const upcomingMeeting = useMemo(() => {
-    const anchor = isWithin(now, rangeStart, rangeEnd) ? now : rangeStart;
-    return visibleEvents
-      .filter((event) => parseEventMetadata(event).category === 'meeting' && new Date(event.endTime) > anchor)
-      .sort((left, right) => new Date(left.startTime).getTime() - new Date(right.startTime).getTime())[0] ?? null;
-  }, [now, rangeEnd, rangeStart, visibleEvents]);
-
-  const changeWeek = (amount: number) => {
-    setRangeStart((current) => addDays(current, amount * 7));
-    setSelectedCategory(null);
-  };
-
-  const canGoPrevious = addDays(rangeStart, -7).getTime() >= boundStart.getTime();
-  const canGoNext = addDays(rangeEnd, 7).getTime() <= boundEnd.getTime();
 
   return (
-    <div className="mx-auto min-w-0 max-w-[1440px] px-4 py-8 sm:px-6 sm:py-10 lg:px-10 lg:py-12">
-      <DashboardHeader
-        rangeStart={rangeStart}
-        rangeEnd={addDays(rangeEnd, -1)}
-        canGoPrevious={canGoPrevious}
-        canGoNext={canGoNext}
-        onPrevious={() => canGoPrevious && changeWeek(-1)}
-        onNext={() => canGoNext && changeWeek(1)}
-        onCurrentWeek={() => {
-          setRangeStart(currentWeekStart);
-          setSelectedCategory(null);
-        }}
-      />
-
-      {(intervention || interventionError) && (
-        <div className="mt-7">
-          {interventionError && !intervention ? (
-            <p className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900" role="status">Intervention check is temporarily unavailable.</p>
-          ) : (
-            <InterventionCard intervention={intervention} onRespond={respond} onDismiss={dismiss} />
-          )}
+    <main className="mx-auto max-w-[1440px] space-y-7 px-5 py-8 lg:px-10 lg:py-10">
+      <header className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">Persona A · Oct 5–18, 2026</p>
+          <h1 className="mt-2 text-4xl font-semibold text-text-primary">Your next two weeks, understood.</h1>
+          <p className="mt-2 max-w-2xl text-text-secondary">Future Me connects calendar facts, usable capacity, personal direction, and history—not just empty slots.</p>
         </div>
-      )}
+        <Link to="/understanding" className="rounded-xl border border-primary/20 bg-white px-4 py-2 text-sm font-semibold text-primary">View what Future Me understands</Link>
+      </header>
 
-      <div className="mt-8 min-w-0">
-        <GanttCalendar
-          key={rangeStart.toISOString()}
-          visibleDays={visibleDays}
-          events={visibleEvents}
-          status={status}
-          syncing={syncing}
-          selectedCategory={selectedCategory}
-          onCategoryClear={() => setSelectedCategory(null)}
-          onSync={() => void handleSync()}
-          onEventOpen={setSelectedEvent}
-          loading={loading}
-          error={Boolean(error)}
-          onRetry={() => void loadData(rangeStart)}
-        />
-      </div>
+      <section className="grid gap-4 md:grid-cols-4" aria-label="Current state">
+        {[
+          ['Workload','High workload','Several fixed commitments and a hard deadline'],
+          ['Available Capacity',capacity.availableCapacity === 'limited' ? 'Limited' : 'Restructured','Usable capacity, not empty time'],
+          ['Mental Well-being',world.capacityProfile.mentalWellbeing.value === 'slightly-strained' ? 'Slightly strained' : 'Steady','User Reported'],
+          ['Next critical deadline','Client Proposal · Thu Oct 8, 19:00','~90 minutes focused work remains'],
+        ].map(([label,value,note]) => <article key={label} className="card p-5"><p className="text-xs font-bold uppercase tracking-wide text-text-secondary">{label}</p><p className="mt-2 text-xl font-semibold text-text-primary">{value}</p><p className="mt-1 text-xs text-text-secondary">{note}</p></article>)}
+      </section>
 
-      <div className="mt-5">
-        <DashboardInsightGrid>
-          <DeadlinesCard deadlines={deadlines} loading={loading} error={Boolean(error)} onRetry={() => void loadData(rangeStart)} />
-          <TaskTypeBubbleCard
-            allocation={allocation}
-            range={allocationRange}
-            selectedCategory={selectedCategory}
-            onRangeChange={setAllocationRange}
-            onCategoryOpen={(category) => setSelectedCategory((current) => current === category ? null : category)}
-            loading={loading}
-            error={Boolean(error)}
-            onRetry={() => void loadData(rangeStart)}
-          />
-          <UpcomingAndSuggestionsCard
-            upcomingMeeting={upcomingMeeting}
-            suggestions={suggestions}
-            now={suggestionNow}
-            loading={loading}
-            error={Boolean(error)}
-            onRetry={() => void loadData(rangeStart)}
-          />
-        </DashboardInsightGrid>
-      </div>
+      <section className="card overflow-hidden">
+        <div className="flex items-end justify-between border-b border-surface-border p-6"><div><p className="text-xs font-bold uppercase tracking-wide text-primary">Fixed demo period</p><h2 className="mt-1 text-2xl text-text-primary">14-Day Capacity</h2></div><p className="text-sm text-text-secondary">Busy ≠ impossible · Free ≠ available</p></div>
+        <div className="grid grid-cols-2 gap-px bg-surface-border sm:grid-cols-4 lg:grid-cols-7">
+          {capacityDays.map(([day,label]) => <div key={day} className="min-h-28 bg-white p-3"><p className="text-sm font-semibold text-text-primary">{day}</p><span className={`mt-4 inline-flex rounded-full px-2 py-1 text-xs font-semibold ${tone(label)}`}>{label}</span><div className="mt-3 h-2 rounded-full bg-slate-100"><div className={`h-2 rounded-full ${label === 'Protected' ? 'w-1/4 bg-emerald-400' : label === 'Capacity' ? 'w-2/5 bg-violet-400' : 'w-4/5 bg-amber-400'}`} /></div></div>)}
+        </div>
+      </section>
 
-      <EventDetailDialog event={selectedEvent} onClose={() => setSelectedEvent(null)} />
-    </div>
+      <section className="grid gap-6 lg:grid-cols-[1.25fr_.75fr]">
+        <article className="rounded-3xl border border-violet-200 bg-gradient-to-br from-violet-50 to-white p-6 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-violet-700">Proactive insight</p><h2 className="mt-2 max-w-3xl text-2xl text-text-primary">4:00 PM looks free, but using it for the workshop would put your 7:00 PM deadline under unnecessary pressure.</h2></div><span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-violet-700">No calendar conflict</span></div>
+          <p className="mt-3 text-sm font-bold text-emerald-800">Thursday Oct 8 · 16:00–17:00 · FREE</p>
+          <p className="mt-1 text-sm text-text-secondary">The optional workshop consumes the strongest remaining focus window before the Client Proposal deadline.</p>
+          <button type="button" onClick={openReasoning} className="mt-5 rounded-xl bg-violet-700 px-4 py-2 text-sm font-bold text-white">View reasoning</button>
+          {world.ui.scenarioBInsightOpen && <div className="mt-5 rounded-2xl border border-violet-200 bg-white p-5" role="region" aria-label="Workshop reasoning">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {['Thursday Oct 8 · 16:00–17:00 · FREE','19:00 deadline','~90 min focused work remains','16:00–18:00 strong focus window','High workload',reasoning.mentalWellbeing === 'slightly-strained' ? 'Slightly strained mental state' : 'Steady mental state'].map((text) => <div key={text} className="rounded-xl bg-slate-50 p-3 text-sm font-medium text-text-primary">{text}</div>)}
+            </div>
+            <div className="mt-4 rounded-xl bg-amber-50 p-4 text-sm text-amber-950"><strong>{workshop?.title}</strong> is optional, {reasoning.workshopValue} value, {reasoning.recordingAvailable ? 'with recording available later' : 'without a recording option'}.</div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2"><div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4"><p className="text-xs font-bold uppercase text-emerald-700">Calendar availability: Yes</p><p className="mt-1 text-sm">The hour contains no overlapping event.</p></div><div className="rounded-xl border border-red-200 bg-red-50 p-4"><p className="text-xs font-bold uppercase text-red-700">Usable capacity: Low</p><p className="mt-1 text-sm">Deadline pressure and focus opportunity cost are high.</p></div></div>
+            <p className="mt-4 text-lg font-semibold text-text-primary">{reasoning.recommendationText}</p>
+            {workshop?.status === 'declined-live' ? <p className="mt-3 text-sm font-semibold text-emerald-700">Declined live session · Recording flagged for later</p> : <button type="button" onClick={() => dispatch({ type:'use-workshop-recording' })} className="mt-4 rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white">Use recording instead</button>}
+          </div>}
+        </article>
+        <article className="card p-6"><p className="text-xs font-bold uppercase tracking-wide text-primary">Current opportunity</p><h2 className="mt-2 text-2xl text-text-primary">{mentoring?.title}</h2><p className="mt-2 text-sm text-text-secondary"><span className="capitalize">{mentoring?.priority}</span> priority · <span className="capitalize">{mentoring?.value.level}</span> alignment with startup and advisory direction</p><div className="mt-4 rounded-xl bg-violet-50 p-4 text-sm text-violet-900">Status: <strong>{mentoring?.status}</strong></div><Link to="/ask-future-me" className="mt-4 inline-flex text-sm font-bold text-primary">Ask Future Me →</Link></article>
+      </section>
+
+      <section className="grid gap-6 lg:grid-cols-2">
+        <article className="card p-6"><h2 className="text-2xl text-text-primary">Upcoming Commitments & Deadlines</h2><div className="mt-4 space-y-3">{upcoming.map((event) => <div key={event.id} className="flex items-center justify-between gap-4 rounded-xl bg-slate-50 p-3"><div><p className="text-sm font-semibold text-text-primary">{event.title}</p><p className="text-xs text-text-secondary">{event.start.replace('T',' · ')}</p></div><span className="rounded-full bg-white px-2 py-1 text-xs font-semibold capitalize text-text-secondary">{event.kind}</span></div>)}</div></article>
+        <article className="card p-6"><h2 className="text-2xl text-text-primary">Personal Direction Snapshot</h2><div className="mt-4 space-y-3">{world.goals.slice(0,4).map((goal) => <div key={goal.id} className="rounded-xl border border-surface-border p-3"><p className="text-xs font-bold uppercase text-text-secondary">{goal.horizon}</p><p className="mt-1 text-sm font-semibold text-text-primary">{goal.title}</p></div>)}</div></article>
+      </section>
+    </main>
   );
 }
 
