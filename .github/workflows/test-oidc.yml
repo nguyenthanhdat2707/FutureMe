@@ -11,12 +11,28 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+
     steps:
+      - name: Check OIDC claims
+        shell: bash
+        run: |
+          TOKEN=$(curl -fsS \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com" \
+            | jq -r '.value')
+
+          PAYLOAD=$(echo "$TOKEN" | cut -d. -f2)
+
+          echo "$PAYLOAD" | base64 -d 2>/dev/null \
+            | jq '{sub, aud}'
+
       - name: Assume AWS Role via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::728033416182:role/Test
           aws-region: ap-southeast-1
+          retry-max-attempts: 1
+          action-timeout-s: 30
 
-      - name: Verify identity
+      - name: Verify AWS identity
         run: aws sts get-caller-identity
