@@ -23,8 +23,16 @@ jobs:
 
           PAYLOAD=$(echo "$TOKEN" | cut -d. -f2)
 
-          echo "$PAYLOAD" | base64 -d 2>/dev/null \
-            | jq '{sub, aud}'
+          python3 -c '
+          import base64, json, sys
+          payload = sys.stdin.read().strip()
+          payload += "=" * (-len(payload) % 4)
+          claims = json.loads(base64.urlsafe_b64decode(payload))
+          print(json.dumps({
+              "sub": claims["sub"],
+              "aud": claims["aud"]
+          }, indent=2))
+          ' <<< "$PAYLOAD"
 
       - name: Assume AWS Role via OIDC
         uses: aws-actions/configure-aws-credentials@v4
